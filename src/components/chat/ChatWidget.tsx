@@ -95,7 +95,7 @@ export const ChatWidget = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h3 className="font-semibold truncate">
-              {selectedConversation?.other_user_first_name} {selectedConversation?.other_user_last_name}
+              {`${selectedConversation?.other_user_first_name || ''} ${selectedConversation?.other_user_last_name || ''}`.trim() || 'Chat'}
             </h3>
           </div>
         );

@@ -52,7 +52,9 @@ export const ConversationList = ({ onSelectConversation, onlineUsers }: Conversa
             )}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="font-semibold truncate">{convo.other_user_first_name} {convo.other_user_last_name}</p>
+            <p className="font-semibold truncate">
+              {`${convo.other_user_first_name || ''} ${convo.other_user_last_name || ''}`.trim() || 'Unbekannter Benutzer'}
+            </p>
             <p className="text-sm text-muted-foreground truncate">{convo.last_message_content || 'Keine Nachrichten'}</p>
           </div>
         </div>
