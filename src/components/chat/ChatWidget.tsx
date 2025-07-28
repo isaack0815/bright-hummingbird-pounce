@@ -8,7 +8,7 @@ import { UserSearch } from './UserSearch';
 import type { Conversation, ChatMessage } from '@/types/chat';
 import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
-import { showSuccess } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 
 type View = 'list' | 'conversation' | 'search';
 
@@ -73,12 +73,17 @@ export const ChatWidget = () => {
     setView('conversation');
   };
 
-  const handleStartNewConversation = (user: any) => {
+  const handleStartNewConversation = (conversationData: any) => {
+    if (!conversationData || !conversationData.conversation_id) {
+      showError("Konversation konnte nicht gestartet werden.");
+      console.error("handleStartNewConversation received invalid data:", conversationData);
+      return;
+    }
      const newConversation: Conversation = {
-      conversation_id: user.conversation_id,
-      other_user_id: user.other_user_id,
-      other_user_first_name: user.other_user_first_name,
-      other_user_last_name: user.other_user_last_name,
+      conversation_id: conversationData.conversation_id,
+      other_user_id: conversationData.other_user_id,
+      other_user_first_name: conversationData.other_user_first_name,
+      other_user_last_name: conversationData.other_user_last_name,
       last_message_content: null,
       last_message_created_at: null,
     };
