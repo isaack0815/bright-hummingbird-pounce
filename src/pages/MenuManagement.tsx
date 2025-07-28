@@ -7,14 +7,17 @@ import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import {
   DndContext,
-  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
+  DragStartEvent,
   DragEndEvent,
+  DragMoveEvent,
+  UniqueIdentifier,
+  closestCenter,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
@@ -22,6 +25,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { AddMenuItemDialog } from '@/components/AddMenuItemDialog';
 import { EditMenuItemDialog } from '@/components/EditMenuItemDialog';
+import { createPortal } from 'react-dom';
 
 export type MenuItem = {
   id: number;
@@ -30,16 +34,74 @@ export type MenuItem = {
   link: string | null;
   icon: string | null;
   position: number;
-  children?: MenuItem[];
 };
 
-type SortableItemProps = {
+type TreeMenuItem = MenuItem & { children: TreeMenuItem[] };
+
+type FlattenedItem = TreeMenuItem & {
+  parentId: number | null;
+  depth: number;
+  index: number;
+};
+
+const INDENTATION_WIDTH = 20;
+
+// Helper to build the tree from a flat list
+const buildTree = (items: MenuItem[]): TreeMenuItem[] => {
+  const itemMap = new Map<number, TreeMenuItem>();
+  const tree: TreeMenuItem[] = [];
+
+  items.forEach(item => {
+    itemMap.set(item.id, { ...item, children: [] });
+  });
+
+  items.forEach(item => {
+    if (item.parent_id && itemMap.has(item.parent_id)) {
+      const parent = itemMap.get(item.parent_id)!;
+      parent.children.push(itemMap.get(item.id)!);
+    } else {
+      tree.push(itemMap.get(item.id)!);
+    }
+  });
+
+  const sortChildren = (node: TreeMenuItem) => {
+    node.children.sort((a, b) => a.position - b.position);
+    node.children.forEach(sortChildren);
+  };
+  tree.sort((a, b) => a.position - b.position);
+  tree.forEach(sortChildren);
+
+  return tree;
+};
+
+// Helper to flatten the tree for dnd-kit
+function flattenTree(items: TreeMenuItem[], parentId: number | null = null, depth = 0): FlattenedItem[] {
+  return items.reduce<FlattenedItem[]>((acc, item, index) => {
+    return [
+      ...acc,
+      { ...item, parentId, depth, index },
+      ...flattenTree(item.children, item.id, depth + 1),
+    ];
+  }, []);
+}
+
+function getDragDepth(offset: number, indentationWidth: number) {
+  return Math.round(offset / indentationWidth);
+}
+
+function SortableTreeItem({
+  item,
+  depth,
+  isDragging,
+  onEdit,
+  onDelete,
+}: {
   item: MenuItem;
+  depth: number;
+  isDragging?: boolean;
   onEdit: (item: MenuItem) => void;
   onDelete: (id: number) => void;
-};
-
-function SortableItem({ item, onEdit, onDelete }: SortableItemProps) {
+}) {
   const {
     attributes,
     listeners,
@@ -49,17 +111,19 @@ function SortableItem({ item, onEdit, onDelete }: SortableItemProps) {
   } = useSortable({ id: item.id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
+    marginLeft: depth * INDENTATION_WIDTH,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center bg-background rounded-lg p-2 my-1 shadow-sm">
+    <div ref={setNodeRef} style={style} className="flex items-center bg-background rounded-lg my-1 shadow-sm group">
       <div {...attributes} {...listeners} className="p-2 cursor-grab active:cursor-grabbing">
         <GripVertical className="h-5 w-5 text-muted-foreground" />
       </div>
       <div className="flex-grow">{item.name}</div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button variant="ghost" size="icon" onClick={() => onEdit(item)}>
           <Edit className="h-4 w-4" />
         </Button>
@@ -82,21 +146,28 @@ const MenuManagement = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [overId, setOverId] = useState<UniqueIdentifier | null>(null);
+  const [offsetLeft, setOffsetLeft] = useState(0);
+
   const queryClient = useQueryClient();
 
-  const { data: fetchedItems, isLoading, error } = useQuery<MenuItem[]>({
+  const { isLoading, error } = useQuery<MenuItem[]>({
     queryKey: ['menuItems'],
     queryFn: fetchMenuItems,
+    onSuccess: setItems,
   });
 
-  useEffect(() => {
-    if (fetchedItems) {
-      setItems(fetchedItems);
-    }
-  }, [fetchedItems]);
+  const flattenedItems = useMemo(() => {
+    const tree = buildTree(items);
+    return flattenTree(tree);
+  }, [items]);
+
+  const activeItem = useMemo(() => activeId ? flattenedItems.find(({ id }) => id === activeId) : null, [activeId, flattenedItems]);
+  const projected = activeId && overId ? getProjection(flattenedItems, activeId, overId, offsetLeft, INDENTATION_WIDTH) : null;
 
   const updateStructureMutation = useMutation({
-    mutationFn: async (updatedItems: { id: number; parentId: number | null; position: number }[]) => {
+    mutationFn: async (updatedItems: { id: number; parent_id: number | null; position: number }[]) => {
       const { error } = await supabase.functions.invoke('update-menu-structure', {
         body: { items: updatedItems },
       });
@@ -108,7 +179,7 @@ const MenuManagement = () => {
     },
     onError: (err: any) => showError(err.message || "Fehler beim Speichern der Struktur."),
   });
-  
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await supabase.functions.invoke('delete-menu-item', { body: { id } });
@@ -122,25 +193,50 @@ const MenuManagement = () => {
   });
 
   const sensors = useSensors(useSensor(PointerSensor));
-  const sortedItemIds = useMemo(() => items.map(item => item.id), [items]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = items.findIndex((item) => item.id === active.id);
-      const newIndex = items.findIndex((item) => item.id === over.id);
-      const newItems = arrayMove(items, oldIndex, newIndex);
-      setItems(newItems);
+  function handleDragStart({ active }: DragStartEvent) {
+    setActiveId(active.id);
+    setOverId(active.id);
+  }
 
-      const itemsToUpdate = newItems.map((item, index) => ({
-        id: item.id,
-        parentId: item.parent_id, // Nesting logic to be added in a future step
-        position: index,
-      }));
-      updateStructureMutation.mutate(itemsToUpdate);
+  function handleDragMove({ delta, over }: DragMoveEvent) {
+    setOffsetLeft(delta.x);
+    if (over) {
+      setOverId(over.id);
     }
-  };
-  
+  }
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    resetState();
+    if (projected && over) {
+      const { depth, parentId } = projected;
+      const clonedItems: MenuItem[] = JSON.parse(JSON.stringify(items));
+      const activeItemInClone = clonedItems.find(item => item.id === active.id)!;
+      
+      activeItemInClone.parent_id = parentId;
+
+      const parentChildren = clonedItems.filter(item => item.parent_id === parentId);
+      const overIndex = parentChildren.findIndex(item => item.id === over.id);
+      
+      const newItems = moveItem(clonedItems, active.id, parentId, overIndex);
+      
+      const finalItemsToUpdate = calculatePositions(newItems);
+      
+      setItems(newItems);
+      updateStructureMutation.mutate(finalItemsToUpdate);
+    }
+  }
+
+  function handleDragCancel() {
+    resetState();
+  }
+
+  function resetState() {
+    setActiveId(null);
+    setOverId(null);
+    setOffsetLeft(0);
+  }
+
   const handleEdit = (item: MenuItem) => {
     setSelectedItem(item);
     setIsEditDialogOpen(true);
@@ -157,37 +253,139 @@ const MenuManagement = () => {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Menüverwaltung</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Menüpunkt hinzufügen
-        </Button>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Menü-Editor</CardTitle>
-          <CardDescription>Ordnen Sie Menüpunkte per Drag & Drop an. Verschachtelung wird in Kürze verfügbar sein.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p>Menüpunkte werden geladen...</p>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={sortedItemIds} strategy={verticalListSortingStrategy}>
-                {items.map(item => (
-                  <SortableItem key={item.id} item={item} onEdit={handleEdit} onDelete={handleDelete} />
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-foreground">Menüverwaltung</h1>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Menüpunkt hinzufügen
+          </Button>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Menü-Editor</CardTitle>
+            <CardDescription>Ordnen Sie Menüpunkte per Drag & Drop an. Ziehen Sie sie nach rechts, um sie zu verschachteln.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <p>Menüpunkte werden geladen...</p>
+            ) : (
+              <SortableContext items={flattenedItems.map(({ id }) => id)} strategy={verticalListSortingStrategy}>
+                {flattenedItems.map(item => (
+                  <SortableTreeItem
+                    key={item.id}
+                    item={item}
+                    depth={item.id === activeId && projected ? projected.depth : item.depth}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
                 ))}
+                {typeof document !== 'undefined' && createPortal(
+                  <DragOverlay dropAnimation={null}>
+                    {activeId && activeItem ? (
+                      <SortableTreeItem
+                        item={activeItem}
+                        depth={activeItem.depth}
+                        isDragging
+                        onEdit={() => {}}
+                        onDelete={() => {}}
+                      />
+                    ) : null}
+                  </DragOverlay>,
+                  document.body
+                )}
               </SortableContext>
-            </DndContext>
-          )}
-        </CardContent>
-      </Card>
-      <AddMenuItemDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
-      <EditMenuItemDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} item={selectedItem} />
-    </div>
+            )}
+          </CardContent>
+        </Card>
+        <AddMenuItemDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
+        <EditMenuItemDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} item={selectedItem} />
+      </div>
+    </DndContext>
   );
 };
+
+// --- DND Helper Functions ---
+
+function getProjection(
+  items: FlattenedItem[],
+  activeId: UniqueIdentifier,
+  overId: UniqueIdentifier,
+  dragOffset: number,
+  indentationWidth: number
+) {
+  const overItemIndex = items.findIndex(({ id }) => id === overId);
+  const activeItemIndex = items.findIndex(({ id }) => id === activeId);
+  const activeItem = items[activeItemIndex];
+  const newItems = arrayMove(items, activeItemIndex, overItemIndex);
+  const previousItem = newItems[overItemIndex - 1];
+  const nextItem = newItems[overItemIndex + 1];
+  const dragDepth = getDragDepth(dragOffset, indentationWidth);
+  const projectedDepth = activeItem.depth + dragDepth;
+  const maxDepth = previousItem ? previousItem.depth + 1 : 0;
+  const minDepth = nextItem ? nextItem.depth : 0;
+  let depth = projectedDepth;
+  if (projectedDepth >= maxDepth) {
+    depth = maxDepth;
+  } else if (projectedDepth < minDepth) {
+    depth = minDepth;
+  }
+
+  function getParentId() {
+    if (depth === 0 || !previousItem) {
+      return null;
+    }
+    if (depth === previousItem.depth) {
+      return previousItem.parentId;
+    }
+    if (depth > previousItem.depth) {
+      return previousItem.id;
+    }
+    const newParent = newItems
+      .slice(0, overItemIndex)
+      .reverse()
+      .find((item) => item.depth === depth - 1);
+    return newParent ? newParent.id : null;
+  }
+
+  return { depth, parentId: getParentId() };
+}
+
+function moveItem(items: MenuItem[], activeId: UniqueIdentifier, newParentId: number | null, newIndex: number): MenuItem[] {
+    const activeItem = items.find(item => item.id === activeId)!;
+    const newItems = items.filter(item => item.id !== activeId);
+    
+    const childrenOfNewParent = newItems.filter(item => item.parent_id === newParentId);
+    childrenOfNewParent.splice(newIndex, 0, activeItem);
+
+    const nonChildren = newItems.filter(item => item.parent_id !== newParentId);
+    
+    return [...nonChildren, ...childrenOfNewParent];
+}
+
+function calculatePositions(items: MenuItem[]): { id: number; parent_id: number | null; position: number }[] {
+    const tree = buildTree(items);
+    const updates: { id: number; parent_id: number | null; position: number }[] = [];
+
+    function traverse(nodes: TreeMenuItem[], parentId: number | null) {
+        nodes.forEach((node, index) => {
+            updates.push({ id: node.id, parent_id: parentId, position: index });
+            if (node.children.length > 0) {
+                traverse(node.children, node.id);
+            }
+        });
+    }
+
+    traverse(tree, null);
+    return updates;
+}
 
 export default MenuManagement;
