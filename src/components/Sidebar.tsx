@@ -1,11 +1,93 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
-import { Home, Users, Shield, Menu as MenuIcon, LogOut, Building2 } from 'lucide-react';
+import { Building2, LogOut, ChevronRight } from 'lucide-react';
 import { showError } from '@/utils/toast';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import type { MenuItem } from '@/pages/MenuManagement';
+import DynamicIcon from './DynamicIcon';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+const buildMenuTree = (items: MenuItem[]): MenuItem[] => {
+  const itemMap = new Map<number, MenuItem>();
+  const tree: MenuItem[] = [];
+
+  items.forEach(item => {
+    itemMap.set(item.id, { ...item, children: [] });
+  });
+
+  itemMap.forEach(item => {
+    if (item.parent_id && itemMap.has(item.parent_id)) {
+      const parent = itemMap.get(item.parent_id);
+      parent?.children?.push(item);
+    } else {
+      tree.push(item);
+    }
+  });
+
+  return tree;
+};
+
+const SidebarMenuItem = ({ item }: { item: MenuItem }) => {
+  const location = useLocation();
+  
+  if (!item.children || item.children.length === 0) {
+    return (
+      <NavLink
+        to={item.link || '#'}
+        end={item.link === '/'}
+        className={({ isActive }) =>
+          `flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
+            isActive ? 'bg-muted text-primary' : ''
+          }`
+        }
+      >
+        {item.icon && <DynamicIcon name={item.icon} className="h-4 w-4" />}
+        {item.name}
+      </NavLink>
+    );
+  }
+
+  const isChildActive = useMemo(() => 
+    item.children?.some(child => location.pathname.startsWith(child.link || '___')),
+    [item.children, location.pathname]
+  );
+
+  return (
+    <Collapsible defaultOpen={isChildActive}>
+      <CollapsibleTrigger className="w-full text-left">
+        <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+          <div className="flex items-center gap-3">
+            {item.icon && <DynamicIcon name={item.icon} className="h-4 w-4" />}
+            {item.name}
+          </div>
+          <ChevronRight className="h-4 w-4 transition-transform duration-200 [&[data-state=open]]:rotate-90" />
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pl-6 border-l border-muted-foreground/20 ml-4">
+        <nav className="grid items-start py-1 text-sm font-medium">
+          {item.children.map(child => (
+            <SidebarMenuItem key={child.id} item={child} />
+          ))}
+        </nav>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+const fetchMenuItems = async (): Promise<MenuItem[]> => {
+  const { data, error } = await supabase.functions.invoke('get-menu-items');
+  if (error) throw new Error(error.message);
+  return data.items;
+};
 
 const Sidebar = () => {
   const navigate = useNavigate();
+  const { data: menuItems, isLoading } = useQuery<MenuItem[]>({
+    queryKey: ['menuItems'],
+    queryFn: fetchMenuItems,
+  });
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -16,12 +98,10 @@ const Sidebar = () => {
     }
   };
 
-  const navItems = [
-    { to: '/', icon: <Home className="h-5 w-5" />, label: 'Dashboard' },
-    { to: '/users', icon: <Users className="h-5 w-5" />, label: 'Nutzerverwaltung' },
-    { to: '/roles', icon: <Shield className="h-5 w-5" />, label: 'Rechteverwaltung' },
-    { to: '/menus', icon: <MenuIcon className="h-5 w-5" />, label: 'Menüverwaltung' },
-  ];
+  const menuTree = useMemo(() => {
+    if (!menuItems) return [];
+    return buildMenuTree(menuItems);
+  }, [menuItems]);
 
   return (
     <div className="flex h-full max-h-screen flex-col gap-2">
@@ -31,23 +111,13 @@ const Sidebar = () => {
           <span>ERP System</span>
         </NavLink>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary ${
-                  isActive ? 'bg-muted text-primary' : ''
-                }`
-              }
-            >
-              {item.icon}
-              {item.label}
-            </NavLink>
-          ))}
+          {isLoading ? (
+            <div className="p-4 text-muted-foreground">Menü wird geladen...</div>
+          ) : (
+            menuTree.map(item => <SidebarMenuItem key={item.id} item={item} />)
+          )}
         </nav>
       </div>
       <div className="mt-auto p-4">
