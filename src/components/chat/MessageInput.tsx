@@ -17,7 +17,7 @@ export const MessageInput = ({ conversationId }: MessageInputProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  const handleSendMessage = async (file?: { url: string; name: string; type: string }) => {
+  const handleSendMessage = async (file?: { path: string; name: string; type: string }) => {
     if (!content.trim() && !file) return;
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -27,7 +27,7 @@ export const MessageInput = ({ conversationId }: MessageInputProps) => {
       user_id: user.id,
       conversation_id: conversationId,
       content: content.trim() || null,
-      file_url: file?.url || null,
+      file_url: file?.path || null, // Store the path, not a public URL
       file_name: file?.name || null,
       file_type: file?.type || null,
     };
@@ -51,14 +51,12 @@ export const MessageInput = ({ conversationId }: MessageInputProps) => {
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('chat-files').upload(fileName, file);
+      const filePath = `${Date.now()}-${Math.random()}.${fileExt}`; // Use a more unique path
+      const { error: uploadError } = await supabase.storage.from('chat-files').upload(filePath, file);
 
       if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from('chat-files').getPublicUrl(fileName);
       
-      await handleSendMessage({ url: publicUrl, name: file.name, type: file.type });
+      await handleSendMessage({ path: filePath, name: file.name, type: file.type });
 
     } catch (error) {
       showError('Fehler beim Hochladen der Datei.');

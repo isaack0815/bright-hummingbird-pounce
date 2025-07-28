@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/types/chat';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Download } from 'lucide-react';
+import { showError } from '@/utils/toast';
 
 type MessageListProps = {
   conversationId: number;
@@ -40,6 +41,40 @@ const fetchMessages = async (conversationId: number): Promise<ChatMessage[]> => 
   }));
 
   return messagesWithProfiles as ChatMessage[];
+};
+
+const DownloadableFile = ({ filePath, fileName }: { filePath: string; fileName: string | null }) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from('chat-files')
+        .createSignedUrl(filePath, 300); // Link is valid for 5 minutes
+
+      if (error) throw error;
+
+      window.open(data.signedUrl, '_blank');
+    } catch (error) {
+      console.error('Error creating signed URL:', error);
+      showError("Fehler beim Erstellen des Download-Links.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <a
+      href="#"
+      onClick={handleDownload}
+      className="flex items-center gap-2 text-sm mt-1 underline"
+    >
+      <Download className="h-4 w-4" />
+      {isLoading ? 'Link wird erstellt...' : fileName || 'Datei ansehen'}
+    </a>
+  );
 };
 
 export const MessageList = ({ conversationId, currentUserId }: MessageListProps) => {
@@ -89,15 +124,7 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
             )}
             {msg.content && <p className="text-sm">{msg.content}</p>}
             {msg.file_url && (
-              <a
-                href={msg.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm mt-1 underline"
-              >
-                <Download className="h-4 w-4" />
-                {msg.file_name || 'Datei ansehen'}
-              </a>
+              <DownloadableFile filePath={msg.file_url} fileName={msg.file_name} />
             )}
           </div>
         </div>
