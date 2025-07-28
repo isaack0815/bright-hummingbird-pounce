@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -20,15 +20,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import type { MenuItem } from "@/pages/MenuManagement";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Name ist erforderlich." }),
   link: z.string().optional(),
   icon: z.string().optional(),
+  parentId: z.coerce.number().nullable(),
 });
 
 type EditMenuItemDialogProps = {
@@ -37,11 +39,39 @@ type EditMenuItemDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+const fetchAllMenuItems = async (): Promise<MenuItem[]> => {
+  const { data, error } = await supabase.functions.invoke('get-menu-items');
+  if (error) throw new Error(error.message);
+  return data.items;
+};
+
 export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDialogProps) {
   const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
+
+  const { data: allItems } = useQuery<MenuItem[]>({
+    queryKey: ['menuItems'],
+    queryFn: fetchAllMenuItems,
+    enabled: open,
+  });
+
+  const getDescendantIds = (itemId: number, items: MenuItem[]): number[] => {
+    const children = items.filter(i => i.parent_id === itemId);
+    let descendantIds: number[] = children.map(c => c.id);
+    children.forEach(child => {
+      descendantIds = [...descendantIds, ...getDescendantIds(child.id, items)];
+    });
+    return descendantIds;
+  };
+
+  const possibleParents = useMemo(() => {
+    if (!allItems || !item) return [];
+    const descendantIds = getDescendantIds(item.id, allItems);
+    const invalidIds = [item.id, ...descendantIds];
+    return allItems.filter(i => !invalidIds.includes(i.id));
+  }, [allItems, item]);
 
   useEffect(() => {
     if (item) {
@@ -49,15 +79,22 @@ export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDia
         name: item.name,
         link: item.link || "",
         icon: item.icon || "",
+        parentId: item.parent_id,
       });
     }
-  }, [item, form]);
+  }, [item, form, open]);
 
   const updateMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!item) return;
       const { error } = await supabase.functions.invoke('update-menu-item', {
-        body: { id: item.id, ...values },
+        body: { 
+          id: item.id, 
+          name: values.name,
+          link: values.link,
+          icon: values.icon,
+          parentId: values.parentId 
+        },
       });
       if (error) throw error;
     },
@@ -101,6 +138,31 @@ export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDia
                 <FormMessage />
               </FormItem>
             )} />
+            <FormField
+              control={form.control}
+              name="parentId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Übergeordnetes Element</FormLabel>
+                  <Select onValueChange={field.onChange} value={String(field.value ?? 'null')}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Kein übergeordnetes Element" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={'null'}>- Kein übergeordnetes Element -</SelectItem>
+                      {possibleParents.map(parent => (
+                        <SelectItem key={parent.id} value={String(parent.id)}>
+                          {parent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <DialogFooter>
               <Button type="submit" disabled={updateMutation.isPending}>
                 {updateMutation.isPending ? "Wird gespeichert..." : "Speichern"}

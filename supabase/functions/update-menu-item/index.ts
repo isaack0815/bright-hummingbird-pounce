@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { id, name, link, icon } = await req.json()
+    const { id, name, link, icon, parentId } = await req.json()
 
     if (!id || !name) {
       return new Response(JSON.stringify({ error: 'ID and name are required' }), {
@@ -28,7 +28,7 @@ serve(async (req) => {
 
     const { data, error } = await supabase
       .from('menu_items')
-      .update({ name, link, icon })
+      .update({ name, link, icon, parent_id: parentId })
       .eq('id', id)
       .select()
       .single()
