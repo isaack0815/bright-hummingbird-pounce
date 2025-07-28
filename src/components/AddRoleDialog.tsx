@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useError } from "@/contexts/ErrorContext";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Gruppenname ist erforderlich." }),
@@ -38,6 +39,7 @@ type AddRoleDialogProps = {
 export function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
+  const { addError } = useError();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -63,7 +65,7 @@ export function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps) {
       onOpenChange(false);
       form.reset();
     } catch (error: any) {
-      console.error("Fehler beim Erstellen der Gruppe:", error);
+      addError(error, 'API');
       showError(error.data?.error || "Ein Fehler ist aufgetreten.");
     } finally {
       setIsSubmitting(false);

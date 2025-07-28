@@ -21,6 +21,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useError } from '@/contexts/ErrorContext';
 
 type Role = {
   id: number;
@@ -38,6 +39,7 @@ const fetchRoles = async (): Promise<Role[]> => {
 const RoleManagement = () => {
   const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { addError } = useError();
 
   const { data: roles, isLoading, error } = useQuery<Role[]>({
     queryKey: ['roles'],
@@ -54,11 +56,13 @@ const RoleManagement = () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
     onError: (err: any) => {
+      addError(err, 'API');
       showError(err.message || "Fehler beim Löschen der Gruppe.");
     },
   });
 
   if (error) {
+    addError(error, 'API');
     showError(`Fehler beim Laden der Gruppen: ${error.message}`);
   }
 

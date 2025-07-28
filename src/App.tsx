@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { ErrorProvider } from './contexts/ErrorContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -57,24 +59,28 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-            
-            <Route element={<ProtectedRoute session={session} />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="users" element={<UserManagement />} />
-              <Route path="roles" element={<RoleManagement />} />
-              <Route path="menus" element={<MenuManagement />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="products" element={<ProductManagement />} />
-            </Route>
+        <ErrorProvider>
+          <ErrorBoundary>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+                
+                <Route element={<ProtectedRoute session={session} />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="users" element={<UserManagement />} />
+                  <Route path="roles" element={<RoleManagement />} />
+                  <Route path="menus" element={<MenuManagement />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="products" element={<ProductManagement />} />
+                </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </ErrorBoundary>
+        </ErrorProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

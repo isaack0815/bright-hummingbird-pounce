@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import type { MenuItem } from '@/pages/MenuManagement';
 import DynamicIcon from './DynamicIcon';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ErrorLogViewer } from './ErrorLogViewer';
 
 const buildMenuTree = (items: MenuItem[]): MenuItem[] => {
   const itemMap = new Map<number, MenuItem>();
@@ -120,7 +121,8 @@ const Sidebar = () => {
           )}
         </nav>
       </div>
-      <div className="mt-auto p-4">
+      <div className="mt-auto p-4 space-y-2">
+        <ErrorLogViewer />
         <Button size="sm" className="w-full" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Logout
