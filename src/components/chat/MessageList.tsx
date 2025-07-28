@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { ChatMessage } from '@/types/chat';
+import type { ChatMessage, Profile } from '@/types/chat';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Download } from 'lucide-react';
@@ -12,13 +12,34 @@ type MessageListProps = {
 };
 
 const fetchMessages = async (conversationId: number): Promise<ChatMessage[]> => {
-  const { data, error } = await supabase
+  const { data: messages, error: messagesError } = await supabase
     .from('chat_messages')
-    .select('*, profiles(id, first_name, last_name)')
+    .select('*')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
-  if (error) throw new Error(error.message);
-  return data as ChatMessage[];
+
+  if (messagesError) throw new Error(messagesError.message);
+  if (!messages) return [];
+
+  const userIds = [...new Set(messages.map((msg) => msg.user_id))];
+  
+  if (userIds.length === 0) return [];
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name')
+    .in('id', userIds);
+
+  if (profilesError) throw new Error(profilesError.message);
+
+  const profilesMap = new Map(profiles.map((p) => [p.id, p as Profile]));
+
+  const messagesWithProfiles = messages.map((msg) => ({
+    ...msg,
+    profiles: profilesMap.get(msg.user_id) || null,
+  }));
+
+  return messagesWithProfiles as ChatMessage[];
 };
 
 export const MessageList = ({ conversationId, currentUserId }: MessageListProps) => {
@@ -28,9 +49,12 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
   const { data: messages, isLoading } = useQuery({
     queryKey: ['chatMessages', conversationId],
     queryFn: () => fetchMessages(conversationId),
+    enabled: !!conversationId,
   });
 
   useEffect(() => {
+    if (!conversationId) return;
+
     const channel = supabase
       .channel(`conversation-${conversationId}`)
       .on(
@@ -41,7 +65,7 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
           table: 'chat_messages',
           filter: `conversation_id=eq.${conversationId}`
         },
-        (payload) => {
+        () => {
           queryClient.invalidateQueries({ queryKey: ['chatMessages', conversationId] });
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
@@ -54,7 +78,11 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
   }, [conversationId, queryClient]);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages && messages.length > 0) {
+        setTimeout(() => {
+            scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100)
+    }
   }, [messages]);
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
