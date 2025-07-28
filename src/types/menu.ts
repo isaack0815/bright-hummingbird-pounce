@@ -5,5 +5,6 @@ export type MenuItem = {
   link: string | null;
   icon: string | null;
   position: number;
+  required_permission: string | null;
   children?: MenuItem[];
 };

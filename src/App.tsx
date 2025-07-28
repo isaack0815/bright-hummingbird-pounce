@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { supabase } from './lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorProvider } from './contexts/ErrorContext';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -17,37 +15,15 @@ import RoleManagement from './pages/RoleManagement';
 import MenuManagement from './pages/MenuManagement';
 import Profile from './pages/Profile';
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AccessDenied from "./pages/AccessDenied";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute = ({ session }: { session: Session | null }) => {
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-  return <Layout />;
-};
+const AppRoutes = () => {
+  const { session, isLoading } = useAuth();
 
-const App = () => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setLoading(false);
-    };
-
-    getSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p>Loading...</p>
@@ -56,27 +32,46 @@ const App = () => {
   }
 
   return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+        
+        <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />}>
+          <Route index element={<Dashboard />} />
+          <Route path="profile" element={<Profile />} />
+          
+          <Route element={<ProtectedRoute requiredPermission="users.manage" />}>
+            <Route path="users" element={<UserManagement />} />
+          </Route>
+          
+          <Route element={<ProtectedRoute requiredPermission="roles.manage" />}>
+            <Route path="roles" element={<RoleManagement />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="menus.manage" />}>
+            <Route path="menus" element={<MenuManagement />} />
+          </Route>
+
+          <Route path="access-denied" element={<AccessDenied />} />
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+const App = () => {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ErrorProvider>
           <ErrorBoundary>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-                
-                <Route element={<ProtectedRoute session={session} />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="users" element={<UserManagement />} />
-                  <Route path="roles" element={<RoleManagement />} />
-                  <Route path="menus" element={<MenuManagement />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
-
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
+            <AuthProvider>
+              <Toaster />
+              <Sonner />
+              <AppRoutes />
+            </AuthProvider>
           </ErrorBoundary>
         </ErrorProvider>
       </TooltipProvider>

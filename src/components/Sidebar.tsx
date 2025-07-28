@@ -9,6 +9,7 @@ import type { MenuItem } from '@/types/menu';
 import DynamicIcon from './DynamicIcon';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ErrorLogViewer } from './ErrorLogViewer';
+import { useAuth } from '@/contexts/AuthContext';
 
 const buildMenuTree = (items: MenuItem[]): MenuItem[] => {
   const itemMap = new Map<number, MenuItem>();
@@ -43,6 +44,11 @@ const buildMenuTree = (items: MenuItem[]): MenuItem[] => {
 
 const SidebarMenuItem = ({ item }: { item: MenuItem }) => {
   const location = useLocation();
+  const { hasPermission } = useAuth();
+
+  if (item.required_permission && !hasPermission(item.required_permission)) {
+    return null;
+  }
   
   if (!item.children || item.children.length === 0) {
     return (
@@ -61,15 +67,21 @@ const SidebarMenuItem = ({ item }: { item: MenuItem }) => {
     );
   }
 
+  const visibleChildren = item.children.filter(child => !child.required_permission || hasPermission(child.required_permission));
+
+  if (visibleChildren.length === 0) {
+    return null;
+  }
+
   const isChildActive = useMemo(() => 
-    item.children?.some(child => {
+    visibleChildren?.some(child => {
       if (!child.link) return false;
       if (child.link === '/') {
         return location.pathname === '/';
       }
       return location.pathname.startsWith(child.link);
     }),
-    [item.children, location.pathname]
+    [visibleChildren, location.pathname]
   );
 
   return (
@@ -85,7 +97,7 @@ const SidebarMenuItem = ({ item }: { item: MenuItem }) => {
       </CollapsibleTrigger>
       <CollapsibleContent className="pl-6 border-l border-muted-foreground/20 ml-4">
         <nav className="grid items-start py-1 text-sm font-medium">
-          {item.children.map(child => (
+          {visibleChildren.map(child => (
             <SidebarMenuItem key={child.id} item={child} />
           ))}
         </nav>
