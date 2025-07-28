@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import { ChatWidget } from './chat/ChatWidget';
 
 const Layout = () => {
   return (
@@ -12,6 +13,7 @@ const Layout = () => {
           <Outlet />
         </main>
       </div>
+      <ChatWidget />
     </div>
   );
 };
