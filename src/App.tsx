@@ -14,6 +14,7 @@ import UserManagement from './pages/UserManagement';
 import RoleManagement from './pages/RoleManagement';
 import MenuManagement from './pages/MenuManagement';
 import Profile from './pages/Profile';
+import ProductManagement from './pages/ProductManagement';
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const App = () => {
               <Route path="roles" element={<RoleManagement />} />
               <Route path="menus" element={<MenuManagement />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="products" element={<ProductManagement />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
