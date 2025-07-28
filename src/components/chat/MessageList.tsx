@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ChatMessage } from '@/types/chat';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,58 +7,43 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Download } from 'lucide-react';
 
 type MessageListProps = {
-  onNewMessage: (message: ChatMessage) => void;
+  conversationId: number;
+  currentUserId: string | null;
 };
 
-const fetchMessages = async (): Promise<ChatMessage[]> => {
+const fetchMessages = async (conversationId: number): Promise<ChatMessage[]> => {
   const { data, error } = await supabase
     .from('chat_messages')
     .select('*, profiles(id, first_name, last_name)')
-    .order('created_at', { ascending: true })
-    .limit(50);
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return data as ChatMessage[];
 };
 
-export const MessageList = ({ onNewMessage }: MessageListProps) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+export const MessageList = ({ conversationId, currentUserId }: MessageListProps) => {
+  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: initialMessages, isLoading } = useQuery({
-    queryKey: ['chatMessages'],
-    queryFn: fetchMessages,
+  const { data: messages, isLoading } = useQuery({
+    queryKey: ['chatMessages', conversationId],
+    queryFn: () => fetchMessages(conversationId),
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setCurrentUserId(user?.id || null);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (initialMessages) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages]);
-
-  useEffect(() => {
     const channel = supabase
-      .channel('chat-messages-realtime')
+      .channel(`conversation-${conversationId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-        async (payload) => {
-          const newMessage = payload.new as ChatMessage;
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .eq('id', newMessage.user_id)
-            .single();
-          
-          newMessage.profiles = profile;
-          setMessages((prev) => [...prev, newMessage]);
-          onNewMessage(newMessage);
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'chat_messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          queryClient.invalidateQueries({ queryKey: ['chatMessages', conversationId] });
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
       )
       .subscribe();
@@ -66,7 +51,7 @@ export const MessageList = ({ onNewMessage }: MessageListProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [onNewMessage]);
+  }, [conversationId, queryClient]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -79,7 +64,7 @@ export const MessageList = ({ onNewMessage }: MessageListProps) => {
   return (
     <div className="flex-1 p-4 space-y-4 overflow-y-auto">
       {isLoading && Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-2/3" />)}
-      {messages.map((msg) => (
+      {messages?.map((msg) => (
         <div
           key={msg.id}
           className={`flex items-end gap-2 ${msg.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}

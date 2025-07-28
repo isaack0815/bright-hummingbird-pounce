@@ -8,7 +8,11 @@ import { showError } from '@/utils/toast';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-export const MessageInput = () => {
+type MessageInputProps = {
+  conversationId: number;
+};
+
+export const MessageInput = ({ conversationId }: MessageInputProps) => {
   const [content, setContent] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -21,6 +25,7 @@ export const MessageInput = () => {
 
     const messageToInsert = {
       user_id: user.id,
+      conversation_id: conversationId,
       content: content.trim() || null,
       file_url: file?.url || null,
       file_name: file?.name || null,
@@ -34,7 +39,6 @@ export const MessageInput = () => {
       console.error(error);
     } else {
       setContent('');
-      queryClient.invalidateQueries({ queryKey: ['chatMessages'] });
     }
   };
 
