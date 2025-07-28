@@ -39,6 +39,9 @@ export const MessageInput = ({ conversationId }: MessageInputProps) => {
       console.error(error);
     } else {
       setContent('');
+      // Force a refetch of the messages for the current conversation and the conversation list
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     }
   };
 
