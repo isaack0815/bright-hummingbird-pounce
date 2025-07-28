@@ -26,10 +26,26 @@ serve(async (_req) => {
       .from('profiles')
       .select('id, first_name, last_name')
       .in('id', userIds);
-    
     if (profilesError) throw profilesError;
-
     const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+    const { data: userRoles, error: userRolesError } = await supabaseAdmin
+      .from('user_roles')
+      .select('user_id, roles(id, name)')
+      .in('user_id', userIds);
+    if (userRolesError) throw userRolesError;
+
+    const userRolesMap = new Map<string, {id: number, name: string}[]>();
+    if (userRoles) {
+      for (const ur of userRoles) {
+        if (!userRolesMap.has(ur.user_id)) {
+            userRolesMap.set(ur.user_id, []);
+        }
+        if (ur.roles) {
+          userRolesMap.get(ur.user_id)!.push(ur.roles as {id: number, name: string});
+        }
+      }
+    }
 
     const combinedUsers = users.map(user => ({
       id: user.id,
@@ -37,6 +53,7 @@ serve(async (_req) => {
       created_at: user.created_at,
       first_name: profilesMap.get(user.id)?.first_name,
       last_name: profilesMap.get(user.id)?.last_name,
+      roles: userRolesMap.get(user.id) || [],
     }));
 
     return new Response(JSON.stringify({ users: combinedUsers }), {

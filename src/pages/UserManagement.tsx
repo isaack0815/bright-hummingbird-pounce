@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { EditUserDialog } from '@/components/EditUserDialog';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
   Table,
@@ -20,7 +21,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { showError } from '@/utils/toast';
+import { Badge } from "@/components/ui/badge";
+import { showSuccess, showError } from '@/utils/toast';
 
 type User = {
   id: string;
@@ -28,6 +30,7 @@ type User = {
   created_at: string;
   first_name?: string | null;
   last_name?: string | null;
+  roles: { id: number; name: string }[];
 };
 
 const fetchUsers = async (): Promise<User[]> => {
@@ -39,20 +42,46 @@ const fetchUsers = async (): Promise<User[]> => {
 
 const UserManagement = () => {
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: users, isLoading, error, refetch } = useQuery<User[]>({
+  const { data: users, isLoading, error } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: fetchUsers,
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.functions.invoke('delete-user', { body: { userId } });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Benutzer erfolgreich gelöscht.");
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (err: any) => {
+      showError(err.message || "Fehler beim Löschen des Benutzers.");
+    },
   });
 
   const handleUserAdded = () => {
     queryClient.invalidateQueries({ queryKey: ['users'] });
   };
 
+  const handleEditClick = (user: User) => {
+    setSelectedUser(user);
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleDeleteClick = (userId: string) => {
+    if (window.confirm("Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?")) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
+
   if (error) {
     showError(`Fehler beim Laden der Benutzer: ${error.message}`);
-    console.error(error);
   }
 
   return (
@@ -78,6 +107,7 @@ const UserManagement = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Gruppen</TableHead>
                   <TableHead>Erstellt am</TableHead>
                   <TableHead>
                     <span className="sr-only">Aktionen</span>
@@ -91,6 +121,15 @@ const UserManagement = () => {
                       {user.first_name || user.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'N/A'}
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {user.roles.length > 0 ? (
+                          user.roles.map(role => <Badge key={role.id} variant="secondary">{role.name}</Badge>)
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -102,8 +141,17 @@ const UserManagement = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem>Bearbeiten</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">Löschen</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Bearbeiten
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteClick(user.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Löschen
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -120,6 +168,11 @@ const UserManagement = () => {
         open={isAddUserDialogOpen}
         onOpenChange={setIsAddUserDialogOpen}
         onUserAdded={handleUserAdded}
+      />
+      <EditUserDialog
+        user={selectedUser}
+        open={isEditUserDialogOpen}
+        onOpenChange={setIsEditUserDialogOpen}
       />
     </div>
   );
