@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageCircle, X, Search, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ConversationList } from './ConversationList';
 import { UserSearch } from './UserSearch';
-import type { Conversation } from '@/types/chat';
+import type { Conversation, ChatMessage } from '@/types/chat';
 import { supabase } from '@/lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 
 type View = 'list' | 'conversation' | 'search';
 
@@ -16,12 +17,13 @@ export const ChatWidget = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setCurrentUserId(user.id);
-        const channel = supabase.channel('online-users', {
+        const presenceChannel = supabase.channel('online-users', {
           config: {
             presence: {
               key: user.id,
@@ -29,19 +31,38 @@ export const ChatWidget = () => {
           },
         });
 
-        channel.on('presence', { event: 'sync' }, () => {
-          const userIds = Object.keys(channel.presenceState()).map(key => key);
+        presenceChannel.on('presence', { event: 'sync' }, () => {
+          const userIds = Object.keys(presenceChannel.presenceState()).map(key => key);
           setOnlineUsers(userIds);
         });
 
-        channel.subscribe(async (status) => {
+        presenceChannel.subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
-            await channel.track({ online_at: new Date().toISOString() });
+            await presenceChannel.track({ online_at: new Date().toISOString() });
           }
         });
       }
     });
-  }, []);
+
+    const messageSubscription = supabase
+      .channel('public-chat-messages-subscription')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          const newMessage = payload.new as ChatMessage;
+          // Aktualisiert die Konversationsliste (für die Vorschau der letzten Nachricht)
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          // Aktualisiert das Chat-Fenster, falls es geöffnet ist
+          queryClient.invalidateQueries({ queryKey: ['chatMessages', newMessage.conversation_id] });
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeAllChannels();
+    }
+  }, [queryClient]);
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);

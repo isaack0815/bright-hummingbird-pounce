@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/types/chat';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,7 +43,6 @@ const fetchMessages = async (conversationId: number): Promise<ChatMessage[]> => 
 };
 
 export const MessageList = ({ conversationId, currentUserId }: MessageListProps) => {
-  const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: messages, isLoading } = useQuery({
@@ -51,31 +50,6 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
     queryFn: () => fetchMessages(conversationId),
     enabled: !!conversationId,
   });
-
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const channel = supabase
-      .channel(`conversation-${conversationId}`)
-      .on(
-        'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'chat_messages',
-          filter: `conversation_id=eq.${conversationId}`
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['chatMessages', conversationId] });
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [conversationId, queryClient]);
 
   useEffect(() => {
     if (messages && messages.length > 0) {
