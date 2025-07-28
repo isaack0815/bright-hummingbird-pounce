@@ -24,24 +24,29 @@ export const ChatWidget = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setCurrentUserId(user.id);
-        const presenceChannel = supabase.channel('online-users', {
-          config: {
-            presence: {
-              key: user.id,
-            },
-          },
-        });
+      }
+    });
+  }, []);
 
-        presenceChannel.on('presence', { event: 'sync' }, () => {
-          const userIds = Object.keys(presenceChannel.presenceState()).map(key => key);
-          setOnlineUsers(userIds);
-        });
+  useEffect(() => {
+    if (!currentUserId) return;
 
-        presenceChannel.subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await presenceChannel.track({ online_at: new Date().toISOString() });
-          }
-        });
+    const presenceChannel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: currentUserId,
+        },
+      },
+    });
+
+    presenceChannel.on('presence', { event: 'sync' }, () => {
+      const userIds = Object.keys(presenceChannel.presenceState()).map(key => key);
+      setOnlineUsers(userIds);
+    });
+
+    presenceChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel.track({ online_at: new Date().toISOString() });
       }
     });
 
@@ -64,9 +69,10 @@ export const ChatWidget = () => {
       .subscribe();
     
     return () => {
-      supabase.removeAllChannels();
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(messageSubscription);
     }
-  }, [queryClient, currentUserId]);
+  }, [currentUserId, queryClient]);
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
