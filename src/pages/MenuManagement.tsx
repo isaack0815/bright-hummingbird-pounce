@@ -7,16 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { AddMenuItemDialog } from '@/components/AddMenuItemDialog';
 import { EditMenuItemDialog } from '@/components/EditMenuItemDialog';
-
-export type MenuItem = {
-  id: number;
-  parent_id: number | null;
-  name: string;
-  link: string | null;
-  icon: string | null;
-  position: number;
-  children?: MenuItem[];
-};
+import type { MenuItem } from '@/types/menu';
 
 const buildTree = (items: MenuItem[]): MenuItem[] => {
   const itemMap = new Map<number, MenuItem>();
@@ -124,7 +115,7 @@ const MenuManagement = () => {
   const menuTree = useMemo(() => buildTree(items), [items]);
 
   const updateStructureMutation = useMutation({
-    mutationFn: async (updatedItems: { id: number; parentId: number | null; position: number }[]) => {
+    mutationFn: async (updatedItems: { id: number; parent_id: number | null; position: number }[]) => {
       const { error } = await supabase.functions.invoke('update-menu-structure', {
         body: { items: updatedItems },
       });
@@ -150,18 +141,19 @@ const MenuManagement = () => {
   });
 
   const handleMove = (itemId: number, direction: 'up' | 'down') => {
-    const findSiblings = (nodes: MenuItem[]): MenuItem[] | null => {
+    const findSiblingsAndParent = (nodes: MenuItem[], parentId: number | null): { siblings: MenuItem[], parentId: number | null } | null => {
       for (const node of nodes) {
         if (node.children?.some(child => child.id === itemId)) {
-          return node.children;
+          return { siblings: node.children, parentId: node.id };
         }
-        const found = findSiblings(node.children || []);
+        const found = findSiblingsAndParent(node.children || [], node.id);
         if (found) return found;
       }
       return null;
     };
     
-    const siblings = findSiblings(menuTree) ?? menuTree;
+    const result = findSiblingsAndParent(menuTree, null);
+    const siblings = result ? result.siblings : menuTree;
     const index = siblings.findIndex(item => item.id === itemId);
     
     if (index === -1) return;
@@ -171,12 +163,12 @@ const MenuManagement = () => {
 
     if (swapIndex < 0 || swapIndex >= newSiblings.length) return;
 
-    [newSiblings[index].position, newSiblings[swapIndex].position] = [newSiblings[swapIndex].position, newSiblings[index].position];
+    [newSiblings[index], newSiblings[swapIndex]] = [newSiblings[swapIndex], newSiblings[index]];
 
-    const itemsToUpdate = [newSiblings[index], newSiblings[swapIndex]].map(item => ({
+    const itemsToUpdate = newSiblings.map((item, idx) => ({
       id: item.id,
-      parentId: item.parent_id,
-      position: item.position,
+      parent_id: item.parent_id,
+      position: idx,
     }));
 
     updateStructureMutation.mutate(itemsToUpdate);

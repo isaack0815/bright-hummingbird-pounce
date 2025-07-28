@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
-import type { MenuItem } from "@/pages/MenuManagement";
+import type { MenuItem } from "@/types/menu";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Name ist erforderlich." }),

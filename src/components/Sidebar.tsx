@@ -5,7 +5,7 @@ import { Building2, LogOut, ChevronRight } from 'lucide-react';
 import { showError } from '@/utils/toast';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import type { MenuItem } from '@/pages/MenuManagement';
+import type { MenuItem } from '@/types/menu';
 import DynamicIcon from './DynamicIcon';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ErrorLogViewer } from './ErrorLogViewer';

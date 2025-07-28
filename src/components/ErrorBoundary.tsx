@@ -1,10 +1,11 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode, PropsWithChildren } from 'react';
 import { useError } from '@/contexts/ErrorContext';
 
-interface Props {
-  children: ReactNode;
+interface CustomProps {
   addError: (error: any, source: 'UI' | 'API') => void;
 }
+
+type Props = PropsWithChildren<CustomProps>;
 
 interface State {
   hasError: boolean;
@@ -15,12 +16,10 @@ class ErrorBoundary extends Component<Props, State> {
     hasError: false,
   };
 
-  // This is a static method, so we can't use context here.
   public static getDerivedStateFromError(_: Error): State {
     return { hasError: true };
   }
 
-  // We'll get the context via a wrapper component.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     const { addError } = this.props;
     addError({ message: error.message, stack: errorInfo.componentStack }, 'UI');
@@ -40,7 +39,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// Wrapper component to inject the context function into the class component
 const ErrorBoundaryWithContext: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { addError } = useError();
   return <ErrorBoundary addError={addError}>{children}</ErrorBoundary>;
