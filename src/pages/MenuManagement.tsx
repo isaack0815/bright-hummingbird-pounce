@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, GripVertical, Edit, Trash2 } from 'lucide-react';
@@ -11,6 +11,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -83,13 +84,16 @@ const MenuManagement = () => {
   const [items, setItems] = useState<MenuItem[]>([]);
   const queryClient = useQueryClient();
 
-  const { isLoading, error } = useQuery<MenuItem[]>({
+  const { data: fetchedItems, isLoading, error } = useQuery<MenuItem[]>({
     queryKey: ['menuItems'],
     queryFn: fetchMenuItems,
-    onSuccess: (data) => {
-      setItems(data);
-    },
   });
+
+  useEffect(() => {
+    if (fetchedItems) {
+      setItems(fetchedItems);
+    }
+  }, [fetchedItems]);
 
   const updateStructureMutation = useMutation({
     mutationFn: async (updatedItems: { id: number; parentId: number | null; position: number }[]) => {
@@ -120,9 +124,9 @@ const MenuManagement = () => {
   const sensors = useSensors(useSensor(PointerSensor));
   const sortedItemIds = useMemo(() => items.map(item => item.id), [items]);
 
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (active.id !== over.id) {
+    if (over && active.id !== over.id) {
       const oldIndex = items.findIndex((item) => item.id === active.id);
       const newIndex = items.findIndex((item) => item.id === over.id);
       const newItems = arrayMove(items, oldIndex, newIndex);
