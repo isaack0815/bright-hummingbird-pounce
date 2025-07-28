@@ -8,6 +8,7 @@ import type { ChatUser } from '@/types/chat';
 type UserSearchProps = {
   onlineUsers: string[];
   onUserSelected: (conversation: any) => void;
+  currentUserId: string | null;
 };
 
 const fetchUsers = async (): Promise<ChatUser[]> => {
@@ -16,17 +17,19 @@ const fetchUsers = async (): Promise<ChatUser[]> => {
   return data.users;
 };
 
-export const UserSearch = ({ onlineUsers, onUserSelected }: UserSearchProps) => {
+export const UserSearch = ({ onlineUsers, onUserSelected, currentUserId }: UserSearchProps) => {
   const [isCreating, setIsCreating] = useState(false);
   const { data: users, isLoading } = useQuery<ChatUser[]>({
     queryKey: ['chatUsers'],
     queryFn: fetchUsers,
   });
 
-  const options = users?.map(user => ({
-    value: user.id,
-    label: `${user.first_name} ${user.last_name}`,
-  })) || [];
+  const options = users
+    ?.filter(user => user.id !== currentUserId)
+    .map(user => ({
+      value: user.id,
+      label: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+    })) || [];
 
   const handleSelectUser = async (selectedOption: any) => {
     if (!selectedOption) return;

@@ -8,6 +8,7 @@ import { UserSearch } from './UserSearch';
 import type { Conversation, ChatMessage } from '@/types/chat';
 import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
+import { showSuccess } from '@/utils/toast';
 
 type View = 'list' | 'conversation' | 'search';
 
@@ -51,10 +52,13 @@ export const ChatWidget = () => {
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const newMessage = payload.new as ChatMessage;
-          // Aktualisiert die Konversationsliste (für die Vorschau der letzten Nachricht)
+          
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
-          // Aktualisiert das Chat-Fenster, falls es geöffnet ist
           queryClient.invalidateQueries({ queryKey: ['chatMessages', newMessage.conversation_id] });
+
+          if (newMessage.user_id !== currentUserId) {
+            showSuccess(`Neue Nachricht erhalten!`);
+          }
         }
       )
       .subscribe();
@@ -62,7 +66,7 @@ export const ChatWidget = () => {
     return () => {
       supabase.removeAllChannels();
     }
-  }, [queryClient]);
+  }, [queryClient, currentUserId]);
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -126,7 +130,7 @@ export const ChatWidget = () => {
           </>
         );
       case 'search':
-        return <UserSearch onlineUsers={onlineUsers} onUserSelected={handleStartNewConversation} />;
+        return <UserSearch onlineUsers={onlineUsers} onUserSelected={handleStartNewConversation} currentUserId={currentUserId} />;
       case 'list':
       default:
         return <ConversationList onSelectConversation={handleSelectConversation} onlineUsers={onlineUsers} />;
