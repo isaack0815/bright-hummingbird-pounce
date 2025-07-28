@@ -18,15 +18,26 @@ const buildMenuTree = (items: MenuItem[]): MenuItem[] => {
     itemMap.set(item.id, { ...item, children: [] });
   });
 
-  itemMap.forEach(item => {
+  items.forEach(item => {
+    const currentItem = itemMap.get(item.id)!;
     if (item.parent_id && itemMap.has(item.parent_id)) {
       const parent = itemMap.get(item.parent_id);
-      parent?.children?.push(item);
+      parent?.children?.push(currentItem);
     } else {
-      tree.push(item);
+      tree.push(currentItem);
     }
   });
 
+  const sortNodes = (nodes: MenuItem[]) => {
+    nodes.sort((a, b) => a.position - b.position);
+    nodes.forEach(node => {
+      if (node.children && node.children.length > 0) {
+        sortNodes(node.children);
+      }
+    });
+  };
+  
+  sortNodes(tree);
   return tree;
 };
 
@@ -51,7 +62,13 @@ const SidebarMenuItem = ({ item }: { item: MenuItem }) => {
   }
 
   const isChildActive = useMemo(() => 
-    item.children?.some(child => location.pathname.startsWith(child.link || '___')),
+    item.children?.some(child => {
+      if (!child.link) return false;
+      if (child.link === '/') {
+        return location.pathname === '/';
+      }
+      return location.pathname.startsWith(child.link);
+    }),
     [item.children, location.pathname]
   );
 
