@@ -21,6 +21,7 @@ import {
   SortableContext,
   useSortable,
   verticalListSortingStrategy,
+  arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AddMenuItemDialog } from '@/components/AddMenuItemDialog';
@@ -34,6 +35,7 @@ export type MenuItem = {
   link: string | null;
   icon: string | null;
   position: number;
+  children?: MenuItem[];
 };
 
 type TreeMenuItem = MenuItem & { children: TreeMenuItem[] };
@@ -152,11 +154,16 @@ const MenuManagement = () => {
 
   const queryClient = useQueryClient();
 
-  const { isLoading, error } = useQuery<MenuItem[]>({
+  const { data: fetchedItems, isLoading, error } = useQuery<MenuItem[]>({
     queryKey: ['menuItems'],
     queryFn: fetchMenuItems,
-    onSuccess: setItems,
   });
+
+  useEffect(() => {
+    if (fetchedItems) {
+      setItems(fetchedItems);
+    }
+  }, [fetchedItems]);
 
   const flattenedItems = useMemo(() => {
     const tree = buildTree(items);
@@ -208,22 +215,31 @@ const MenuManagement = () => {
 
   function handleDragEnd({ active, over }: DragEndEvent) {
     resetState();
-    if (projected && over) {
-      const { depth, parentId } = projected;
-      const clonedItems: MenuItem[] = JSON.parse(JSON.stringify(items));
-      const activeItemInClone = clonedItems.find(item => item.id === active.id)!;
-      
-      activeItemInClone.parent_id = parentId;
 
-      const parentChildren = clonedItems.filter(item => item.parent_id === parentId);
-      const overIndex = parentChildren.findIndex(item => item.id === over.id);
-      
-      const newItems = moveItem(clonedItems, active.id, parentId, overIndex);
-      
-      const finalItemsToUpdate = calculatePositions(newItems);
-      
-      setItems(newItems);
-      updateStructureMutation.mutate(finalItemsToUpdate);
+    if (projected && over && active.id !== over.id) {
+        const { parentId } = projected;
+        
+        const itemsCopy = JSON.parse(JSON.stringify(items));
+        const activeItemIndexInFull = itemsCopy.findIndex((i: MenuItem) => i.id === active.id);
+        const overItemIndexInFull = itemsCopy.findIndex((i: MenuItem) => i.id === over.id);
+
+        const reorderedItems = arrayMove(itemsCopy, activeItemIndexInFull, overItemIndexInFull);
+        
+        const movedItem = reorderedItems.find((i: MenuItem) => i.id === active.id)!;
+        movedItem.parent_id = parentId;
+
+        const finalUpdates = calculatePositions(reorderedItems);
+
+        const finalStateItems = items.map(originalItem => {
+            const update = finalUpdates.find(u => u.id === originalItem.id);
+            if (update) {
+                return { ...originalItem, parent_id: update.parent_id, position: update.position };
+            }
+            return originalItem;
+        });
+
+        setItems(finalStateItems);
+        updateStructureMutation.mutate(finalUpdates);
     }
   }
 
@@ -357,18 +373,6 @@ function getProjection(
   }
 
   return { depth, parentId: getParentId() };
-}
-
-function moveItem(items: MenuItem[], activeId: UniqueIdentifier, newParentId: number | null, newIndex: number): MenuItem[] {
-    const activeItem = items.find(item => item.id === activeId)!;
-    const newItems = items.filter(item => item.id !== activeId);
-    
-    const childrenOfNewParent = newItems.filter(item => item.parent_id === newParentId);
-    childrenOfNewParent.splice(newIndex, 0, activeItem);
-
-    const nonChildren = newItems.filter(item => item.parent_id !== newParentId);
-    
-    return [...nonChildren, ...childrenOfNewParent];
 }
 
 function calculatePositions(items: MenuItem[]): { id: number; parent_id: number | null; position: number }[] {

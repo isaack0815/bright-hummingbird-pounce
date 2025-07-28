@@ -3,6 +3,7 @@ import { useError } from '@/contexts/ErrorContext';
 
 interface Props {
   children: ReactNode;
+  addError: (error: any, source: 'UI' | 'API') => void;
 }
 
 interface State {
@@ -21,7 +22,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   // We'll get the context via a wrapper component.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const { addError } = this.props as Props & { addError: (error: any, source: 'UI' | 'API') => void };
+    const { addError } = this.props;
     addError({ message: error.message, stack: errorInfo.componentStack }, 'UI');
   }
 
@@ -40,7 +41,7 @@ class ErrorBoundary extends Component<Props, State> {
 }
 
 // Wrapper component to inject the context function into the class component
-const ErrorBoundaryWithContext: React.FC<Props> = ({ children }) => {
+const ErrorBoundaryWithContext: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { addError } = useError();
   return <ErrorBoundary addError={addError}>{children}</ErrorBoundary>;
 };
