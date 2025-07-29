@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "../ui/skeleton";
-import { File as FileIcon, Trash2, Download, Loader2 } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
+import { FileListItem } from "./FileListItem";
 
 type OrderFile = {
   id: number;
@@ -31,7 +30,6 @@ const fetchFiles = async (orderId: number): Promise<OrderFile[]> => {
 
 const FilesTab = ({ orderId }: { orderId: number | null }) => {
   const [uploading, setUploading] = useState(false);
-  const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -39,20 +37,6 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
     queryKey: ['orderFiles', orderId],
     queryFn: () => fetchFiles(orderId!),
     enabled: !!orderId,
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async ({ id, path }: { id: number, path: string }) => {
-      const { error: storageError } = await supabase.storage.from('order-files').remove([path]);
-      if (storageError) throw storageError;
-      const { error: dbError } = await supabase.from('order_files').delete().eq('id', id);
-      if (dbError) throw dbError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orderFiles', orderId] });
-      showSuccess("Datei gelöscht!");
-    },
-    onError: (err: any) => showError(err.message || "Fehler beim Löschen der Datei."),
   });
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,23 +68,6 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
     }
   };
 
-  const handleDownload = async (fileId: number, filePath: string) => {
-    setDownloadingFileId(fileId);
-    try {
-      const { data, error } = await supabase.storage
-        .from('order-files')
-        .createSignedUrl(filePath, 60); // Link is valid for 1 minute
-
-      if (error) throw error;
-
-      window.open(data.signedUrl, '_blank');
-    } catch (err: any) {
-      showError(err.message || "Fehler beim Herunterladen der Datei.");
-    } finally {
-      setDownloadingFileId(null);
-    }
-  };
-
   if (!orderId) {
     return (
       <Card>
@@ -121,33 +88,7 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
         <div className="space-y-2">
           {isLoading && <Skeleton className="h-12 w-full" />}
           {files?.map(file => (
-            <div key={file.id} className="flex items-center justify-between rounded-md border p-3">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <FileIcon className="h-6 w-6 text-muted-foreground flex-shrink-0" />
-                <div className="flex-grow overflow-hidden">
-                  <p className="font-medium truncate">{file.file_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Hochgeladen von {`${file.first_name || ''} ${file.last_name || ''}`.trim() || 'Unbekannt'} am {new Date(file.created_at).toLocaleString('de-DE')}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => handleDownload(file.id, file.file_path)}
-                  disabled={downloadingFileId === file.id}
-                >
-                  {downloadingFileId === file.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button type="button" variant="ghost" size="icon" onClick={() => deleteMutation.mutate({ id: file.id, path: file.file_path })} disabled={deleteMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-              </div>
-            </div>
+            <FileListItem key={file.id} file={file} orderId={orderId} />
           ))}
           {!isLoading && files?.length === 0 && <p className="text-muted-foreground text-center">Keine Dateien vorhanden.</p>}
         </div>
