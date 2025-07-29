@@ -3,7 +3,7 @@ import type { Customer } from "@/pages/CustomerManagement";
 export type Stop = {
   id?: number;
   order_id?: number;
-  stop_type: 'Abholung' | 'Teillieferung';
+  stop_type: 'Abholung' | 'Teillieferung' | 'Teilladung' | 'Lieferung';
   address: string;
   stop_date: string | null;
   time_start: string | null;

@@ -26,7 +26,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
 
 const stopSchema = z.object({
-  stop_type: z.enum(['Abholung', 'Teillieferung']),
+  stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
   address: z.string().min(1, "Adresse ist erforderlich."),
   stop_date: z.string().nullable(),
   time_start: z.string().nullable(),
@@ -229,7 +229,12 @@ const FreightOrderForm = () => {
                                             <FormItem><FormLabel>Stopp-Art</FormLabel>
                                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                    <SelectContent><SelectItem value="Abholung">Abholung</SelectItem><SelectItem value="Teillieferung">Teillieferung</SelectItem></SelectContent>
+                                                    <SelectContent>
+                                                        <SelectItem value="Abholung">Abholung</SelectItem>
+                                                        <SelectItem value="Teilladung">Teilladung</SelectItem>
+                                                        <SelectItem value="Teillieferung">Teillieferung</SelectItem>
+                                                        <SelectItem value="Lieferung">Lieferung</SelectItem>
+                                                    </SelectContent>
                                                 </Select>
                                             <FormMessage /></FormItem>
                                         )} />
