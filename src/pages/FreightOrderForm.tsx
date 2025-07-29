@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,9 @@ import type { FreightOrder } from '@/types/freight';
 import { ArrowLeft, PlusCircle, Trash2 } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
+import NotesTab from '@/components/freight/NotesTab';
+import FilesTab from '@/components/freight/FilesTab';
+import TeamTab from '@/components/freight/TeamTab';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung']),
@@ -124,7 +128,6 @@ const FreightOrderForm = () => {
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      // BUGFIX: Convert empty strings to null for date/time fields
       const cleanedOrderData = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
       );
@@ -189,132 +192,140 @@ const FreightOrderForm = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-                {/* Stops Card */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Route & Stopps</CardTitle>
-                        <CardDescription>Definieren Sie hier die Abhol-, Liefer- und Zwischenstopps.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {stopFields.map((field, index) => (
-                            <Card key={field.id} className="p-4 relative">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={form.control} name={`stops.${index}.address`} render={({ field }) => (
-                                        <FormItem className="md:col-span-2"><FormLabel>Adresse</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`stops.${index}.stop_type`} render={({ field }) => (
-                                        <FormItem><FormLabel>Stopp-Art</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                <SelectContent><SelectItem value="Abholung">Abholung</SelectItem><SelectItem value="Teillieferung">Teillieferung</SelectItem></SelectContent>
-                                            </Select>
-                                        <FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`stops.${index}.stop_date`} render={({ field }) => (
-                                        <FormItem><FormLabel>Datum</FormLabel><FormControl><Input type="date" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`stops.${index}.time_start`} render={({ field }) => (
-                                        <FormItem><FormLabel>Zeitfenster (von)</FormLabel><FormControl><Input type="time" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`stops.${index}.time_end`} render={({ field }) => (
-                                        <FormItem><FormLabel>Zeitfenster (bis)</FormLabel><FormControl><Input type="time" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                </div>
-                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </Card>
-                        ))}
-                        <Button type="button" variant="outline" onClick={() => appendStop({ stop_type: 'Teillieferung', address: '', stop_date: null, time_start: null, time_end: null, position: stopFields.length })}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Stopp hinzufügen
-                        </Button>
-                    </CardContent>
-                </Card>
-
-                {/* Cargo Card */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Ladungsdetails</CardTitle>
-                        <CardDescription>Fügen Sie hier die einzelnen Ladungspositionen hinzu.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                         {cargoFields.map((field, index) => (
-                            <Card key={field.id} className="p-4 relative">
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                    <FormField control={form.control} name={`cargoItems.${index}.quantity`} render={({ field }) => (
-                                        <FormItem><FormLabel>Anzahl</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`cargoItems.${index}.cargo_type`} render={({ field }) => (
-                                        <FormItem><FormLabel>Art</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`cargoItems.${index}.description`} render={({ field }) => (
-                                        <FormItem><FormLabel>Bezeichnung</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`cargoItems.${index}.weight`} render={({ field }) => (
-                                        <FormItem><FormLabel>Gewicht (kg)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`cargoItems.${index}.loading_meters`} render={({ field }) => (
-                                        <FormItem><FormLabel>Lademeter</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl></FormItem>
-                                    )} />
-                                </div>
-                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeCargo(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </Card>
-                        ))}
-                        <Button type="button" variant="outline" onClick={() => appendCargo({ quantity: 1, cargo_type: '', description: '', weight: null, loading_meters: null })}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Ladungsposition hinzufügen
-                        </Button>
-                    </CardContent>
-                </Card>
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="general">Allgemein</TabsTrigger>
+            <TabsTrigger value="notes">Notizen</TabsTrigger>
+            <TabsTrigger value="files">Dateien</TabsTrigger>
+            <TabsTrigger value="team">Team</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Route & Stopps</CardTitle>
+                            <CardDescription>Definieren Sie hier die Abhol-, Liefer- und Zwischenstopps.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {stopFields.map((field, index) => (
+                                <Card key={field.id} className="p-4 relative">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField control={form.control} name={`stops.${index}.address`} render={({ field }) => (
+                                            <FormItem className="md:col-span-2"><FormLabel>Adresse</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`stops.${index}.stop_type`} render={({ field }) => (
+                                            <FormItem><FormLabel>Stopp-Art</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                    <SelectContent><SelectItem value="Abholung">Abholung</SelectItem><SelectItem value="Teillieferung">Teillieferung</SelectItem></SelectContent>
+                                                </Select>
+                                            <FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`stops.${index}.stop_date`} render={({ field }) => (
+                                            <FormItem><FormLabel>Datum</FormLabel><FormControl><Input type="date" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`stops.${index}.time_start`} render={({ field }) => (
+                                            <FormItem><FormLabel>Zeitfenster (von)</FormLabel><FormControl><Input type="time" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`stops.${index}.time_end`} render={({ field }) => (
+                                            <FormItem><FormLabel>Zeitfenster (bis)</FormLabel><FormControl><Input type="time" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                        )} />
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </Card>
+                            ))}
+                            <Button type="button" variant="outline" onClick={() => appendStop({ stop_type: 'Teillieferung', address: '', stop_date: null, time_start: null, time_end: null, position: stopFields.length })}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> Stopp hinzufügen
+                            </Button>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Ladungsdetails</CardTitle>
+                            <CardDescription>Fügen Sie hier die einzelnen Ladungspositionen hinzu.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {cargoFields.map((field, index) => (
+                                <Card key={field.id} className="p-4 relative">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        <FormField control={form.control} name={`cargoItems.${index}.quantity`} render={({ field }) => (
+                                            <FormItem><FormLabel>Anzahl</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`cargoItems.${index}.cargo_type`} render={({ field }) => (
+                                            <FormItem><FormLabel>Art</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`cargoItems.${index}.description`} render={({ field }) => (
+                                            <FormItem><FormLabel>Bezeichnung</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`cargoItems.${index}.weight`} render={({ field }) => (
+                                            <FormItem><FormLabel>Gewicht (kg)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl></FormItem>
+                                        )} />
+                                        <FormField control={form.control} name={`cargoItems.${index}.loading_meters`} render={({ field }) => (
+                                            <FormItem><FormLabel>Lademeter</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl></FormItem>
+                                        )} />
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeCargo(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </Card>
+                            ))}
+                            <Button type="button" variant="outline" onClick={() => appendCargo({ quantity: 1, cargo_type: '', description: '', weight: null, loading_meters: null })}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> Ladungsposition hinzufügen
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader><CardTitle>Allgemeine Informationen</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="customer_id"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>Kunde</FormLabel>
+                                        <CustomerCombobox
+                                            customers={customers || []}
+                                            value={field.value}
+                                            onChange={(value) => form.setValue('customer_id', value)}
+                                            onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                                        />
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField control={form.control} name="external_order_number" render={({ field }) => (
+                                <FormItem><FormLabel>Externe Auftragsnummer</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="status" render={({ field }) => (
+                                <FormItem><FormLabel>Status</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="Angelegt">Angelegt</SelectItem>
+                                            <SelectItem value="Geplant">Geplant</SelectItem>
+                                            <SelectItem value="Unterwegs">Unterwegs</SelectItem>
+                                            <SelectItem value="Zugestellt">Zugestellt</SelectItem>
+                                            <SelectItem value="Storniert">Storniert</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                <FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="price" render={({ field }) => (
+                                <FormItem><FormLabel>Preis (€)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="description" render={({ field }) => (
+                                <FormItem><FormLabel>Beschreibung / Notizen</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
-
-            {/* Side Card */}
-            <div className="space-y-6">
-                <Card>
-                    <CardHeader><CardTitle>Allgemeine Informationen</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="customer_id"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>Kunde</FormLabel>
-                                    <CustomerCombobox
-                                        customers={customers || []}
-                                        value={field.value}
-                                        onChange={(value) => form.setValue('customer_id', value)}
-                                        onAddNew={() => setIsAddCustomerDialogOpen(true)}
-                                    />
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField control={form.control} name="external_order_number" render={({ field }) => (
-                            <FormItem><FormLabel>Externe Auftragsnummer</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="status" render={({ field }) => (
-                            <FormItem><FormLabel>Status</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="Angelegt">Angelegt</SelectItem>
-                                        <SelectItem value="Geplant">Geplant</SelectItem>
-                                        <SelectItem value="Unterwegs">Unterwegs</SelectItem>
-                                        <SelectItem value="Zugestellt">Zugestellt</SelectItem>
-                                        <SelectItem value="Storniert">Storniert</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            <FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="price" render={({ field }) => (
-                            <FormItem><FormLabel>Preis (€)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="description" render={({ field }) => (
-                            <FormItem><FormLabel>Beschreibung / Notizen</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
+          </TabsContent>
+          <TabsContent value="notes" className="mt-6"><NotesTab /></TabsContent>
+          <TabsContent value="files" className="mt-6"><FilesTab /></TabsContent>
+          <TabsContent value="team" className="mt-6"><TeamTab /></TabsContent>
+        </Tabs>
       </form>
     </Form>
     <AddCustomerDialog
