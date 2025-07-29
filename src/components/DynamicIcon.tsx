@@ -9,6 +9,7 @@ import {
   Package,
   User,
   ChevronRight,
+  Truck,
   type LucideProps,
 } from 'lucide-react';
 
@@ -21,7 +22,8 @@ const iconMap = {
   LogOut,
   User,
   ChevronRight,
-  Package, // Fallback
+  Package,
+  Truck,
 };
 
 type IconName = keyof typeof iconMap;
