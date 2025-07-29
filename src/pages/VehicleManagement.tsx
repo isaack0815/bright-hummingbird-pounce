@@ -6,8 +6,7 @@ import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
-import { AddVehicleDialog } from '@/components/AddVehicleDialog';
-import { EditVehicleDialog } from '@/components/EditVehicleDialog';
+import { useNavigate } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -27,7 +26,6 @@ import { useError } from '@/contexts/ErrorContext';
 import type { Vehicle } from '@/types/vehicle';
 import { Badge } from '@/components/ui/badge';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 const fetchVehicles = async (): Promise<Vehicle[]> => {
   const { data, error } = await supabase.functions.invoke('get-vehicles');
@@ -36,12 +34,10 @@ const fetchVehicles = async (): Promise<Vehicle[]> => {
 };
 
 const VehicleManagement = () => {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
   const { addError } = useError();
+  const navigate = useNavigate();
 
   const { data: vehicles, isLoading, error } = useQuery<Vehicle[]>({
     queryKey: ['vehicles'],
@@ -62,11 +58,6 @@ const VehicleManagement = () => {
       showError(err.message || "Fehler beim Löschen des Fahrzeugs.");
     },
   });
-
-  const handleEditClick = (vehicle: Vehicle) => {
-    setSelectedVehicle(vehicle);
-    setIsEditDialogOpen(true);
-  };
 
   const filteredVehicles = useMemo(() => {
     if (!vehicles) return [];
@@ -101,7 +92,7 @@ const VehicleManagement = () => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-foreground">Fahrzeugverwaltung</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        <Button onClick={() => navigate('/vehicles/new')}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Fahrzeug hinzufügen
         </Button>
@@ -165,7 +156,7 @@ const VehicleManagement = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditClick(vehicle)}><Edit className="mr-2 h-4 w-4" />Bearbeiten</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}><Edit className="mr-2 h-4 w-4" />Bearbeiten</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(vehicle.id)}><Trash2 className="mr-2 h-4 w-4" />Löschen</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -179,8 +170,6 @@ const VehicleManagement = () => {
           )}
         </CardContent>
       </Card>
-      <AddVehicleDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
-      <EditVehicleDialog vehicle={selectedVehicle} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} />
     </div>
   );
 };
