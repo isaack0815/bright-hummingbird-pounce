@@ -16,14 +16,14 @@ import { useError } from '@/contexts/ErrorContext';
 import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
-import { ArrowLeft, PlusCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Trash2, Download } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
-import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
+import { generateOrderPDF } from '@/utils/pdfGenerator';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
@@ -198,9 +198,16 @@ const FreightOrderForm = () => {
                     {isEditMode ? `Auftrag ${existingOrder?.order_number} bearbeiten` : 'Neuer Frachtauftrag'}
                 </h1>
             </div>
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Wird gespeichert...' : 'Auftrag speichern'}
-          </Button>
+            <div className="flex items-center gap-2">
+                {isEditMode && existingOrder && (
+                <Button type="button" variant="outline" size="icon" onClick={() => generateOrderPDF(existingOrder)}>
+                    <Download className="h-4 w-4" />
+                </Button>
+                )}
+                <Button type="submit" disabled={mutation.isPending}>
+                    {mutation.isPending ? 'Wird gespeichert...' : 'Auftrag speichern'}
+                </Button>
+            </div>
         </div>
 
         <Tabs defaultValue="general" className="w-full">
