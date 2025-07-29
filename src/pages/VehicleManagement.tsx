@@ -79,12 +79,12 @@ const VehicleManagement = () => {
     );
   }, [vehicles, searchTerm]);
 
-  const getDateBadgeVariant = (dateStr: string | null): 'destructive' | 'warning' | 'secondary' => {
+  const getDateBadgeVariant = (dateStr: string | null): 'destructive' | 'default' | 'secondary' => {
     if (!dateStr) return 'secondary';
     try {
       const daysUntil = differenceInCalendarDays(parseISO(dateStr), new Date());
       if (daysUntil < 0) return 'destructive';
-      if (daysUntil <= 30) return 'warning';
+      if (daysUntil <= 30) return 'default';
       return 'secondary';
     } catch (e) {
       console.error("Error parsing date:", e);

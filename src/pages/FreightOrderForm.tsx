@@ -111,7 +111,7 @@ const FreightOrderForm = () => {
         status: existingOrder.status,
         price: existingOrder.price || undefined,
         description: existingOrder.description || '',
-        stops: existingOrder.freight_order_stops.map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })) || [],
+        stops: (existingOrder.freight_order_stops || []).map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })),
         cargoItems: existingOrder.cargo_items || [],
       });
     }
