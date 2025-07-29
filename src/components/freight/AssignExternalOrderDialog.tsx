@@ -76,9 +76,11 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     mutationFn: async (updatedOrder: FreightOrder) => {
       if (!settings || !user) throw new Error("Fehlende Daten für PDF-Erstellung");
       
-      const pdfBlob = generateExternalOrderPDF(updatedOrder, settings);
-      const fileName = `Transportauftrag_${updatedOrder.order_number}.pdf`;
+      const sanitizedOrderNumber = updatedOrder.order_number.replace(/\//g, '_');
+      const fileName = `Transportauftrag_${sanitizedOrderNumber}.pdf`;
       const filePath = `${updatedOrder.id}/${uuidv4()}-${fileName}`;
+
+      const pdfBlob = generateExternalOrderPDF(updatedOrder, settings);
 
       const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, pdfBlob);
       if (uploadError) throw uploadError;
