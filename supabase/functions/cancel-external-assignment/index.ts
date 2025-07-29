@@ -23,7 +23,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Order ID is required' }), { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    // 1. Reset external assignment fields on the order
+    const { data, error: updateError } = await supabaseAdmin
       .from('freight_orders')
       .update({
         is_external: false,
@@ -39,7 +40,14 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (error) throw error
+    if (updateError) throw updateError
+
+    // 2. Archive the associated transport order PDF
+    await supabaseAdmin
+      .from('order_files')
+      .update({ is_archived: true })
+      .eq('order_id', orderId)
+      .like('file_name', 'Transportauftrag_%');
 
     return new Response(JSON.stringify({ order: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

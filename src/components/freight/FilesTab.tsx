@@ -16,6 +16,7 @@ type OrderFile = {
   created_at: string;
   first_name: string | null;
   last_name: string | null;
+  is_archived: boolean;
 };
 
 const fetchFiles = async (orderId: number): Promise<OrderFile[]> => {
@@ -23,6 +24,7 @@ const fetchFiles = async (orderId: number): Promise<OrderFile[]> => {
     .from('order_files_with_profile')
     .select('*')
     .eq('order_id', orderId)
+    .eq('is_archived', false) // Only fetch non-archived files
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data;
