@@ -24,8 +24,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useError } from "@/contexts/ErrorContext";
+import type { ChatUser } from "@/types/chat";
 
 const formSchema = z.object({
   license_plate: z.string().min(1, "Kennzeichen ist erforderlich."),
@@ -40,11 +41,18 @@ const formSchema = z.object({
   loading_area: z.coerce.number().optional(),
   next_service_date: z.string().optional(),
   gas_inspection_due_date: z.string().optional(),
+  driver_id: z.string().uuid().nullable().optional(),
 });
 
 type AddVehicleDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+};
+
+const fetchUsers = async (): Promise<ChatUser[]> => {
+  const { data, error } = await supabase.functions.invoke('get-chat-users');
+  if (error) throw new Error(error.message);
+  return data.users;
 };
 
 export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) {
@@ -60,13 +68,21 @@ export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) 
       vin: "",
       status: "Verfügbar",
       notes: "",
+      driver_id: null,
     },
+  });
+
+  const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
+    queryKey: ['chatUsers'],
+    queryFn: fetchUsers,
+    enabled: open,
   });
 
   const createMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
+      const payload = { ...values, driver_id: values.driver_id || null };
       const { error } = await supabase.functions.invoke('create-vehicle', {
-        body: values,
+        body: payload,
       });
       if (error) throw error;
     },
@@ -98,6 +114,35 @@ export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) 
                 <FormField control={form.control} name="license_plate" render={({ field }) => (
                   <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField
+                  control={form.control}
+                  name="driver_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fahrer</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value === "" ? null : value)}
+                        value={field.value || ""}
+                        disabled={isLoadingUsers}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Fahrer auswählen..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">- Kein Fahrer -</SelectItem>
+                          {users?.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="brand" render={({ field }) => (
                     <FormItem><FormLabel>Marke</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -160,7 +205,7 @@ export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) 
               </div>
             </ScrollArea>
             <DialogFooter className="pt-4">
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending || isLoadingUsers}>
                 {createMutation.isPending ? "Wird erstellt..." : "Fahrzeug erstellen"}
               </Button>
             </DialogFooter>

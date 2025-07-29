@@ -72,9 +72,10 @@ const VehicleManagement = () => {
     if (!vehicles) return [];
     return vehicles.filter(vehicle =>
       vehicle.license_plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.vin?.toLowerCase().includes(searchTerm.toLowerCase())
+      (vehicle.brand && vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (vehicle.model && vehicle.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (vehicle.vin && vehicle.vin.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (vehicle.profiles && `${vehicle.profiles.first_name} ${vehicle.profiles.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [vehicles, searchTerm]);
 
@@ -113,7 +114,7 @@ const VehicleManagement = () => {
         <CardContent>
           <div className="mb-4">
             <Input
-              placeholder="Fahrzeuge suchen (Kennzeichen, Marke...)"
+              placeholder="Fahrzeuge suchen (Kennzeichen, Fahrer...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-sm"
@@ -127,6 +128,7 @@ const VehicleManagement = () => {
                 <TableRow>
                   <TableHead>Kennzeichen</TableHead>
                   <TableHead>Marke & Modell</TableHead>
+                  <TableHead>Fahrer</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Nächste HU</TableHead>
                   <TableHead>Service</TableHead>
@@ -139,6 +141,7 @@ const VehicleManagement = () => {
                   <TableRow key={vehicle.id}>
                     <TableCell className="font-medium">{vehicle.license_plate}</TableCell>
                     <TableCell>{`${vehicle.brand || ''} ${vehicle.model || ''}`.trim()}</TableCell>
+                    <TableCell>{vehicle.profiles ? `${vehicle.profiles.first_name || ''} ${vehicle.profiles.last_name || ''}`.trim() : '-'}</TableCell>
                     <TableCell><Badge variant={vehicle.status === 'Verfügbar' ? 'default' : 'secondary'}>{vehicle.status}</Badge></TableCell>
                     <TableCell>
                       <Badge variant={getDateBadgeVariant(vehicle.inspection_due_date)}>

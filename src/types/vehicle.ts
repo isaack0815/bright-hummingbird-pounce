@@ -13,4 +13,10 @@ export type Vehicle = {
   loading_area: number | null;
   next_service_date: string | null;
   gas_inspection_due_date: string | null;
+  driver_id: string | null;
+  profiles: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
 };
