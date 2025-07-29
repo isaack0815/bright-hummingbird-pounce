@@ -121,8 +121,8 @@ export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) 
                     <FormItem>
                       <FormLabel>Fahrer</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(value === "" ? null : value)}
-                        value={field.value || ""}
+                        onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                        value={field.value ?? "none"}
                         disabled={isLoadingUsers}
                       >
                         <FormControl>
@@ -131,7 +131,7 @@ export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) 
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">- Kein Fahrer -</SelectItem>
+                          <SelectItem value="none">- Kein Fahrer -</SelectItem>
                           {users?.map((user) => (
                             <SelectItem key={user.id} value={user.id}>
                               {`${user.first_name || ''} ${user.last_name || ''}`.trim()}

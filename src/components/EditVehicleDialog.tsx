@@ -136,8 +136,8 @@ export function EditVehicleDialog({ vehicle, open, onOpenChange }: EditVehicleDi
                     <FormItem>
                       <FormLabel>Fahrer</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(value === "" ? null : value)}
-                        value={field.value || ""}
+                        onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                        value={field.value ?? "none"}
                         disabled={isLoadingUsers}
                       >
                         <FormControl>
@@ -146,7 +146,7 @@ export function EditVehicleDialog({ vehicle, open, onOpenChange }: EditVehicleDi
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">- Kein Fahrer -</SelectItem>
+                          <SelectItem value="none">- Kein Fahrer -</SelectItem>
                           {users?.map((user) => (
                             <SelectItem key={user.id} value={user.id}>
                               {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
