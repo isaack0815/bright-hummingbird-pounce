@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import UserManagement from './pages/UserManagement';
 import RoleManagement from './pages/RoleManagement';
 import MenuManagement from './pages/MenuManagement';
+import CustomerManagement from './pages/CustomerManagement';
 import Profile from './pages/Profile';
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -50,6 +51,10 @@ const AppRoutes = () => {
 
           <Route element={<ProtectedRoute requiredPermission="menus.manage" />}>
             <Route path="menus" element={<MenuManagement />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="customers.manage" />}>
+            <Route path="customers" element={<CustomerManagement />} />
           </Route>
 
           <Route path="access-denied" element={<AccessDenied />} />
