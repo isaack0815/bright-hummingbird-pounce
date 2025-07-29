@@ -121,13 +121,18 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
           {isLoading && <Skeleton className="h-12 w-full" />}
           {files?.map(file => (
             <div key={file.id} className="flex items-center justify-between rounded-md border p-3">
-              <div className="flex items-center gap-3">
-                <FileIcon className="h-6 w-6 text-muted-foreground" />
-                <span className="font-medium">{file.file_name}</span>
+              <div className="flex items-center gap-3 overflow-hidden">
+                <FileIcon className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                <div className="flex-grow overflow-hidden">
+                  <p className="font-medium truncate">{file.file_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Hochgeladen von {`${file.first_name || ''} ${file.last_name || ''}`.trim() || 'Unbekannt'} am {new Date(file.created_at).toLocaleString('de-DE')}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={() => handleDownload(file.file_path)}><Download className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate({ id: file.id, path: file.file_path })} disabled={deleteMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => handleDownload(file.file_path)}><Download className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => deleteMutation.mutate({ id: file.id, path: file.file_path })} disabled={deleteMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
             </div>
           ))}
