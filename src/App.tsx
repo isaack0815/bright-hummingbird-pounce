@@ -16,6 +16,7 @@ import MenuManagement from './pages/MenuManagement';
 import CustomerManagement from './pages/CustomerManagement';
 import FreightOrderManagement from './pages/FreightOrderManagement';
 import FreightOrderForm from './pages/FreightOrderForm';
+import VehicleManagement from './pages/VehicleManagement';
 import Profile from './pages/Profile';
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -57,6 +58,10 @@ const AppRoutes = () => {
 
           <Route element={<ProtectedRoute requiredPermission="customers.manage" />}>
             <Route path="customers" element={<CustomerManagement />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="vehicles.manage" />}>
+            <Route path="vehicles" element={<VehicleManagement />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredPermission="freight_orders.manage" />}>

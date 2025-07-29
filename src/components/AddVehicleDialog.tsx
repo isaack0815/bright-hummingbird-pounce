@@ -1,0 +1,158 @@
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/lib/supabase";
+import { showSuccess, showError } from "@/utils/toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useError } from "@/contexts/ErrorContext";
+
+const formSchema = z.object({
+  license_plate: z.string().min(1, "Kennzeichen ist erforderlich."),
+  brand: z.string().optional(),
+  model: z.string().optional(),
+  type: z.string().optional(),
+  vin: z.string().optional(),
+  year_of_manufacture: z.coerce.number().optional(),
+  inspection_due_date: z.string().optional(),
+  status: z.string().default('Verfügbar'),
+  notes: z.string().optional(),
+});
+
+type AddVehicleDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
+export function AddVehicleDialog({ open, onOpenChange }: AddVehicleDialogProps) {
+  const queryClient = useQueryClient();
+  const { addError } = useError();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      license_plate: "",
+      brand: "",
+      model: "",
+      type: "Sattelzugmaschine",
+      vin: "",
+      status: "Verfügbar",
+      notes: "",
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (values: z.infer<typeof formSchema>) => {
+      const { error } = await supabase.functions.invoke('create-vehicle', {
+        body: values,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Fahrzeug erfolgreich erstellt!");
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (err: any) => {
+      addError(err, 'API');
+      showError(err.data?.error || "Fehler beim Erstellen des Fahrzeugs.");
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Neues Fahrzeug anlegen</DialogTitle>
+          <DialogDescription>
+            Füllen Sie die Details aus, um ein neues Fahrzeug zu erstellen.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))}>
+            <ScrollArea className="h-96 p-4">
+              <div className="space-y-4">
+                <FormField control={form.control} name="license_plate" render={({ field }) => (
+                  <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="brand" render={({ field }) => (
+                    <FormItem><FormLabel>Marke</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="model" render={({ field }) => (
+                    <FormItem><FormLabel>Modell</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="type" render={({ field }) => (
+                  <FormItem><FormLabel>Fahrzeugtyp</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="Sattelzugmaschine">Sattelzugmaschine</SelectItem>
+                        <SelectItem value="Anhänger">Anhänger</SelectItem>
+                        <SelectItem value="Transporter">Transporter</SelectItem>
+                        <SelectItem value="LKW">LKW</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  <FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="vin" render={({ field }) => (
+                  <FormItem><FormLabel>Fahrgestellnummer (VIN)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="year_of_manufacture" render={({ field }) => (
+                    <FormItem><FormLabel>Baujahr</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="inspection_due_date" render={({ field }) => (
+                    <FormItem><FormLabel>Nächste HU</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                 <FormField control={form.control} name="status" render={({ field }) => (
+                  <FormItem><FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="Verfügbar">Verfügbar</SelectItem>
+                        <SelectItem value="In Reparatur">In Reparatur</SelectItem>
+                        <SelectItem value="Unterwegs">Unterwegs</SelectItem>
+                        <SelectItem value="Außer Betrieb">Außer Betrieb</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  <FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="notes" render={({ field }) => (
+                  <FormItem><FormLabel>Notizen</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+            </ScrollArea>
+            <DialogFooter className="pt-4">
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Wird erstellt..." : "Fahrzeug erstellen"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
