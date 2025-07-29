@@ -12,10 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const { name } = await req.json()
@@ -23,7 +22,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Category name is required' }), { status: 400 })
     }
 
-    const { data, error } = await supabase.from('vehicle_note_categories').insert({ name }).select().single()
+    const { data, error } = await supabaseAdmin.from('vehicle_note_categories').insert({ name }).select().single()
     if (error) throw error
 
     return new Response(JSON.stringify({ category: data }), {
