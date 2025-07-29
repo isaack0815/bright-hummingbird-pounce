@@ -6,22 +6,6 @@ interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
 
-const agbText = `
-1. Vertragsabschluss: Der Vertrag kommt durch die schriftliche Bestätigung des Transportauftrags durch den Transportdienstleister zustande.
-2. Haftung: Der Transportdienstleister haftet für Schäden am Transportgut gemäß den gesetzlichen Bestimmungen. Eine Haftung für Folgeschäden wird ausgeschlossen.
-3. Lieferzeit: Die angegebenen Lieferzeiten sind bindend. Höhere Gewalt oder unvorhersehbare Ereignisse können zu Verzögerungen führen.
-4. Zahlung: Der Auftraggeber verpflichtet sich, den vereinbarten Betrag innerhalb von 60 Tagen nach postalischen erhalt der Originalpapiere (Rechnung, Lieferscheine) zu zahlen.
-5. Stornierung: Stornierungen müssen schriftlich erfolgen. Bei Stornierung weniger als 48 Stunden vor der Abholung wird eine Gebühr von 50 % des Auftragswertes fällig. Ebenso ist der Auftraggeber berechtigt den Auftrag bei einem unangekündigten Zeitverzug von mehr als 1 Stunde den Auftrag zu stornieren. Eine Erstattung der bisher angefallen kosten des Auftragnehmers ist nicht möglich.
-6. Der Subunternhemer ist nicht berechtigt, die Ladung an Dritte weiterzugeben oder zu verkaufen.
-7. Der Subunternehmer ist nicht berechtigt, die Ladung in ein anderes Land zu transportieren, als im Auftrag angegeben. Hier kann eine Sondergenehmigung des Auftraggebers eingeholt werden.
-8. Der Subunternhmer ist verpflichtet, die Ladung ordnungsgemäß zu sichern und zu transportieren.
-9. Der Subunternehmer ist verpflichtet, die Ladung eigenständig zu prüfen.
-10. Wartezeiten: Wartezeiten am Abhol- oder Lieferort werden mit 50 € pro Stunde berechnet ab einer Wartezeit von 5 Stunden, sofern sie nicht im Vorfeld anders vereinbart wurden.
-11. Datenschutz: Die Daten des Auftraggebers werden nur zum Zwecke der Auftragsabwicklung gespeichert und nicht an Dritte weitergegeben.
-12. Dokumentation: Der Transportdienstleister ist verpflichtet, alle relevanten Dokumente (Lieferscheine, CMR, Rechnungen) ordnungsgemäß zu archivieren.
-13. Gerichtsstand: Gerichtsstand ist der Sitz des Transportdienstleisters.
-`;
-
 const hinweisText = `
 KEIN PALETTENTAUSCH / NO PALLETS CHANGE
 1. IMMER im CMR oder Lieferschein festhalten
@@ -44,6 +28,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Bl
   const doc = new jsPDF() as jsPDFWithAutoTable;
   const pageHeight = doc.internal.pageSize.height;
   const margin = 14;
+  const agbText = settings.agb_text || 'Keine AGB konfiguriert.';
 
   // Header
   doc.setFontSize(16);

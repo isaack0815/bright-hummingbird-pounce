@@ -29,6 +29,7 @@ const settingsSchema = z.object({
   email_signature: z.string().optional(),
   email_bcc: z.string().email({ message: "Ungültige E-Mail-Adresse." }).optional().or(z.literal('')),
   payment_term_default: z.coerce.number().optional(),
+  agb_text: z.string().optional(),
 });
 
 const fetchSettings = async (): Promise<Setting[]> => {
@@ -55,6 +56,7 @@ const Settings = () => {
       email_signature: "",
       email_bcc: "",
       payment_term_default: 45,
+      agb_text: "",
     },
   });
 
@@ -70,6 +72,7 @@ const Settings = () => {
         email_signature: settingsMap.get('email_signature') || "",
         email_bcc: settingsMap.get('email_bcc') || "",
         payment_term_default: Number(settingsMap.get('payment_term_default')) || 45,
+        agb_text: settingsMap.get('agb_text') || "",
       });
     }
   }, [settings, form]);
@@ -138,6 +141,34 @@ const Settings = () => {
                 <FormField control={form.control} name="payment_term_default" render={({ field }) => (
                   <FormItem><FormLabel>Standard-Zahlungsfrist (Tage)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>AGB für PDF-Export</CardTitle>
+              <CardDescription>Dieser Text wird auf den generierten Transportaufträgen als AGB gedruckt.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? <Skeleton className="h-40 w-full" /> : (
+                <FormField
+                  control={form.control}
+                  name="agb_text"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>AGB Text</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Geben Sie hier Ihre AGB ein..."
+                          className="min-h-[300px] font-mono text-xs"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
             </CardContent>
           </Card>
