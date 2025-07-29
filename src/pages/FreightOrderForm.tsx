@@ -91,7 +91,7 @@ const FreightOrderForm = () => {
     queryFn: fetchSettings,
   });
 
-  const { data: existingOrder, isLoading: isLoadingOrder } = useQuery<FreightOrder>({
+  const { data: existingOrder, isLoading: isLoadingOrder, isFetching: isFetchingOrder } = useQuery<FreightOrder>({
     queryKey: ['freightOrder', id],
     queryFn: () => fetchOrder(id!),
     enabled: isEditMode,
@@ -213,9 +213,9 @@ const FreightOrderForm = () => {
             </div>
             <div className="flex items-center gap-2">
                 {isEditMode && (
-                  <Button type="button" variant={existingOrder?.is_external ? "secondary" : "outline"} onClick={() => setIsAssignModalOpen(true)}>
+                  <Button type="button" variant={existingOrder?.is_external ? "secondary" : "outline"} onClick={() => setIsAssignModalOpen(true)} disabled={isFetchingOrder}>
                     <Share2 className="mr-2 h-4 w-4" />
-                    {existingOrder?.is_external ? 'Externe Vergabe verwalten' : 'Extern vergeben'}
+                    {isFetchingOrder ? 'Lade...' : (existingOrder?.is_external ? 'Externe Vergabe verwalten' : 'Extern vergeben')}
                   </Button>
                 )}
                 <Button type="submit" disabled={mutation.isPending}>

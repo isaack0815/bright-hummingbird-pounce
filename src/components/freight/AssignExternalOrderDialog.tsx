@@ -136,6 +136,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     onSuccess: () => {
       showSuccess("Externe Vergabe storniert.");
       queryClient.invalidateQueries({ queryKey: ['freightOrder', order?.id] });
+      queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
       onOpenChange(false);
     },
     onError: (err: any) => {

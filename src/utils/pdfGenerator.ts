@@ -1,10 +1,6 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import type { FreightOrder } from '@/types/freight';
-
-interface jsPDFWithAutoTable extends jsPDF {
-  autoTable: (options: any) => jsPDF;
-}
 
 const hinweisText = `
 KEIN PALETTENTAUSCH / NO PALLETS CHANGE
@@ -25,7 +21,7 @@ Bei fehlerhafter Dokumentation wird eine Bearbeitungsgebühr von 50€ erhoben.
 `;
 
 export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Blob => {
-  const doc = new jsPDF() as jsPDFWithAutoTable;
+  const doc = new jsPDF();
   const pageHeight = doc.internal.pageSize.height;
   const margin = 14;
   const agbText = settings.agb_text || 'Keine AGB konfiguriert.';
@@ -37,7 +33,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Bl
   doc.setFont('helvetica', 'normal');
 
   // Auftraggeber / Auftragnehmer
-  doc.autoTable({
+  autoTable(doc, {
     startY: 30,
     body: [
       [
@@ -73,7 +69,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Bl
     ['Beschreibung:', order.description || ''],
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: lastY,
     body: details,
     theme: 'plain',
@@ -113,7 +109,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Bl
   doc.line(margin, lastY + 2, margin + 80, lastY + 2);
 
   // Footer
-  const pageCount = doc.internal.getNumberOfPages();
+  const pageCount = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
