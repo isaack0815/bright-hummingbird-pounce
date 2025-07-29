@@ -16,15 +16,16 @@ import { useError } from '@/contexts/ErrorContext';
 import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
-import { ArrowLeft, PlusCircle, Trash2, Download } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Trash2, Download, FileText } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
 import { useAuth } from '@/contexts/AuthContext';
-import { generateOrderPDF } from '@/utils/pdfGenerator';
+import { generateExternalOrderPDF } from '@/utils/pdfGenerator';
 import { Switch } from '@/components/ui/switch';
+import { v4 as uuidv4 } from 'uuid';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
@@ -68,7 +69,7 @@ const fetchCustomers = async (): Promise<Customer[]> => {
 };
 
 const fetchOrder = async (id: string): Promise<FreightOrder> => {
-    const { data, error } = await supabase.from('freight_orders').select('*, freight_order_stops(*), cargo_items(*)').eq('id', id).single();
+    const { data, error } = await supabase.from('freight_orders').select('*, customers(id, company_name), freight_order_stops(*), cargo_items(*)').eq('id', id).single();
     if (error) throw new Error(error.message);
     return data as FreightOrder;
 }
@@ -94,7 +95,7 @@ const FreightOrderForm = () => {
     queryFn: fetchCustomers,
   });
 
-  const { data: settings } = useQuery({
+  const { data: settings, isLoading: isLoadingSettings } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
   });
@@ -215,7 +216,37 @@ const FreightOrderForm = () => {
     },
   });
 
-  if (isLoadingCustomers || isLoadingOrder) {
+  const pdfMutation = useMutation({
+    mutationFn: async () => {
+      if (!existingOrder || !settings || !user) throw new Error("Fehlende Daten für PDF-Erstellung");
+      
+      const pdfBlob = generateExternalOrderPDF(existingOrder, settings);
+      const fileName = `Transportauftrag_${existingOrder.order_number}.pdf`;
+      const filePath = `${existingOrder.id}/${uuidv4()}-${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, pdfBlob);
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase.from('order_files').insert({
+        order_id: existingOrder.id,
+        user_id: user.id,
+        file_path: filePath,
+        file_name: fileName,
+        file_type: 'application/pdf',
+      });
+      if (dbError) throw dbError;
+    },
+    onSuccess: () => {
+      showSuccess("PDF-Auftrag erfolgreich erstellt und gespeichert!");
+      queryClient.invalidateQueries({ queryKey: ['orderFiles', Number(id)] });
+    },
+    onError: (err: any) => {
+      addError(err, 'API');
+      showError(err.message || "Fehler beim Erstellen des PDFs.");
+    },
+  });
+
+  if (isLoadingCustomers || isLoadingOrder || isLoadingSettings) {
       return <p>Lade Formulardaten...</p>
   }
 
@@ -233,10 +264,11 @@ const FreightOrderForm = () => {
                 </h1>
             </div>
             <div className="flex items-center gap-2">
-                {isEditMode && existingOrder && (
-                <Button type="button" variant="outline" size="icon" onClick={() => generateOrderPDF(existingOrder)}>
-                    <Download className="h-4 w-4" />
-                </Button>
+                {isEditMode && existingOrder && isExternal && (
+                  <Button type="button" variant="outline" onClick={() => pdfMutation.mutate()} disabled={pdfMutation.isPending}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    {pdfMutation.isPending ? 'PDF wird erstellt...' : 'Externen Auftrag als PDF erstellen'}
+                  </Button>
                 )}
                 <Button type="submit" disabled={mutation.isPending}>
                     {mutation.isPending ? 'Wird gespeichert...' : 'Auftrag speichern'}
