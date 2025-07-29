@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { AddRoleDialog } from '@/components/AddRoleDialog';
+import { EditRoleDialog } from '@/components/EditRoleDialog';
 import {
   Table,
   TableBody,
@@ -22,12 +23,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useError } from '@/contexts/ErrorContext';
+import { Badge } from '@/components/ui/badge';
+
+type Permission = {
+  id: number;
+  name: string;
+};
 
 type Role = {
   id: number;
   name: string;
   description: string | null;
   created_at: string;
+  permissions: Permission[];
 };
 
 const fetchRoles = async (): Promise<Role[]> => {
@@ -38,6 +46,8 @@ const fetchRoles = async (): Promise<Role[]> => {
 
 const RoleManagement = () => {
   const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
+  const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const queryClient = useQueryClient();
   const { addError } = useError();
 
@@ -60,6 +70,11 @@ const RoleManagement = () => {
       showError(err.message || "Fehler beim Löschen der Gruppe.");
     },
   });
+
+  const handleEditClick = (role: Role) => {
+    setSelectedRole(role);
+    setIsEditRoleDialogOpen(true);
+  };
 
   if (error) {
     addError(error, 'API');
@@ -89,6 +104,7 @@ const RoleManagement = () => {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Beschreibung</TableHead>
+                  <TableHead>Berechtigungen</TableHead>
                   <TableHead>
                     <span className="sr-only">Aktionen</span>
                   </TableHead>
@@ -99,17 +115,29 @@ const RoleManagement = () => {
                   <TableRow key={role.id}>
                     <TableCell className="font-medium">{role.name}</TableCell>
                     <TableCell>{role.description}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {role.permissions.length > 0 ? (
+                          role.permissions.map(p => <Badge key={p.id} variant="outline">{p.name}</Badge>)
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
+                          <Button aria-haspopup="true" size="icon" variant="ghost" disabled={role.name === 'Admin'}>
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Menü</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem disabled>Bearbeiten</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClick(role)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Bearbeiten
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => deleteRoleMutation.mutate(role.id)}
@@ -130,6 +158,7 @@ const RoleManagement = () => {
         </CardContent>
       </Card>
       <AddRoleDialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen} />
+      <EditRoleDialog role={selectedRole} open={isEditRoleDialogOpen} onOpenChange={setIsEditRoleDialogOpen} />
     </div>
   );
 };

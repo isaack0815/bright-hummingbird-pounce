@@ -17,28 +17,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { data, error } = await supabase
-      .from('roles')
-      .select(`
-        id,
-        name,
-        description,
-        created_at,
-        permissions (
-          id,
-          name
-        )
-      `)
-      .order('created_at')
+    const { data, error } = await supabase.from('permissions').select('*').order('name')
 
     if (error) throw error
 
-    const rolesWithPermissions = data.map(role => ({
-      ...role,
-      permissions: role.permissions || [],
-    }));
-
-    return new Response(JSON.stringify({ roles: rolesWithPermissions }), {
+    return new Response(JSON.stringify({ permissions: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

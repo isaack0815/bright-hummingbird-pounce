@@ -17,28 +17,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { data, error } = await supabase
-      .from('roles')
-      .select(`
-        id,
-        name,
-        description,
-        created_at,
-        permissions (
-          id,
-          name
-        )
-      `)
-      .order('created_at')
+    const { roleId, name, description, permissionIds } = await req.json()
+
+    if (!roleId || !name) {
+      return new Response(JSON.stringify({ error: 'Role ID and name are required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
+    const { error } = await supabase.rpc('update_role_with_permissions', {
+      p_role_id: roleId,
+      p_name: name,
+      p_description: description,
+      p_permission_ids: permissionIds,
+    })
 
     if (error) throw error
 
-    const rolesWithPermissions = data.map(role => ({
-      ...role,
-      permissions: role.permissions || [],
-    }));
-
-    return new Response(JSON.stringify({ roles: rolesWithPermissions }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
