@@ -1,29 +1,28 @@
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import { Editor } from '@tinymce/tinymce-react';
 
 interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
 }
 
-const modules = {
-  toolbar: [
-    [{ 'header': [1, 2, false] }],
-    ['bold', 'italic', 'underline','strike', 'blockquote'],
-    [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-    ['link'],
-    ['clean']
-  ],
-};
-
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   return (
-    <div className="bg-background">
-      <ReactQuill
-        theme="snow"
+    <div className="rounded-md border border-input">
+      <Editor
+        apiKey="no-api-key"
         value={value}
-        onChange={onChange}
-        modules={modules}
+        onEditorChange={(newValue) => onChange(newValue)}
+        init={{
+          height: 200,
+          menubar: false,
+          plugins: [
+            'lists', 'link', 'autolink', 'wordcount'
+          ],
+          toolbar: 'undo redo | blocks | bold italic | bullist numlist | link',
+          content_style: 'body { font-family:inherit; font-size:14px }',
+          skin: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'oxide-dark' : 'oxide',
+          content_css: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'default'
+        }}
       />
     </div>
   );

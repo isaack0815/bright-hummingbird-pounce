@@ -92,15 +92,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-@layer components {
-    .ql-toolbar {
-        @apply rounded-t-md border-border;
-    }
-    .ql-container {
-        @apply rounded-b-md border-border;
-    }
-    .ql-editor {
-        @apply min-h-[150px] bg-transparent;
-    }
-}
