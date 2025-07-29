@@ -24,6 +24,7 @@ import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateOrderPDF } from '@/utils/pdfGenerator';
+import { Switch } from '@/components/ui/switch';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
@@ -50,6 +51,14 @@ const formSchema = z.object({
   description: z.string().optional(),
   stops: z.array(stopSchema).min(1, "Es muss mindestens ein Stopp vorhanden sein."),
   cargoItems: z.array(cargoItemSchema).optional(),
+  is_external: z.boolean().default(false),
+  external_company_address: z.string().optional(),
+  external_email: z.string().email({ message: "Ungültige E-Mail." }).optional().or(z.literal('')),
+  external_driver_name: z.string().optional(),
+  external_driver_phone: z.string().optional(),
+  external_license_plate: z.string().optional(),
+  external_transporter_dimensions: z.string().optional(),
+  payment_term_days: z.coerce.number().optional(),
 });
 
 const fetchCustomers = async (): Promise<Customer[]> => {
@@ -63,6 +72,13 @@ const fetchOrder = async (id: string): Promise<FreightOrder> => {
     if (error) throw new Error(error.message);
     return data as FreightOrder;
 }
+
+const fetchSettings = async (): Promise<any> => {
+    const { data, error } = await supabase.functions.invoke('get-settings');
+    if (error) throw new Error(error.message);
+    const settingsMap = new Map(data.settings.map((s: any) => [s.key, s.value]));
+    return Object.fromEntries(settingsMap);
+};
 
 const FreightOrderForm = () => {
   const { id } = useParams<{ id: string }>();
@@ -78,6 +94,11 @@ const FreightOrderForm = () => {
     queryFn: fetchCustomers,
   });
 
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: fetchSettings,
+  });
+
   const { data: existingOrder, isLoading: isLoadingOrder } = useQuery<FreightOrder>({
     queryKey: ['freightOrder', id],
     queryFn: () => fetchOrder(id!),
@@ -90,8 +111,11 @@ const FreightOrderForm = () => {
       status: 'Angelegt',
       stops: [],
       cargoItems: [],
+      is_external: false,
     },
   });
+
+  const isExternal = form.watch('is_external');
 
   const { fields: stopFields, append: appendStop, remove: removeStop } = useFieldArray({
     control: form.control,
@@ -113,9 +137,19 @@ const FreightOrderForm = () => {
         description: existingOrder.description || '',
         stops: (existingOrder.freight_order_stops || []).map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })),
         cargoItems: existingOrder.cargo_items || [],
+        is_external: existingOrder.is_external || false,
+        external_company_address: existingOrder.external_company_address || '',
+        external_email: existingOrder.external_email || '',
+        external_driver_name: existingOrder.external_driver_name || '',
+        external_driver_phone: existingOrder.external_driver_phone || '',
+        external_license_plate: existingOrder.external_license_plate || '',
+        external_transporter_dimensions: existingOrder.external_transporter_dimensions || '',
+        payment_term_days: existingOrder.payment_term_days || undefined,
       });
+    } else if (!isEditMode && settings) {
+        form.setValue('payment_term_days', Number(settings.payment_term_default) || 45);
     }
-  }, [existingOrder, isEditMode, form]);
+  }, [existingOrder, isEditMode, form, settings]);
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>): Promise<FreightOrder> => {
@@ -341,6 +375,50 @@ const FreightOrderForm = () => {
                                 <FormItem><FormLabel>Beschreibung / Notizen</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                             )} />
                         </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <FormField
+                                control={form.control}
+                                name="is_external"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center justify-between rounded-lg">
+                                        <div className="space-y-0.5">
+                                            <FormLabel className="text-base">Extern vergeben</FormLabel>
+                                            <CardDescription>Auftrag wird von einem externen Dienstleister ausgeführt.</CardDescription>
+                                        </div>
+                                        <FormControl>
+                                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                        </FormControl>
+                                    </FormItem>
+                                )}
+                            />
+                        </CardHeader>
+                        {isExternal && (
+                            <CardContent className="space-y-4">
+                                <FormField control={form.control} name="external_company_address" render={({ field }) => (
+                                    <FormItem><FormLabel>Anschrift der Firma</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                                <FormField control={form.control} name="external_email" render={({ field }) => (
+                                    <FormItem><FormLabel>E-Mail-Adresse</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                                <FormField control={form.control} name="external_driver_name" render={({ field }) => (
+                                    <FormItem><FormLabel>Fahrername</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                                <FormField control={form.control} name="external_driver_phone" render={({ field }) => (
+                                    <FormItem><FormLabel>Fahrer Telefon</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                                <FormField control={form.control} name="external_license_plate" render={({ field }) => (
+                                    <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                                <FormField control={form.control} name="external_transporter_dimensions" render={({ field }) => (
+                                    <FormItem><FormLabel>Transportermaße (LxBxH)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                                <FormField control={form.control} name="payment_term_days" render={({ field }) => (
+                                    <FormItem><FormLabel>Zahlungsfrist (Tage)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                                )} />
+                            </CardContent>
+                        )}
                     </Card>
                 </div>
             </div>

@@ -43,6 +43,15 @@ export type FreightOrder = {
   created_at: string;
   created_by: string | null;
   
+  is_external: boolean | null;
+  external_company_address: string | null;
+  external_email: string | null;
+  external_driver_name: string | null;
+  external_driver_phone: string | null;
+  external_license_plate: string | null;
+  external_transporter_dimensions: string | null;
+  payment_term_days: number | null;
+
   customers: Pick<Customer, 'id' | 'company_name'> | null;
   freight_order_stops: Stop[];
   cargo_items: CargoItem[];
