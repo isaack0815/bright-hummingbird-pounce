@@ -39,6 +39,9 @@ const formSchema = z.object({
   inspection_due_date: z.string().optional(),
   status: z.string(),
   notes: z.string().optional(),
+  loading_area: z.coerce.number().optional(),
+  next_service_date: z.string().optional(),
+  gas_inspection_due_date: z.string().optional(),
 });
 
 type EditVehicleDialogProps = {
@@ -66,6 +69,9 @@ export function EditVehicleDialog({ vehicle, open, onOpenChange }: EditVehicleDi
         inspection_due_date: vehicle.inspection_due_date || "",
         status: vehicle.status,
         notes: vehicle.notes || "",
+        loading_area: vehicle.loading_area || undefined,
+        next_service_date: vehicle.next_service_date || "",
+        gas_inspection_due_date: vehicle.gas_inspection_due_date || "",
       });
     }
   }, [vehicle, form, open]);
@@ -102,7 +108,7 @@ export function EditVehicleDialog({ vehicle, open, onOpenChange }: EditVehicleDi
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}>
-            <ScrollArea className="h-96 p-4">
+            <ScrollArea className="h-[60vh] p-4">
               <div className="space-y-4">
                 <FormField control={form.control} name="license_plate" render={({ field }) => (
                   <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -135,10 +141,21 @@ export function EditVehicleDialog({ vehicle, open, onOpenChange }: EditVehicleDi
                   <FormField control={form.control} name="year_of_manufacture" render={({ field }) => (
                     <FormItem><FormLabel>Baujahr</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
+                  <FormField control={form.control} name="loading_area" render={({ field }) => (
+                    <FormItem><FormLabel>Ladefläche (m²)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="inspection_due_date" render={({ field }) => (
                     <FormItem><FormLabel>Nächste HU</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
+                  <FormField control={form.control} name="next_service_date" render={({ field }) => (
+                    <FormItem><FormLabel>Nächster Service</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
                 </div>
+                <FormField control={form.control} name="gas_inspection_due_date" render={({ field }) => (
+                    <FormItem><FormLabel>Nächste Gasdurchsicht</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
                  <FormField control={form.control} name="status" render={({ field }) => (
                   <FormItem><FormLabel>Status</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>

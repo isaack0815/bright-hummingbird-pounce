@@ -78,12 +78,17 @@ const VehicleManagement = () => {
     );
   }, [vehicles, searchTerm]);
 
-  const getInspectionBadgeVariant = (dateStr: string | null): 'default' | 'destructive' | 'secondary' => {
+  const getDateBadgeVariant = (dateStr: string | null): 'destructive' | 'warning' | 'secondary' => {
     if (!dateStr) return 'secondary';
-    const daysUntil = differenceInCalendarDays(parseISO(dateStr), new Date());
-    if (daysUntil < 0) return 'destructive';
-    if (daysUntil <= 30) return 'default'; // 'default' is orange-ish in this theme
-    return 'secondary';
+    try {
+      const daysUntil = differenceInCalendarDays(parseISO(dateStr), new Date());
+      if (daysUntil < 0) return 'destructive';
+      if (daysUntil <= 30) return 'warning';
+      return 'secondary';
+    } catch (e) {
+      console.error("Error parsing date:", e);
+      return 'secondary';
+    }
   };
 
   if (error) {
@@ -122,9 +127,10 @@ const VehicleManagement = () => {
                 <TableRow>
                   <TableHead>Kennzeichen</TableHead>
                   <TableHead>Marke & Modell</TableHead>
-                  <TableHead>Typ</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Nächste HU</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Gasdurchsicht</TableHead>
                   <TableHead><span className="sr-only">Aktionen</span></TableHead>
                 </TableRow>
               </TableHeader>
@@ -133,11 +139,20 @@ const VehicleManagement = () => {
                   <TableRow key={vehicle.id}>
                     <TableCell className="font-medium">{vehicle.license_plate}</TableCell>
                     <TableCell>{`${vehicle.brand || ''} ${vehicle.model || ''}`.trim()}</TableCell>
-                    <TableCell>{vehicle.type}</TableCell>
                     <TableCell><Badge variant={vehicle.status === 'Verfügbar' ? 'default' : 'secondary'}>{vehicle.status}</Badge></TableCell>
                     <TableCell>
-                      <Badge variant={getInspectionBadgeVariant(vehicle.inspection_due_date)}>
+                      <Badge variant={getDateBadgeVariant(vehicle.inspection_due_date)}>
                         {vehicle.inspection_due_date ? new Date(vehicle.inspection_due_date).toLocaleDateString() : '-'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getDateBadgeVariant(vehicle.next_service_date)}>
+                        {vehicle.next_service_date ? new Date(vehicle.next_service_date).toLocaleDateString() : '-'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getDateBadgeVariant(vehicle.gas_inspection_due_date)}>
+                        {vehicle.gas_inspection_due_date ? new Date(vehicle.gas_inspection_due_date).toLocaleDateString() : '-'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
