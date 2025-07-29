@@ -118,7 +118,7 @@ const FreightOrderForm = () => {
   }, [existingOrder, isEditMode, form]);
 
   const mutation = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>) => {
+    mutationFn: async (values: z.infer<typeof formSchema>): Promise<FreightOrder> => {
       const cleanedOrderData = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
       );
@@ -144,17 +144,27 @@ const FreightOrderForm = () => {
       };
 
       if (isEditMode) {
-        const { error } = await supabase.functions.invoke('update-freight-order', { body: { orderId: id, ...payload } });
+        const { data, error } = await supabase.functions.invoke('update-freight-order', { body: { orderId: id, ...payload } });
         if (error) throw error;
+        return data.order;
       } else {
-        const { error } = await supabase.functions.invoke('create-freight-order', { body: payload });
+        const { data, error } = await supabase.functions.invoke('create-freight-order', { body: payload });
         if (error) throw error;
+        return data.order;
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       showSuccess(`Auftrag erfolgreich ${isEditMode ? 'aktualisiert' : 'erstellt'}!`);
       queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
-      navigate('/freight-orders');
+      
+      if (!isEditMode) {
+        navigate(`/freight-orders/edit/${data.id}`, { replace: true });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['freightOrder', id] });
+        queryClient.invalidateQueries({ queryKey: ['orderNotes', Number(id)] });
+        queryClient.invalidateQueries({ queryKey: ['orderFiles', Number(id)] });
+        queryClient.invalidateQueries({ queryKey: ['orderTeam', Number(id)] });
+      }
     },
     onError: (err: any) => {
       addError(err, 'API');

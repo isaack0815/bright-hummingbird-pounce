@@ -15,13 +15,14 @@ type OrderFile = {
   file_name: string;
   file_path: string;
   created_at: string;
-  profiles: { first_name: string | null, last_name: string | null } | null;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 const fetchFiles = async (orderId: number): Promise<OrderFile[]> => {
   const { data, error } = await supabase
-    .from('order_files')
-    .select('id, file_name, file_path, created_at, profiles(first_name, last_name)')
+    .from('order_files_with_profile')
+    .select('*')
     .eq('order_id', orderId)
     .order('created_at', { ascending: false });
   if (error) throw error;

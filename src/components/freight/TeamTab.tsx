@@ -11,13 +11,14 @@ import type { ChatUser } from "@/types/chat";
 
 type TeamMember = {
   user_id: string;
-  profiles: { first_name: string | null, last_name: string | null } | null;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 const fetchTeam = async (orderId: number): Promise<TeamMember[]> => {
   const { data, error } = await supabase
-    .from('order_team_members')
-    .select('user_id, profiles(first_name, last_name)')
+    .from('order_team_members_with_profile')
+    .select('*')
     .eq('order_id', orderId);
   if (error) throw error;
   return data;
@@ -105,10 +106,10 @@ const TeamTab = ({ orderId }: { orderId: number | null }) => {
             <div key={member.user_id} className="flex items-center justify-between rounded-md border p-3">
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${member.profiles?.first_name} ${member.profiles?.last_name}`} />
-                  <AvatarFallback>{getInitials(member.profiles?.first_name, member.profiles?.last_name)}</AvatarFallback>
+                  <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${member.first_name} ${member.last_name}`} />
+                  <AvatarFallback>{getInitials(member.first_name, member.last_name)}</AvatarFallback>
                 </Avatar>
-                <span className="font-medium">{`${member.profiles?.first_name || ''} ${member.profiles?.last_name || ''}`.trim()}</span>
+                <span className="font-medium">{`${member.first_name || ''} ${member.last_name || ''}`.trim()}</span>
               </div>
               <Button variant="ghost" size="icon" onClick={() => removeMutation.mutate(member.user_id)} disabled={removeMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>

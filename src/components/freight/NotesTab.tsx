@@ -15,13 +15,14 @@ type Note = {
   id: number;
   note: string;
   created_at: string;
-  profiles: { first_name: string | null, last_name: string | null } | null;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 const fetchNotes = async (orderId: number): Promise<Note[]> => {
   const { data, error } = await supabase
-    .from('order_notes')
-    .select('id, note, created_at, profiles(first_name, last_name)')
+    .from('order_notes_with_profile')
+    .select('*')
     .eq('order_id', orderId)
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -96,12 +97,12 @@ const NotesTab = ({ orderId }: { orderId: number | null }) => {
           {notes?.map(note => (
             <div key={note.id} className="flex items-start gap-4">
               <Avatar>
-                <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${note.profiles?.first_name} ${note.profiles?.last_name}`} />
-                <AvatarFallback>{getInitials(note.profiles?.first_name, note.profiles?.last_name)}</AvatarFallback>
+                <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${note.first_name} ${note.last_name}`} />
+                <AvatarFallback>{getInitials(note.first_name, note.last_name)}</AvatarFallback>
               </Avatar>
               <div className="w-full rounded-md border bg-muted/50 p-3">
                 <div className="flex justify-between items-center">
-                  <p className="font-semibold text-sm">{`${note.profiles?.first_name || ''} ${note.profiles?.last_name || ''}`.trim()}</p>
+                  <p className="font-semibold text-sm">{`${note.first_name || ''} ${note.last_name || ''}`.trim()}</p>
                   <p className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(note.created_at), { addSuffix: true, locale: de })}
                   </p>
