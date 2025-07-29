@@ -16,16 +16,14 @@ import { useError } from '@/contexts/ErrorContext';
 import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
-import { ArrowLeft, PlusCircle, Trash2, Download, FileText } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Trash2, Share2 } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
 import { useAuth } from '@/contexts/AuthContext';
-import { generateExternalOrderPDF } from '@/utils/pdfGenerator';
-import { Switch } from '@/components/ui/switch';
-import { v4 as uuidv4 } from 'uuid';
+import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
@@ -52,14 +50,6 @@ const formSchema = z.object({
   description: z.string().optional(),
   stops: z.array(stopSchema).min(1, "Es muss mindestens ein Stopp vorhanden sein."),
   cargoItems: z.array(cargoItemSchema).optional(),
-  is_external: z.boolean().default(false),
-  external_company_address: z.string().optional(),
-  external_email: z.string().email({ message: "Ungültige E-Mail." }).optional().or(z.literal('')),
-  external_driver_name: z.string().optional(),
-  external_driver_phone: z.string().optional(),
-  external_license_plate: z.string().optional(),
-  external_transporter_dimensions: z.string().optional(),
-  payment_term_days: z.coerce.number().optional(),
 });
 
 const fetchCustomers = async (): Promise<Customer[]> => {
@@ -89,6 +79,7 @@ const FreightOrderForm = () => {
   const { addError } = useError();
   const { user } = useAuth();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({
     queryKey: ['customers'],
@@ -112,11 +103,8 @@ const FreightOrderForm = () => {
       status: 'Angelegt',
       stops: [],
       cargoItems: [],
-      is_external: false,
     },
   });
-
-  const isExternal = form.watch('is_external');
 
   const { fields: stopFields, append: appendStop, remove: removeStop } = useFieldArray({
     control: form.control,
@@ -138,19 +126,9 @@ const FreightOrderForm = () => {
         description: existingOrder.description || '',
         stops: (existingOrder.freight_order_stops || []).map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })),
         cargoItems: existingOrder.cargo_items || [],
-        is_external: existingOrder.is_external || false,
-        external_company_address: existingOrder.external_company_address || '',
-        external_email: existingOrder.external_email || '',
-        external_driver_name: existingOrder.external_driver_name || '',
-        external_driver_phone: existingOrder.external_driver_phone || '',
-        external_license_plate: existingOrder.external_license_plate || '',
-        external_transporter_dimensions: existingOrder.external_transporter_dimensions || '',
-        payment_term_days: existingOrder.payment_term_days || undefined,
       });
-    } else if (!isEditMode && settings) {
-        form.setValue('payment_term_days', Number(settings.payment_term_default) || 45);
     }
-  }, [existingOrder, isEditMode, form, settings]);
+  }, [existingOrder, isEditMode, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>): Promise<FreightOrder> => {
@@ -216,36 +194,6 @@ const FreightOrderForm = () => {
     },
   });
 
-  const pdfMutation = useMutation({
-    mutationFn: async () => {
-      if (!existingOrder || !settings || !user) throw new Error("Fehlende Daten für PDF-Erstellung");
-      
-      const pdfBlob = generateExternalOrderPDF(existingOrder, settings);
-      const fileName = `Transportauftrag_${existingOrder.order_number}.pdf`;
-      const filePath = `${existingOrder.id}/${uuidv4()}-${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, pdfBlob);
-      if (uploadError) throw uploadError;
-
-      const { error: dbError } = await supabase.from('order_files').insert({
-        order_id: existingOrder.id,
-        user_id: user.id,
-        file_path: filePath,
-        file_name: fileName,
-        file_type: 'application/pdf',
-      });
-      if (dbError) throw dbError;
-    },
-    onSuccess: () => {
-      showSuccess("PDF-Auftrag erfolgreich erstellt und gespeichert!");
-      queryClient.invalidateQueries({ queryKey: ['orderFiles', Number(id)] });
-    },
-    onError: (err: any) => {
-      addError(err, 'API');
-      showError(err.message || "Fehler beim Erstellen des PDFs.");
-    },
-  });
-
   if (isLoadingCustomers || isLoadingOrder || isLoadingSettings) {
       return <p>Lade Formulardaten...</p>
   }
@@ -264,10 +212,10 @@ const FreightOrderForm = () => {
                 </h1>
             </div>
             <div className="flex items-center gap-2">
-                {isEditMode && existingOrder && isExternal && (
-                  <Button type="button" variant="outline" onClick={() => pdfMutation.mutate()} disabled={pdfMutation.isPending}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    {pdfMutation.isPending ? 'PDF wird erstellt...' : 'Externen Auftrag als PDF erstellen'}
+                {isEditMode && (
+                  <Button type="button" variant={existingOrder?.is_external ? "secondary" : "outline"} onClick={() => setIsAssignModalOpen(true)}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    {existingOrder?.is_external ? 'Externe Vergabe verwalten' : 'Extern vergeben'}
                   </Button>
                 )}
                 <Button type="submit" disabled={mutation.isPending}>
@@ -408,50 +356,6 @@ const FreightOrderForm = () => {
                             )} />
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader>
-                            <FormField
-                                control={form.control}
-                                name="is_external"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-center justify-between rounded-lg">
-                                        <div className="space-y-0.5">
-                                            <FormLabel className="text-base">Extern vergeben</FormLabel>
-                                            <CardDescription>Auftrag wird von einem externen Dienstleister ausgeführt.</CardDescription>
-                                        </div>
-                                        <FormControl>
-                                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                        </FormControl>
-                                    </FormItem>
-                                )}
-                            />
-                        </CardHeader>
-                        {isExternal && (
-                            <CardContent className="space-y-4">
-                                <FormField control={form.control} name="external_company_address" render={({ field }) => (
-                                    <FormItem><FormLabel>Anschrift der Firma</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={form.control} name="external_email" render={({ field }) => (
-                                    <FormItem><FormLabel>E-Mail-Adresse</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={form.control} name="external_driver_name" render={({ field }) => (
-                                    <FormItem><FormLabel>Fahrername</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={form.control} name="external_driver_phone" render={({ field }) => (
-                                    <FormItem><FormLabel>Fahrer Telefon</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={form.control} name="external_license_plate" render={({ field }) => (
-                                    <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={form.control} name="external_transporter_dimensions" render={({ field }) => (
-                                    <FormItem><FormLabel>Transportermaße (LxBxH)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                                <FormField control={form.control} name="payment_term_days" render={({ field }) => (
-                                    <FormItem><FormLabel>Zahlungsfrist (Tage)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                )} />
-                            </CardContent>
-                        )}
-                    </Card>
                 </div>
             </div>
           </TabsContent>
@@ -469,6 +373,12 @@ const FreightOrderForm = () => {
             form.setValue('customer_id', newCustomer.id);
             setIsAddCustomerDialogOpen(false);
         }}
+    />
+    <AssignExternalOrderDialog
+        open={isAssignModalOpen}
+        onOpenChange={setIsAssignModalOpen}
+        order={existingOrder || null}
+        settings={settings}
     />
     </>
   );
