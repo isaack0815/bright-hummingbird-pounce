@@ -17,25 +17,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { id, ...updateData } = await req.json()
+    const { orderId, orderData, stops, cargoItems } = await req.json()
 
-    if (!id) {
-      return new Response(JSON.stringify({ error: 'Order ID is required' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      })
+    if (!orderId) {
+      return new Response(JSON.stringify({ error: 'Order ID is required' }), { status: 400 })
     }
 
-    const { data, error } = await supabase
+    // Update main order
+    const { data: updatedOrder, error: orderError } = await supabase
       .from('freight_orders')
-      .update(updateData)
-      .eq('id', id)
+      .update(orderData)
+      .eq('id', orderId)
       .select()
       .single()
+    if (orderError) throw orderError
 
-    if (error) throw error
+    // Delete old stops and cargo, then insert new ones (simple approach)
+    await supabase.from('freight_order_stops').delete().eq('order_id', orderId)
+    if (stops && stops.length > 0) {
+      const stopsToInsert = stops.map((stop: any) => ({ ...stop, order_id: orderId }))
+      await supabase.from('freight_order_stops').insert(stopsToInsert)
+    }
 
-    return new Response(JSON.stringify({ order: data }), {
+    await supabase.from('cargo_items').delete().eq('order_id', orderId)
+    if (cargoItems && cargoItems.length > 0) {
+      const cargoToInsert = cargoItems.map((item: any) => ({ ...item, order_id: orderId }))
+      await supabase.from('cargo_items').insert(cargoToInsert)
+    }
+
+    return new Response(JSON.stringify({ order: updatedOrder }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

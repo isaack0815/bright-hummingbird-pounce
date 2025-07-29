@@ -17,17 +17,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const orderData = await req.json()
+    const { orderData, stops, cargoItems } = await req.json()
 
-    const { data, error } = await supabase
+    // Insert the main order
+    const { data: newOrder, error: orderError } = await supabase
       .from('freight_orders')
       .insert(orderData)
       .select()
       .single()
 
-    if (error) throw error
+    if (orderError) throw orderError
 
-    return new Response(JSON.stringify({ order: data }), {
+    // Insert stops if they exist
+    if (stops && stops.length > 0) {
+      const stopsToInsert = stops.map((stop: any) => ({ ...stop, order_id: newOrder.id }))
+      const { error: stopsError } = await supabase.from('freight_order_stops').insert(stopsToInsert)
+      if (stopsError) throw stopsError
+    }
+
+    // Insert cargo items if they exist
+    if (cargoItems && cargoItems.length > 0) {
+      const cargoToInsert = cargoItems.map((item: any) => ({ ...item, order_id: newOrder.id }))
+      const { error: cargoError } = await supabase.from('cargo_items').insert(cargoToInsert)
+      if (cargoError) throw cargoError
+    }
+
+    return new Response(JSON.stringify({ order: newOrder }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
     })

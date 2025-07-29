@@ -15,6 +15,7 @@ import RoleManagement from './pages/RoleManagement';
 import MenuManagement from './pages/MenuManagement';
 import CustomerManagement from './pages/CustomerManagement';
 import FreightOrderManagement from './pages/FreightOrderManagement';
+import FreightOrderForm from './pages/FreightOrderForm';
 import Profile from './pages/Profile';
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -60,6 +61,8 @@ const AppRoutes = () => {
 
           <Route element={<ProtectedRoute requiredPermission="freight_orders.manage" />}>
             <Route path="freight-orders" element={<FreightOrderManagement />} />
+            <Route path="freight-orders/new" element={<FreightOrderForm />} />
+            <Route path="freight-orders/edit/:id" element={<FreightOrderForm />} />
           </Route>
 
           <Route path="access-denied" element={<AccessDenied />} />

@@ -21,10 +21,9 @@ serve(async (req) => {
       .from('freight_orders')
       .select(`
         *,
-        customers (
-          id,
-          company_name
-        )
+        customers (id, company_name),
+        freight_order_stops (*),
+        cargo_items (*)
       `)
       .order('created_at', { ascending: false });
 

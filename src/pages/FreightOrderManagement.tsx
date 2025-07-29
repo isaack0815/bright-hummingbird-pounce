@@ -6,8 +6,6 @@ import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
-import { AddFreightOrderDialog } from '@/components/AddFreightOrderDialog';
-import { EditFreightOrderDialog } from '@/components/EditFreightOrderDialog';
 import {
   Table,
   TableBody,
@@ -26,6 +24,7 @@ import {
 import { useError } from '@/contexts/ErrorContext';
 import type { FreightOrder } from '@/types/freight';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
 
 const fetchFreightOrders = async (): Promise<FreightOrder[]> => {
   const { data, error } = await supabase.functions.invoke('get-freight-orders');
@@ -34,12 +33,10 @@ const fetchFreightOrders = async (): Promise<FreightOrder[]> => {
 };
 
 const FreightOrderManagement = () => {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<FreightOrder | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
   const { addError } = useError();
+  const navigate = useNavigate();
 
   const { data: orders, isLoading, error } = useQuery<FreightOrder[]>({
     queryKey: ['freightOrders'],
@@ -61,18 +58,13 @@ const FreightOrderManagement = () => {
     },
   });
 
-  const handleEditClick = (order: FreightOrder) => {
-    setSelectedOrder(order);
-    setIsEditDialogOpen(true);
-  };
-
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
     return orders.filter(order =>
       order.customers?.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.origin_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.destination_address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(order.id).includes(searchTerm)
+      order.order_number.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [orders, searchTerm]);
 
@@ -85,7 +77,7 @@ const FreightOrderManagement = () => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-foreground">Frachtaufträge</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        <Button onClick={() => navigate('/freight-orders/new')}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Auftrag hinzufügen
         </Button>
@@ -98,7 +90,7 @@ const FreightOrderManagement = () => {
         <CardContent>
           <div className="mb-4">
             <Input
-              placeholder="Aufträge suchen..."
+              placeholder="Aufträge suchen (nach Auftragsnr., Kunde, Ort...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-sm"
@@ -110,7 +102,7 @@ const FreightOrderManagement = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Auftrag #</TableHead>
+                  <TableHead>Auftragsnr.</TableHead>
                   <TableHead>Kunde</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Von</TableHead>
@@ -124,7 +116,7 @@ const FreightOrderManagement = () => {
               <TableBody>
                 {filteredOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id}</TableCell>
+                    <TableCell className="font-medium">{order.order_number}</TableCell>
                     <TableCell>{order.customers?.company_name || 'N/A'}</TableCell>
                     <TableCell><Badge>{order.status}</Badge></TableCell>
                     <TableCell>{order.origin_address}</TableCell>
@@ -139,7 +131,7 @@ const FreightOrderManagement = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditClick(order)}>
+                          <DropdownMenuItem onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Bearbeiten
                           </DropdownMenuItem>
@@ -162,8 +154,6 @@ const FreightOrderManagement = () => {
           )}
         </CardContent>
       </Card>
-      <AddFreightOrderDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
-      <EditFreightOrderDialog order={selectedOrder} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} />
     </div>
   );
 };
