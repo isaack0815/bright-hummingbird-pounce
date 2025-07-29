@@ -12,9 +12,11 @@ serve(async (req) => {
   }
 
   try {
+    // Create a client with the user's auth token to respect RLS
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
     const { data, error } = await supabase

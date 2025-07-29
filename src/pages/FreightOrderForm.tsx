@@ -22,6 +22,8 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
+import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from '@/contexts/AuthContext';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung']),
@@ -44,15 +46,9 @@ const formSchema = z.object({
   customer_id: z.coerce.number({ required_error: "Ein Kunde muss ausgewählt werden." }),
   external_order_number: z.string().optional(),
   status: z.string(),
-  pickup_date: z.string().optional(),
-  pickup_time_start: z.string().optional(),
-  pickup_time_end: z.string().optional(),
-  delivery_date: z.string().optional(),
-  delivery_time_start: z.string().optional(),
-  delivery_time_end: z.string().optional(),
   price: z.coerce.number().optional(),
   description: z.string().optional(),
-  stops: z.array(stopSchema).optional(),
+  stops: z.array(stopSchema).min(1, "Es muss mindestens ein Stopp vorhanden sein."),
   cargoItems: z.array(cargoItemSchema).optional(),
 });
 
@@ -74,6 +70,7 @@ const FreightOrderForm = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addError } = useError();
+  const { user } = useAuth();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
 
   const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({
@@ -112,12 +109,6 @@ const FreightOrderForm = () => {
         customer_id: existingOrder.customer_id,
         external_order_number: existingOrder.external_order_number || '',
         status: existingOrder.status,
-        pickup_date: existingOrder.pickup_date || '',
-        pickup_time_start: existingOrder.pickup_time_start || '',
-        pickup_time_end: existingOrder.pickup_time_end || '',
-        delivery_date: existingOrder.delivery_date || '',
-        delivery_time_start: existingOrder.delivery_time_start || '',
-        delivery_time_end: existingOrder.delivery_time_end || '',
         price: existingOrder.price || undefined,
         description: existingOrder.description || '',
         stops: existingOrder.freight_order_stops.map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })) || [],
@@ -146,6 +137,7 @@ const FreightOrderForm = () => {
             ...orderData,
             origin_address: cleanedStops && cleanedStops.length > 0 ? cleanedStops[0].address : null,
             destination_address: cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1].address : null,
+            created_by: isEditMode ? existingOrder?.created_by : user?.id,
         },
         stops: cleanedStops,
         cargoItems,
@@ -322,9 +314,9 @@ const FreightOrderForm = () => {
                 </div>
             </div>
           </TabsContent>
-          <TabsContent value="notes" className="mt-6"><NotesTab /></TabsContent>
-          <TabsContent value="files" className="mt-6"><FilesTab /></TabsContent>
-          <TabsContent value="team" className="mt-6"><TeamTab /></TabsContent>
+          <TabsContent value="notes" className="mt-6"><NotesTab orderId={id ? Number(id) : null} /></TabsContent>
+          <TabsContent value="files" className="mt-6"><FilesTab orderId={id ? Number(id) : null} /></TabsContent>
+          <TabsContent value="team" className="mt-6"><TeamTab orderId={id ? Number(id) : null} /></TabsContent>
         </Tabs>
       </form>
     </Form>
