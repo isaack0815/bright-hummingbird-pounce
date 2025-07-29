@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,6 +16,8 @@ import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
 import { ArrowLeft, PlusCircle, Trash2 } from 'lucide-react';
+import { CustomerCombobox } from '@/components/CustomerCombobox';
+import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung']),
@@ -68,6 +70,7 @@ const FreightOrderForm = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { addError } = useError();
+  const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
 
   const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({
     queryKey: ['customers'],
@@ -121,14 +124,27 @@ const FreightOrderForm = () => {
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const { stops, cargoItems, ...orderData } = values;
+      // BUGFIX: Convert empty strings to null for date/time fields
+      const cleanedOrderData = Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
+      );
+      
+      const { stops, cargoItems, ...orderData } = cleanedOrderData;
+
+      const cleanedStops = stops?.map(stop => ({
+        ...stop,
+        stop_date: stop.stop_date || null,
+        time_start: stop.time_start || null,
+        time_end: stop.time_end || null,
+      }));
+
       const payload = {
         orderData: {
             ...orderData,
-            origin_address: stops && stops.length > 0 ? stops[0].address : null,
-            destination_address: stops && stops.length > 0 ? stops[stops.length - 1].address : null,
+            origin_address: cleanedStops && cleanedStops.length > 0 ? cleanedStops[0].address : null,
+            destination_address: cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1].address : null,
         },
-        stops,
+        stops: cleanedStops,
         cargoItems,
       };
 
@@ -156,6 +172,7 @@ const FreightOrderForm = () => {
   }
 
   return (
+    <>
     <Form {...form}>
       <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-6">
         <div className="flex items-center justify-between">
@@ -255,14 +272,22 @@ const FreightOrderForm = () => {
                 <Card>
                     <CardHeader><CardTitle>Allgemeine Informationen</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <FormField control={form.control} name="customer_id" render={({ field }) => (
-                            <FormItem><FormLabel>Kunde</FormLabel>
-                                <Select onValueChange={field.onChange} value={String(field.value)}>
-                                    <FormControl><SelectTrigger disabled={isLoadingCustomers}><SelectValue placeholder="Kunde wählen" /></SelectTrigger></FormControl>
-                                    <SelectContent>{customers?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.company_name}</SelectItem>)}</SelectContent>
-                                </Select>
-                            <FormMessage /></FormItem>
-                        )} />
+                        <FormField
+                            control={form.control}
+                            name="customer_id"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Kunde</FormLabel>
+                                    <CustomerCombobox
+                                        customers={customers || []}
+                                        value={field.value}
+                                        onChange={(value) => form.setValue('customer_id', value)}
+                                        onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                                    />
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <FormField control={form.control} name="external_order_number" render={({ field }) => (
                             <FormItem><FormLabel>Externe Auftragsnummer</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                         )} />
@@ -292,6 +317,16 @@ const FreightOrderForm = () => {
         </div>
       </form>
     </Form>
+    <AddCustomerDialog
+        open={isAddCustomerDialogOpen}
+        onOpenChange={setIsAddCustomerDialogOpen}
+        onCustomerCreated={(newCustomer) => {
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+            form.setValue('customer_id', newCustomer.id);
+            setIsAddCustomerDialogOpen(false);
+        }}
+    />
+    </>
   );
 };
 

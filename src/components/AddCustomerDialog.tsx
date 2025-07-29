@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useError } from "@/contexts/ErrorContext";
+import type { Customer } from "@/pages/CustomerManagement";
 
 const formSchema = z.object({
   company_name: z.string().min(1, "Firmenname ist erforderlich."),
@@ -42,9 +43,10 @@ const formSchema = z.object({
 type AddCustomerDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCustomerCreated?: (customer: Customer) => void;
 };
 
-export function AddCustomerDialog({ open, onOpenChange }: AddCustomerDialogProps) {
+export function AddCustomerDialog({ open, onOpenChange, onCustomerCreated }: AddCustomerDialogProps) {
   const queryClient = useQueryClient();
   const { addError } = useError();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -65,16 +67,21 @@ export function AddCustomerDialog({ open, onOpenChange }: AddCustomerDialogProps
   });
 
   const createMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const { error } = await supabase.functions.invoke('create-customer', {
+    mutationFn: async (values: z.infer<typeof formSchema>): Promise<Customer> => {
+      const { data, error } = await supabase.functions.invoke('create-customer', {
         body: values,
       });
       if (error) throw error;
+      return data.customer;
     },
-    onSuccess: () => {
+    onSuccess: (newCustomer) => {
       showSuccess("Kunde erfolgreich erstellt!");
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      onOpenChange(false);
+      if (onCustomerCreated) {
+        onCustomerCreated(newCustomer);
+      } else {
+        onOpenChange(false);
+      }
       form.reset();
     },
     onError: (err: any) => {
