@@ -125,12 +125,12 @@ const FreightOrderForm = () => {
       
       const { stops, cargoItems, ...orderData } = cleanedOrderData;
 
-      const cleanedStops = stops?.map(stop => ({
+      const cleanedStops = Array.isArray(stops) ? stops.map(stop => ({
         ...stop,
         stop_date: stop.stop_date || null,
         time_start: stop.time_start || null,
         time_end: stop.time_end || null,
-      }));
+      })) : [];
 
       const firstStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[0] : null;
       const lastStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1] : null;
