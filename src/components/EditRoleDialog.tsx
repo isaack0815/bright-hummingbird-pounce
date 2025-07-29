@@ -31,6 +31,7 @@ import { ScrollArea } from "./ui/scroll-area";
 type Permission = {
   id: number;
   name: string;
+  description: string | null;
 };
 
 type Role = {
@@ -169,7 +170,7 @@ export function EditRoleDialog({ role, open, onOpenChange }: EditRoleDialogProps
                                     }}
                                   />
                                 </FormControl>
-                                <FormLabel className="font-normal">{permission.name}</FormLabel>
+                                <FormLabel className="font-normal">{permission.description || permission.name}</FormLabel>
                               </FormItem>
                             )}
                           />

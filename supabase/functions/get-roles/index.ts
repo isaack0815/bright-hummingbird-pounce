@@ -26,7 +26,8 @@ serve(async (req) => {
         created_at,
         permissions (
           id,
-          name
+          name,
+          description
         )
       `)
       .order('created_at')

@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 type Permission = {
   id: number;
   name: string;
+  description: string | null;
 };
 
 type Role = {
@@ -118,7 +119,7 @@ const RoleManagement = () => {
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
                         {role.permissions.length > 0 ? (
-                          role.permissions.map(p => <Badge key={p.id} variant="outline">{p.name}</Badge>)
+                          role.permissions.map(p => <Badge key={p.id} variant="outline">{p.description || p.name}</Badge>)
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
