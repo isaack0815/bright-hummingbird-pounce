@@ -41,6 +41,7 @@ export type FreightOrder = {
   price: number | null;
   description: string | null;
   created_at: string;
+  created_by: string | null;
   
   customers: Pick<Customer, 'id' | 'company_name'> | null;
   freight_order_stops: Stop[];
