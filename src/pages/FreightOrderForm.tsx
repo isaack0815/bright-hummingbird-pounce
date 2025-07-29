@@ -132,11 +132,20 @@ const FreightOrderForm = () => {
         time_end: stop.time_end || null,
       }));
 
+      const firstStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[0] : null;
+      const lastStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1] : null;
+
       const payload = {
         orderData: {
             ...orderData,
-            origin_address: cleanedStops && cleanedStops.length > 0 ? cleanedStops[0].address : null,
-            destination_address: cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1].address : null,
+            origin_address: firstStop ? firstStop.address : null,
+            destination_address: lastStop ? lastStop.address : null,
+            pickup_date: firstStop ? firstStop.stop_date : null,
+            pickup_time_start: firstStop ? firstStop.time_start : null,
+            pickup_time_end: firstStop ? firstStop.time_end : null,
+            delivery_date: lastStop ? lastStop.stop_date : null,
+            delivery_time_start: lastStop ? lastStop.time_start : null,
+            delivery_time_end: lastStop ? lastStop.time_end : null,
             created_by: isEditMode ? existingOrder?.created_by : user?.id,
         },
         stops: cleanedStops,

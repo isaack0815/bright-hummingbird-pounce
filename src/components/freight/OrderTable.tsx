@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { FreightOrder } from "@/types/freight";
+import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 type OrderTableProps = {
   orders: FreightOrder[];
@@ -26,6 +28,30 @@ type OrderTableProps = {
 
 export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
   const navigate = useNavigate();
+
+  const getRowClass = (order: FreightOrder): string => {
+    if (order.status !== 'Angelegt' || !order.pickup_date) {
+      return '';
+    }
+
+    try {
+      const pickupDate = parseISO(order.pickup_date);
+      const today = new Date();
+      const daysUntilPickup = differenceInCalendarDays(pickupDate, today);
+
+      if (daysUntilPickup <= 0) {
+        return 'bg-red-100 dark:bg-red-900/50'; // Red for past or today
+      }
+      if (daysUntilPickup <= 7) {
+        return 'bg-orange-100 dark:bg-orange-900/50'; // Orange for within 7 days
+      }
+    } catch (e) {
+      console.error("Error parsing date for order:", order.id, order.pickup_date, e);
+      return '';
+    }
+
+    return '';
+  };
 
   if (orders.length === 0) {
     return <p className="text-muted-foreground text-center py-8">Keine Aufträge in dieser Ansicht gefunden.</p>;
@@ -48,7 +74,7 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
       </TableHeader>
       <TableBody>
         {orders.map((order) => (
-          <TableRow key={order.id}>
+          <TableRow key={order.id} className={cn(getRowClass(order))}>
             <TableCell className="font-medium">{order.order_number}</TableCell>
             <TableCell>{order.customers?.company_name || 'N/A'}</TableCell>
             <TableCell><Badge>{order.status}</Badge></TableCell>
