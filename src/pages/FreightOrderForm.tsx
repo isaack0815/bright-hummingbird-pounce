@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,6 +16,7 @@ import { useError } from '@/contexts/ErrorContext';
 import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
+import type { Setting } from '@/types/settings';
 import { ArrowLeft, PlusCircle, Trash2, Share2 } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
@@ -64,11 +65,10 @@ const fetchOrder = async (id: string): Promise<FreightOrder> => {
     return data as FreightOrder;
 }
 
-const fetchSettings = async (): Promise<any> => {
+const fetchSettings = async (): Promise<Setting[]> => {
     const { data, error } = await supabase.functions.invoke('get-settings');
     if (error) throw new Error(error.message);
-    const settingsMap = new Map(data.settings.map((s: any) => [s.key, s.value]));
-    return Object.fromEntries(settingsMap);
+    return data.settings;
 };
 
 const FreightOrderForm = () => {
@@ -86,10 +86,16 @@ const FreightOrderForm = () => {
     queryFn: fetchCustomers,
   });
 
-  const { data: settings, isLoading: isLoadingSettings } = useQuery({
+  const { data: settingsArray, isLoading: isLoadingSettings } = useQuery<Setting[]>({
     queryKey: ['settings'],
     queryFn: fetchSettings,
   });
+
+  const settings = useMemo(() => {
+    if (!settingsArray) return {};
+    const settingsMap = new Map(settingsArray.map((s) => [s.key, s.value]));
+    return Object.fromEntries(settingsMap);
+  }, [settingsArray]);
 
   const { data: existingOrder, isLoading: isLoadingOrder, isFetching: isFetchingOrder } = useQuery<FreightOrder>({
     queryKey: ['freightOrder', id],

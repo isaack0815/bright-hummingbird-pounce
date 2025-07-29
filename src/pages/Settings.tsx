@@ -13,12 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
-
-type Setting = {
-  key: string;
-  value: string | null;
-  description: string | null;
-};
+import type { Setting } from "@/types/settings";
 
 const settingsSchema = z.object({
   company_name: z.string().optional(),
