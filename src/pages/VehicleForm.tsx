@@ -41,9 +41,12 @@ const fetchUsers = async (): Promise<ChatUser[]> => {
 };
 
 const fetchVehicle = async (id: string): Promise<Vehicle> => {
-    const { data, error } = await supabase.from('vehicles').select('*, profiles(*)').eq('id', id).single();
-    if (error) throw new Error(error.message);
-    return data as Vehicle;
+  const { data, error } = await supabase.functions.invoke('get-vehicle', {
+    body: { id: parseInt(id, 10) },
+  });
+  if (error) throw new Error(error.message);
+  if (!data || !data.vehicle) throw new Error("Fahrzeug nicht gefunden");
+  return data.vehicle;
 }
 
 const VehicleForm = () => {
