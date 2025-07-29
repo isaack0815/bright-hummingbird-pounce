@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "../ui/skeleton";
-import { File as FileIcon, Trash2, Download } from "lucide-react";
+import { File as FileIcon, Trash2, Download, Loader2 } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
 
 type OrderFile = {
@@ -31,6 +31,7 @@ const fetchFiles = async (orderId: number): Promise<OrderFile[]> => {
 
 const FilesTab = ({ orderId }: { orderId: number | null }) => {
   const [uploading, setUploading] = useState(false);
+  const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -83,20 +84,20 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
     }
   };
 
-  const handleDownload = async (filePath: string) => {
+  const handleDownload = async (fileId: number, filePath: string) => {
+    setDownloadingFileId(fileId);
     try {
-      const { data, error } = await supabase.storage.from('order-files').download(filePath);
+      const { data, error } = await supabase.storage
+        .from('order-files')
+        .createSignedUrl(filePath, 60); // Link is valid for 1 minute
+
       if (error) throw error;
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filePath.split('-').pop() || 'download';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      window.open(data.signedUrl, '_blank');
     } catch (err: any) {
       showError(err.message || "Fehler beim Herunterladen der Datei.");
+    } finally {
+      setDownloadingFileId(null);
     }
   };
 
@@ -131,7 +132,19 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="ghost" size="icon" onClick={() => handleDownload(file.file_path)}><Download className="h-4 w-4" /></Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => handleDownload(file.id, file.file_path)}
+                  disabled={downloadingFileId === file.id}
+                >
+                  {downloadingFileId === file.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
                 <Button type="button" variant="ghost" size="icon" onClick={() => deleteMutation.mutate({ id: file.id, path: file.file_path })} disabled={deleteMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </div>
             </div>
