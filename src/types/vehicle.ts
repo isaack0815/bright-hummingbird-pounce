@@ -1,3 +1,20 @@
+export type VehicleNoteCategory = {
+  id: number;
+  name: string;
+};
+
+export type VehicleNote = {
+  id: number;
+  vehicle_id: number;
+  note: string;
+  created_at: string;
+  user_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  category_id: number;
+  category_name: string;
+};
+
 export type Vehicle = {
   id: number;
   license_plate: string;
