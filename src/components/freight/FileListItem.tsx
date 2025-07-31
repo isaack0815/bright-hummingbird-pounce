@@ -25,8 +25,10 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, path }: { id: number, path: string }) => {
-      const { error: storageError } = await supabase.storage.from('order-files').remove([path]);
-      if (storageError) throw storageError;
+      // Try to remove from storage, but don't fail if it's already gone.
+      await supabase.storage.from('order-files').remove([path]);
+      
+      // The critical part is deleting the database record.
       const { error: dbError } = await supabase.from('order_files').delete().eq('id', id);
       if (dbError) throw dbError;
     },
@@ -46,11 +48,25 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
 
       if (error) throw error;
 
-      window.open(data.signedUrl, '_blank');
+      // Create a temporary link element to trigger the download reliably
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
     } catch (err: any) {
       showError(err.message || "Fehler beim Herunterladen der Datei.");
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Sind Sie sicher, dass Sie die Datei "${file.file_name}" löschen möchten?`)) {
+      deleteMutation.mutate({ id: file.id, path: file.file_path });
     }
   };
 
@@ -83,7 +99,7 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
           type="button" 
           variant="ghost" 
           size="icon" 
-          onClick={() => deleteMutation.mutate({ id: file.id, path: file.file_path })} 
+          onClick={handleDelete} 
           disabled={deleteMutation.isPending}
         >
           {deleteMutation.isPending ? (
