@@ -1,3 +1,5 @@
+console.log("--- Starting server.js (ESM Version vom 24.07.2024) ---");
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
