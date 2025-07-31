@@ -54,19 +54,24 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
     setIsDownloading(true);
 
     try {
-      console.log(`[3] Attempting to create signed URL for path: ${file.file_path}`);
-      const { data, error } = await supabase.storage
-        .from('order-files')
-        .createSignedUrl(file.file_path, 60); // URL is valid for 60 seconds
+      console.log(`[3] Invoking edge function 'get-download-url' with path: ${file.file_path}`);
+      const { data, error } = await supabase.functions.invoke('get-download-url', {
+        body: { filePath: file.file_path },
+      });
 
       if (error) {
-        console.error("[ERROR] Supabase storage error:", error);
+        console.error("[ERROR] Edge function error:", error);
         throw error;
       }
       
-      console.log("[4] Successfully created signed URL:", data.signedUrl);
+      const signedUrl = data.signedUrl;
+      console.log("[4] Successfully received signed URL from edge function:", signedUrl);
 
-      const newWindow = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      if (!signedUrl) {
+        throw new Error("Edge function did not return a signed URL.");
+      }
+
+      const newWindow = window.open(signedUrl, '_blank', 'noopener,noreferrer');
       if (!newWindow) {
           console.warn("[WARN] Pop-up was blocked by the browser.");
           showError("Pop-up wurde blockiert. Bitte erlauben Sie Pop-ups für diese Seite.");
@@ -76,7 +81,7 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
 
     } catch (err: any) {
       console.error("[6] CATCH BLOCK: An error occurred during download:", err);
-      showError(err.message || "Fehler beim Herunterladen der Datei.");
+      showError(err.data?.error || err.message || "Fehler beim Herunterladen der Datei.");
     } finally {
       console.log("[7] FINALLY BLOCK: Setting isDownloading to false after a delay.");
       setTimeout(() => {
