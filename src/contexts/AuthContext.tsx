@@ -19,27 +19,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // onAuthStateChange is called when the user signs in, signs out, or when the token is refreshed.
-    // It is also called once when the client is initialized and a session is found, so we don't
-    // need a separate getSession() call. This is the most robust way to handle auth state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      try {
+        setSession(session);
+        setUser(session?.user ?? null);
 
-      if (session) {
-        const { data, error } = await supabase.rpc('get_my_permissions');
-        if (error) {
-          console.error("Error fetching permissions:", error);
-          setPermissions([]);
-        } else {
+        if (session) {
+          const { data, error } = await supabase.rpc('get_my_permissions');
+          if (error) {
+            throw error;
+          }
           setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
+        } else {
+          setPermissions([]);
         }
-      } else {
-        // If there is no session, clear permissions
-        setPermissions([]);
+      } catch (error) {
+        console.error("Error during onAuthStateChange:", error);
+        setPermissions([]); // Clear permissions on error as a safeguard
+      } finally {
+        // This block ensures that loading is always set to false,
+        // preventing the app from getting stuck on the loading screen.
+        setIsLoading(false);
       }
-      // Set loading to false after the initial check has been performed.
-      setIsLoading(false);
     });
 
     return () => {
@@ -48,8 +49,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const hasPermission = (permission: string) => {
-    // A simple way to grant all permissions to an 'Admin' role.
-    // This assumes the 'Admin' role has been granted all relevant permissions in the database.
     if (permissions.includes('roles.manage') && permissions.includes('users.manage')) {
         return true;
     }
