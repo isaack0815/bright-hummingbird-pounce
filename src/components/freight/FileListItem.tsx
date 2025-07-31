@@ -9,6 +9,7 @@ type OrderFile = {
   id: number;
   file_name: string;
   file_path: string;
+  file_type: string | null;
   created_at: string;
   first_name: string | null;
   last_name: string | null;
@@ -60,13 +61,18 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
       const signedUrl = data.signedUrl;
       if (!signedUrl) throw new Error("Edge function did not return a signed URL.");
 
-      // Create a temporary link to trigger the download
-      const link = document.createElement('a');
-      link.href = signedUrl;
-      link.setAttribute('download', file.file_name || 'download');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const isPreviewable = file.file_type?.startsWith('image/') || file.file_type === 'application/pdf';
+
+      if (isPreviewable) {
+        window.open(signedUrl, '_blank');
+      } else {
+        const link = document.createElement('a');
+        link.href = signedUrl;
+        link.setAttribute('download', file.file_name || 'download');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
 
     } catch (err: any) {
       showError(err.data?.error || err.message || "Fehler beim Herunterladen der Datei.");

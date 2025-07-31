@@ -43,7 +43,7 @@ const fetchMessages = async (conversationId: number): Promise<ChatMessage[]> => 
   return messagesWithProfiles as ChatMessage[];
 };
 
-const DownloadableFile = ({ filePath, fileName }: { filePath: string; fileName: string | null }) => {
+const DownloadableFile = ({ filePath, fileName, fileType }: { filePath: string; fileName: string | null; fileType: string | null }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDownload = async (e: React.MouseEvent) => {
@@ -56,13 +56,18 @@ const DownloadableFile = ({ filePath, fileName }: { filePath: string; fileName: 
 
       if (error) throw error;
 
-      // Create a temporary link to trigger the download
-      const link = document.createElement('a');
-      link.href = data.signedUrl;
-      link.setAttribute('download', fileName || 'download');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const isPreviewable = fileType?.startsWith('image/') || fileType === 'application/pdf';
+
+      if (isPreviewable) {
+        window.open(data.signedUrl, '_blank');
+      } else {
+        const link = document.createElement('a');
+        link.href = data.signedUrl;
+        link.setAttribute('download', fileName || 'download');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
 
     } catch (error) {
       console.error('Error creating signed URL:', error);
@@ -135,7 +140,7 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
             )}
             {msg.content && <p className="text-sm">{msg.content}</p>}
             {msg.file_url && (
-              <DownloadableFile filePath={msg.file_url} fileName={msg.file_name} />
+              <DownloadableFile filePath={msg.file_url} fileName={msg.file_name} fileType={msg.file_type} />
             )}
           </div>
         </div>

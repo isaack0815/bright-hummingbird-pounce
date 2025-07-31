@@ -13,6 +13,7 @@ type OrderFile = {
   id: number;
   file_name: string;
   file_path: string;
+  file_type: string | null;
   created_at: string;
   first_name: string | null;
   last_name: string | null;
