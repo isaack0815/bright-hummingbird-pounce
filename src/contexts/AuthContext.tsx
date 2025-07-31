@@ -19,28 +19,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // This function handles the initial fetch of the session when the app loads.
+    const fetchInitialSession = async () => {
       try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session) {
-          const { data, error } = await supabase.rpc('get_my_permissions');
-          if (error) {
-            throw error;
-          }
-          setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
+          const { data: perms, error: permError } = await supabase.rpc('get_my_permissions');
+          if (permError) throw permError;
+          setPermissions(perms.map((p: { permission_name: string }) => p.permission_name));
         } else {
           setPermissions([]);
         }
       } catch (error) {
-        console.error("Error during onAuthStateChange:", error);
-        setPermissions([]); // Clear permissions on error as a safeguard
+        console.error("Error fetching initial session:", error);
+        setPermissions([]);
       } finally {
-        // This block ensures that loading is always set to false,
-        // preventing the app from getting stuck on the loading screen.
+        // Crucially, we always stop loading, even if there was an error.
         setIsLoading(false);
       }
+    };
+
+    fetchInitialSession();
+
+    // This listener handles subsequent auth changes (SIGN_IN, SIGN_OUT, etc.).
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session) {
+        const { data, error } = await supabase.rpc('get_my_permissions');
+        if (error) {
+          console.error("Error refetching permissions on auth change:", error);
+          setPermissions([]);
+        } else {
+          setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
+        }
+      } else {
+        setPermissions([]);
+      }
+       // Also set loading to false here to handle the case where the listener fires before the initial fetch completes.
+      setIsLoading(false);
     });
 
     return () => {
