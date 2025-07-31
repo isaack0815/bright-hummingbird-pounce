@@ -21,51 +21,57 @@ type FileListItemProps = {
 
 export const FileListItem = ({ file, orderId }: FileListItemProps) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, path }: { id: number, path: string }) => {
-      // Try to remove from storage, but don't fail if it's already gone.
       await supabase.storage.from('order-files').remove([path]);
-      
-      // The critical part is deleting the database record.
-      const { error: dbError } = await supabase.from('order_files').delete().eq('id', id);
-      if (dbError) throw dbError;
+      const { error } = await supabase.from('order_files').delete().eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orderFiles', orderId] });
       showSuccess("Datei gelöscht!");
     },
-    onError: (err: any) => showError(err.message || "Fehler beim Löschen der Datei."),
+    onError: (err: any) => {
+      showError(err.message || "Fehler beim Löschen der Datei.");
+    },
+    onSettled: () => {
+      setIsDeleting(false);
+    }
   });
 
   const handleDownload = async () => {
+    if (!file.file_path) {
+      showError("Kein Dateipfad für diese Datei vorhanden.");
+      return;
+    }
     setIsDownloading(true);
     try {
       const { data, error } = await supabase.storage
         .from('order-files')
-        .createSignedUrl(file.file_path, 60); // Link is valid for 1 minute
+        .createSignedUrl(file.file_path, 60);
 
-      if (error) throw error;
-
-      // Create a temporary link element to trigger the download reliably
-      const link = document.createElement('a');
-      link.href = data.signedUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (error) {
+        throw error;
+      }
+      
+      const newWindow = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      if (!newWindow) {
+          showError("Pop-up wurde blockiert. Bitte erlauben Sie Pop-ups für diese Seite.");
+      }
 
     } catch (err: any) {
       showError(err.message || "Fehler beim Herunterladen der Datei.");
     } finally {
-      setIsDownloading(false);
+      setTimeout(() => setIsDownloading(false), 500);
     }
   };
 
   const handleDelete = () => {
     if (window.confirm(`Sind Sie sicher, dass Sie die Datei "${file.file_name}" löschen möchten?`)) {
+      setIsDeleting(true);
       deleteMutation.mutate({ id: file.id, path: file.file_path });
     }
   };
@@ -87,7 +93,7 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
           variant="ghost" 
           size="icon" 
           onClick={handleDownload}
-          disabled={isDownloading}
+          disabled={isDownloading || isDeleting}
         >
           {isDownloading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -100,9 +106,9 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
           variant="ghost" 
           size="icon" 
           onClick={handleDelete} 
-          disabled={deleteMutation.isPending}
+          disabled={isDownloading || isDeleting}
         >
-          {deleteMutation.isPending ? (
+          {isDeleting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Trash2 className="h-4 w-4 text-destructive" />
