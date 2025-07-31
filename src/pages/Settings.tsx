@@ -12,11 +12,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, GitPullRequest, RefreshCw } from "lucide-react";
+import { Terminal } from "lucide-react";
 import type { Setting } from "@/types/settings";
-import { useUpdateCheck } from "@/hooks/useUpdateCheck";
-import { useAuth } from "@/contexts/AuthContext";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const settingsSchema = z.object({
   company_name: z.string().optional(),
@@ -35,67 +32,6 @@ const fetchSettings = async (): Promise<Setting[]> => {
   if (error) throw new Error(error.message);
   return data.settings;
 };
-
-const UpdateManager = () => {
-  const updateAvailable = useUpdateCheck();
-  const { hasPermission } = useAuth();
-
-  if (!updateAvailable || !hasPermission('settings.manage')) {
-    return null;
-  }
-
-  const updateCommands = `
-# 1. Neueste Änderungen vom Server holen
-git pull
-
-# 2. Notwendige Pakete installieren/aktualisieren
-npm install
-
-# 3. Die Anwendung neu bauen
-npm run build
-
-# 4. Den Server-Prozess neu starten
-# (Falls Sie PM2 verwenden, ansonsten den Befehl für Ihren Prozessmanager)
-pm2 restart server
-  `.trim();
-
-  return (
-    <Card className="border-primary">
-      <CardHeader>
-        <div className="flex items-center gap-4">
-          <RefreshCw className="h-8 w-8 text-primary animate-spin" />
-          <div>
-            <CardTitle>Update verfügbar!</CardTitle>
-            <CardDescription>Eine neue Version der Anwendung ist bereit zur Installation.</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button>
-              <GitPullRequest className="mr-2 h-4 w-4" />
-              Update-Anleitung anzeigen
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4">
-            <Alert>
-              <Terminal className="h-4 w-4" />
-              <AlertTitle>Manuelles Update erforderlich</AlertTitle>
-              <AlertDescription>
-                <p className="mb-2">Führen Sie die folgenden Befehle in Ihrem Server-Terminal aus, um die Anwendung zu aktualisieren:</p>
-                <pre className="mt-2 rounded-md bg-muted p-4 font-mono text-sm overflow-x-auto">
-                  <code>{updateCommands}</code>
-                </pre>
-              </AlertDescription>
-            </Alert>
-          </CollapsibleContent>
-        </Collapsible>
-      </CardContent>
-    </Card>
-  );
-};
-
 
 const Settings = () => {
   const queryClient = useQueryClient();
@@ -165,8 +101,6 @@ const Settings = () => {
           {updateSettingsMutation.isPending ? "Wird gespeichert..." : "Alle Einstellungen speichern"}
         </Button>
       </div>
-      
-      <UpdateManager />
 
       <Form {...form}>
         <form id="settings-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

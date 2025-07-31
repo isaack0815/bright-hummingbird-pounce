@@ -1,12 +1,10 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { ChatWidget } from './chat/ChatWidget';
-import { UpdateNotifier } from './UpdateNotifier';
 
 const Layout = () => {
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <UpdateNotifier />
       <div className="hidden border-r bg-muted/40 md:block">
         <Sidebar />
       </div>
