@@ -12,18 +12,20 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // This function handles the initial fetch of the session when the app loads.
-    const fetchInitialSession = async () => {
+    let isMounted = true;
+
+    async function getInitialSession() {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
+        if (!isMounted) return;
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -31,49 +33,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session) {
           const { data: perms, error: permError } = await supabase.rpc('get_my_permissions');
           if (permError) throw permError;
-          setPermissions(perms.map((p: { permission_name: string }) => p.permission_name));
+          if (isMounted) setPermissions(perms.map((p: { permission_name: string }) => p.permission_name));
         } else {
-          setPermissions([]);
+          if (isMounted) setPermissions([]);
         }
       } catch (error) {
         console.error("Error fetching initial session:", error);
-        setPermissions([]);
+        if (isMounted) setPermissions([]);
       } finally {
-        // Crucially, we always stop loading, even if there was an error.
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
-    };
+    }
 
-    fetchInitialSession();
+    getInitialSession();
 
-    // This listener handles subsequent auth changes (SIGN_IN, SIGN_OUT, etc.).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session) {
-        const { data, error } = await supabase.rpc('get_my_permissions');
-        if (error) {
+        try {
+          const { data, error } = await supabase.rpc('get_my_permissions');
+          if (error) throw error;
+          setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
+        } catch (error) {
           console.error("Error refetching permissions on auth change:", error);
           setPermissions([]);
-        } else {
-          setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
         }
       } else {
         setPermissions([]);
       }
-       // Also set loading to false here to handle the case where the listener fires before the initial fetch completes.
-      setIsLoading(false);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const hasPermission = (permission: string) => {
     if (permissions.includes('roles.manage') && permissions.includes('users.manage')) {
-        return true;
+      return true;
     }
     return permissions.includes(permission);
   };
@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
