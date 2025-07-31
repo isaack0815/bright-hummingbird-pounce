@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 // WICHTIG: Bitte ersetzen Sie dies durch Ihren GitHub-Benutzernamen und Repository-Namen.
-const GITHUB_REPO = 'YOUR_GITHUB_USERNAME/YOUR_REPOSITORY_NAME'; 
+const GITHUB_REPO = 'isaack0815/bright-hummingbird-pounce'; 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // Alle 5 Minuten
 
 const currentCommitHash = import.meta.env.VITE_APP_COMMIT_HASH;

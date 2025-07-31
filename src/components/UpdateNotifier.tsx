@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { ArrowUpCircle } from 'lucide-react';
 
 // WICHTIG: Bitte ersetzen Sie dies durch Ihren GitHub-Benutzernamen und Repository-Namen.
-const GITHUB_REPO_URL = 'https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPOSITORY_NAME';
+const GITHUB_REPO_URL = 'https://github.com/isaack0815/bright-hummingbird-pounce';
 
 export const UpdateNotifier = () => {
   const updateAvailable = useUpdateCheck();
