@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/types/chat';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { showError } from '@/utils/toast';
 
 type MessageListProps = {
@@ -56,7 +56,14 @@ const DownloadableFile = ({ filePath, fileName }: { filePath: string; fileName: 
 
       if (error) throw error;
 
-      window.open(data.signedUrl, '_blank');
+      // Create a temporary link to trigger the download
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.setAttribute('download', fileName || 'download');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
     } catch (error) {
       console.error('Error creating signed URL:', error);
       showError("Fehler beim Erstellen des Download-Links.");
@@ -71,8 +78,12 @@ const DownloadableFile = ({ filePath, fileName }: { filePath: string; fileName: 
       onClick={handleDownload}
       className="flex items-center gap-2 text-sm mt-1 underline"
     >
-      <Download className="h-4 w-4" />
-      {isLoading ? 'Link wird erstellt...' : fileName || 'Datei ansehen'}
+      {isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Download className="h-4 w-4" />
+      )}
+      {isLoading ? 'Wird geladen...' : fileName || 'Datei ansehen'}
     </a>
   );
 };

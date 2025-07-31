@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorProvider } from './contexts/ErrorContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { createClientComponentClient } from '@supabase/auth-helpers-react';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
 
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -31,8 +34,8 @@ const AppRoutes = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p>Loading...</p>
+      <div className="flex items-center justify-center h-screen bg-background">
+        <p className="text-foreground">Sitzung wird geladen...</p>
       </div>
     );
   }
@@ -88,16 +91,20 @@ const AppRoutes = () => {
 }
 
 const App = () => {
+  const [supabaseClient] = useState(() => createClientComponentClient());
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ErrorProvider>
           <ErrorBoundary>
-            <AuthProvider>
-              <Toaster />
-              <Sonner />
-              <AppRoutes />
-            </AuthProvider>
+            <SessionContextProvider supabaseClient={supabaseClient}>
+              <AuthProvider>
+                <Toaster />
+                <Sonner />
+                <AppRoutes />
+              </AuthProvider>
+            </SessionContextProvider>
           </ErrorBoundary>
         </ErrorProvider>
       </TooltipProvider>

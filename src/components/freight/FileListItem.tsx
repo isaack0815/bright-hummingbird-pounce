@@ -55,27 +55,23 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
         body: { filePath: file.file_path },
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       
       const signedUrl = data.signedUrl;
+      if (!signedUrl) throw new Error("Edge function did not return a signed URL.");
 
-      if (!signedUrl) {
-        throw new Error("Edge function did not return a signed URL.");
-      }
-
-      const newWindow = window.open(signedUrl, '_blank', 'noopener,noreferrer');
-      if (!newWindow) {
-          showError("Pop-up wurde blockiert. Bitte erlauben Sie Pop-ups für diese Seite.");
-      }
+      // Create a temporary link to trigger the download
+      const link = document.createElement('a');
+      link.href = signedUrl;
+      link.setAttribute('download', file.file_name || 'download');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
     } catch (err: any) {
       showError(err.data?.error || err.message || "Fehler beim Herunterladen der Datei.");
     } finally {
-      setTimeout(() => {
-        setIsDownloading(false);
-      }, 500);
+      setIsDownloading(false);
     }
   };
 
