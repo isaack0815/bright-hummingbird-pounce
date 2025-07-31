@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,7 +31,7 @@ import { generateExternalOrderPDF } from '@/utils/pdfGenerator';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info } from 'lucide-react';
+import { Info, Mail, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   external_company_address: z.string().min(1, "Anschrift ist erforderlich."),
@@ -53,6 +54,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
   const queryClient = useQueryClient();
   const { addError } = useError();
   const { user } = useAuth();
+  const [sendEmail, setSendEmail] = useState(true);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,6 +73,22 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
       });
     }
   }, [order, settings, form, open]);
+
+  const emailMutation = useMutation({
+    mutationFn: async (orderId: number) => {
+      const { error } = await supabase.functions.invoke('send-order-email', {
+        body: { orderId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("E-Mail wurde erfolgreich versendet!");
+    },
+    onError: (err: any) => {
+      addError(err, 'API');
+      showError(err.data?.error || "Fehler beim Senden der E-Mail.");
+    },
+  });
 
   const pdfMutation = useMutation({
     mutationFn: async (updatedOrder: FreightOrder) => {
@@ -93,10 +111,14 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
         file_type: 'application/pdf',
       });
       if (dbError) throw dbError;
+      return updatedOrder;
     },
-    onSuccess: () => {
+    onSuccess: (updatedOrder) => {
       showSuccess("PDF-Auftrag erfolgreich erstellt und gespeichert!");
       queryClient.invalidateQueries({ queryKey: ['orderFiles', order?.id] });
+      if (sendEmail) {
+        emailMutation.mutate(updatedOrder.id);
+      }
     },
     onError: (err: any) => {
       addError(err, 'API');
@@ -176,9 +198,13 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
                 <p><strong>Kennzeichen:</strong> {order.external_license_plate || '-'}</p>
               </AlertDescription>
             </Alert>
-            <DialogFooter>
+            <DialogFooter className="sm:justify-between gap-2">
               <Button variant="destructive" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
                 {cancelMutation.isPending ? 'Wird storniert...' : 'Vergabe stornieren'}
+              </Button>
+              <Button variant="outline" onClick={() => emailMutation.mutate(order.id)} disabled={emailMutation.isPending || !order.external_email}>
+                {emailMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                E-Mail erneut senden
               </Button>
             </DialogFooter>
           </div>
@@ -206,6 +232,20 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
               <FormField control={form.control} name="payment_term_days" render={({ field }) => (
                   <FormItem><FormLabel>Zahlungsfrist (Tage)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox
+                  id="send-email"
+                  checked={sendEmail}
+                  onCheckedChange={(checked) => setSendEmail(Boolean(checked))}
+                  disabled={!form.watch('external_email')}
+                />
+                <label
+                  htmlFor="send-email"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Transportauftrag nach Speichern per E-Mail senden
+                </label>
+              </div>
               <DialogFooter>
                 <Button type="submit" disabled={assignMutation.isPending}>
                   {assignMutation.isPending ? 'Wird vergeben...' : 'Extern vergeben & PDF erstellen'}
