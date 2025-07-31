@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorProvider } from './contexts/ErrorContext';
 import ErrorBoundary from './components/ErrorBoundary';
-import { createClientComponentClient } from '@supabase/auth-helpers-react';
+import { supabase } from './lib/supabase'; // Import the existing client
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 
 import Layout from './components/Layout';
@@ -91,14 +90,12 @@ const AppRoutes = () => {
 }
 
 const App = () => {
-  const [supabaseClient] = useState(() => createClientComponentClient());
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ErrorProvider>
           <ErrorBoundary>
-            <SessionContextProvider supabaseClient={supabaseClient}>
+            <SessionContextProvider supabaseClient={supabase}>
               <AuthProvider>
                 <Toaster />
                 <Sonner />
