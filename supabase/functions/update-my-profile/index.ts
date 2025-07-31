@@ -39,11 +39,10 @@ serve(async (req) => {
     })
     if (updateUserError) throw updateUserError
 
-    // Update the public.profiles table
+    // Upsert the public.profiles table to create a profile if it doesn't exist
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({ first_name: firstName, last_name: lastName })
-      .eq('id', user.id)
+      .upsert({ id: user.id, first_name: firstName, last_name: lastName })
     if (profileError) throw profileError
 
     return new Response(JSON.stringify({ user: updatedUser.user }), {

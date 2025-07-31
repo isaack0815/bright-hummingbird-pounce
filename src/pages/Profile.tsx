@@ -26,14 +26,14 @@ const fetchUserProfile = async () => {
     .from('profiles')
     .select('first_name, last_name')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
   
   if (profileError) throw profileError;
 
   return {
     email: user.email,
-    firstName: profile.first_name,
-    lastName: profile.last_name,
+    firstName: profile?.first_name,
+    lastName: profile?.last_name,
   };
 };
 
