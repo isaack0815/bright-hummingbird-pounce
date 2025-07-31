@@ -6,12 +6,17 @@ import path from "path";
 export default defineConfig(() => ({
   server: {
     host: "::",
-    port: 16068,
+    port: 8080,
   },
   plugins: [dyadComponentTagger(), react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      input: path.resolve(__dirname, 'index.dev.html'),
     },
   },
 }));
