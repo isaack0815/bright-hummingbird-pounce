@@ -24,7 +24,7 @@ app.use(express.static(distPath));
 
 // Für alle anderen Anfragen die index.html-Datei bereitstellen (SPA-Fallback)
 app.get('*', (req, res) => {
-  const indexPath = path.join(distPath, 'index.html');
+  const indexPath = path.join(distPath, 'index.dev.html');
   console.log(`[FALLBACK] Path "${req.path}" not found in static assets. Serving: ${indexPath}`);
   res.sendFile(indexPath, (err) => {
     if (err) {
