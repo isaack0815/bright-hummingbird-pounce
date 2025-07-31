@@ -43,29 +43,23 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
   });
 
   const handleDownload = async () => {
-    console.log(`[1] handleDownload called for: ${file.file_name}`);
     if (!file.file_path) {
-      console.error("[ERROR] No file path found for this file.");
       showError("Kein Dateipfad für diese Datei vorhanden.");
       return;
     }
     
-    console.log(`[2] Setting isDownloading to true.`);
     setIsDownloading(true);
 
     try {
-      console.log(`[3] Invoking edge function 'get-download-url' with path: ${file.file_path}`);
       const { data, error } = await supabase.functions.invoke('get-download-url', {
         body: { filePath: file.file_path },
       });
 
       if (error) {
-        console.error("[ERROR] Edge function error:", error);
         throw error;
       }
       
       const signedUrl = data.signedUrl;
-      console.log("[4] Successfully received signed URL from edge function:", signedUrl);
 
       if (!signedUrl) {
         throw new Error("Edge function did not return a signed URL.");
@@ -73,20 +67,14 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
 
       const newWindow = window.open(signedUrl, '_blank', 'noopener,noreferrer');
       if (!newWindow) {
-          console.warn("[WARN] Pop-up was blocked by the browser.");
           showError("Pop-up wurde blockiert. Bitte erlauben Sie Pop-ups für diese Seite.");
-      } else {
-          console.log("[5] Pop-up window opened successfully.");
       }
 
     } catch (err: any) {
-      console.error("[6] CATCH BLOCK: An error occurred during download:", err);
       showError(err.data?.error || err.message || "Fehler beim Herunterladen der Datei.");
     } finally {
-      console.log("[7] FINALLY BLOCK: Setting isDownloading to false after a delay.");
       setTimeout(() => {
         setIsDownloading(false);
-        console.log("[8] isDownloading is now false.");
       }, 500);
     }
   };

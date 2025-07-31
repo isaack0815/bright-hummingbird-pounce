@@ -19,12 +19,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const getInitialData = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+    // onAuthStateChange is called when the user signs in, signs out, or when the token is refreshed.
+    // It is also called once when the client is initialized and a session is found, so we don't
+    // need a separate getSession() call. This is the most robust way to handle auth state.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
 
-      if (currentSession) {
+      if (session) {
         const { data, error } = await supabase.rpc('get_my_permissions');
         if (error) {
           console.error("Error fetching permissions:", error);
@@ -32,39 +34,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
         }
-      }
-      setIsLoading(false);
-    };
-
-    getInitialData();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      if (newSession) {
-        const { data, error } = await supabase.rpc('get_my_permissions');
-        if (error) {
-          console.error("Error fetching permissions on auth change:", error);
-          setPermissions([]);
-        } else {
-          setPermissions(data.map((p: { permission_name: string }) => p.permission_name));
-        }
       } else {
+        // If there is no session, clear permissions
         setPermissions([]);
       }
+      // Set loading to false after the initial check has been performed.
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const hasPermission = (permission: string) => {
-    // Admins (users with the 'Admin' role which grants all permissions) have all rights.
-    // A more robust check could be to see if 'Admin' role is present.
-    // For now, checking for all known permissions is a good indicator.
-    const isAdmin = ['users.manage', 'roles.manage', 'menus.manage'].every(p => permissions.includes(p));
-    if (isAdmin) return true;
-    
+    // A simple way to grant all permissions to an 'Admin' role.
+    // This assumes the 'Admin' role has been granted all relevant permissions in the database.
+    if (permissions.includes('roles.manage') && permissions.includes('users.manage')) {
+        return true;
+    }
     return permissions.includes(permission);
   };
 
