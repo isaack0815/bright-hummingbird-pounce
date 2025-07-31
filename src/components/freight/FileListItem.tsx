@@ -43,29 +43,46 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
   });
 
   const handleDownload = async () => {
+    console.log(`[1] handleDownload called for: ${file.file_name}`);
     if (!file.file_path) {
+      console.error("[ERROR] No file path found for this file.");
       showError("Kein Dateipfad für diese Datei vorhanden.");
       return;
     }
+    
+    console.log(`[2] Setting isDownloading to true.`);
     setIsDownloading(true);
+
     try {
+      console.log(`[3] Attempting to create signed URL for path: ${file.file_path}`);
       const { data, error } = await supabase.storage
         .from('order-files')
-        .createSignedUrl(file.file_path, 60);
+        .createSignedUrl(file.file_path, 60); // URL is valid for 60 seconds
 
       if (error) {
+        console.error("[ERROR] Supabase storage error:", error);
         throw error;
       }
       
+      console.log("[4] Successfully created signed URL:", data.signedUrl);
+
       const newWindow = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
       if (!newWindow) {
+          console.warn("[WARN] Pop-up was blocked by the browser.");
           showError("Pop-up wurde blockiert. Bitte erlauben Sie Pop-ups für diese Seite.");
+      } else {
+          console.log("[5] Pop-up window opened successfully.");
       }
 
     } catch (err: any) {
+      console.error("[6] CATCH BLOCK: An error occurred during download:", err);
       showError(err.message || "Fehler beim Herunterladen der Datei.");
     } finally {
-      setTimeout(() => setIsDownloading(false), 500);
+      console.log("[7] FINALLY BLOCK: Setting isDownloading to false after a delay.");
+      setTimeout(() => {
+        setIsDownloading(false);
+        console.log("[8] isDownloading is now false.");
+      }, 500);
     }
   };
 
