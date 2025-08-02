@@ -11,37 +11,55 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const steps: string[] = [];
   try {
+    steps.push("Function started.");
+
     // 1. Check for required environment variables
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
     if (missingEnv.length > 0) {
       throw new Error(`Missing required SMTP secrets: ${missingEnv.join(', ')}`);
     }
+    steps.push("All required secrets are present.");
 
-    // 2. Configure and connect SMTP client
+    // 2. Parse port
+    const port = Number(Deno.env.get('SMTP_PORT'));
+    if (isNaN(port)) {
+        throw new Error(`Invalid SMTP_PORT: Not a number.`);
+    }
+    steps.push(`Port parsed successfully: ${port}`);
+
+    // 3. Get other config
     const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
     const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
+    steps.push(`TLS/SSL mode: ${useTls} (based on SMTP_SECURE value: ${smtpSecure})`);
 
+    // 4. Instantiate and connect
     const smtpClient = new SmtpClient();
+    steps.push("SMTP client instantiated.");
+
     await smtpClient.connect({
       hostname: Deno.env.get('SMTP_HOST'),
-      port: Number(Deno.env.get('SMTP_PORT')),
+      port: port,
       username: Deno.env.get('SMTP_USER'),
       password: Deno.env.get('SMTP_PASS'),
       tls: useTls,
     });
+    steps.push("Connection to SMTP server successful.");
 
-    // 3. If connection is successful, close it and return success
+    // 5. Close connection
     await smtpClient.close();
+    steps.push("Connection closed successfully.");
 
-    return new Response(JSON.stringify({ success: true, message: "SMTP connection successful!" }), {
+    return new Response(JSON.stringify({ success: true, message: "SMTP connection successful!", steps }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (e) {
-    console.error('SMTP Connection Test Error:', e)
-    return new Response(JSON.stringify({ success: false, error: e.message }), {
+    console.error('SMTP Connection Test Error:', e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ success: false, error: errorMessage, steps }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
