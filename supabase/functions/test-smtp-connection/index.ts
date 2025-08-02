@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/emailjs@v3.2.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +14,7 @@ serve(async (req) => {
   const steps: string[] = [];
 
   try {
-    steps.push("Function started using emailjs@v3.2.0.");
+    steps.push("Function started using emailjs@3.0.0.");
 
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
@@ -24,15 +24,11 @@ serve(async (req) => {
     steps.push("All required secrets are present.");
 
     const client = new SMTPClient({
-      connection: {
-        hostname: Deno.env.get('SMTP_HOST')!,
-        port: Number(Deno.env.get('SMTP_PORT')!),
-        tls: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
-        auth: {
-          user: Deno.env.get('SMTP_USER')!,
-          pass: Deno.env.get('SMTP_PASS')!,
-        }
-      }
+      user: Deno.env.get('SMTP_USER')!,
+      password: Deno.env.get('SMTP_PASS')!,
+      host: Deno.env.get('SMTP_HOST')!,
+      port: Number(Deno.env.get('SMTP_PORT')!),
+      ssl: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl',
     });
     steps.push("Client configured.");
 
@@ -43,12 +39,10 @@ serve(async (req) => {
       from: fromEmail,
       to: fromEmail,
       subject: "SMTP Test Email (Success)",
-      html: "This is a test email to confirm SMTP configuration.",
+      text: "This is a test email to confirm SMTP configuration.",
     });
 
     steps.push("Email sent successfully.");
-    await client.close();
-    steps.push("Connection closed.");
 
     return new Response(JSON.stringify({
       success: true,
