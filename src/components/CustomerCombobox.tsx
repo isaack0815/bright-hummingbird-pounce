@@ -11,15 +11,20 @@ type CustomerComboboxProps = {
   onAddNew: () => void;
 };
 
+type OptionType = {
+  value: number;
+  label: string;
+};
+
 export function CustomerCombobox({ customers, value, onChange, onAddNew }: CustomerComboboxProps) {
-  const options = customers.map(customer => ({
+  const options: OptionType[] = customers.map(customer => ({
     value: customer.id,
     label: customer.company_name,
   }));
 
   const selectedOption = options.find(option => option.value === value);
 
-  const NoOptionsMessage = (props: NoticeProps) => {
+  const NoOptionsMessage = (props: NoticeProps<OptionType>) => {
     return (
       <components.NoOptionsMessage {...props}>
         <Button variant="link" className="w-100" onClick={onAddNew}>
@@ -31,7 +36,7 @@ export function CustomerCombobox({ customers, value, onChange, onAddNew }: Custo
   };
 
   return (
-    <Select
+    <Select<OptionType>
       options={options}
       value={selectedOption}
       onChange={(option) => option && onChange(option.value)}
