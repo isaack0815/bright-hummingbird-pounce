@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/types/chat';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Placeholder, Image } from 'react-bootstrap';
 import { Download, Loader2 } from 'lucide-react';
 import { showError } from '@/utils/toast';
 
@@ -52,7 +51,7 @@ const DownloadableFile = ({ filePath, fileName, fileType }: { filePath: string; 
     try {
       const { data, error } = await supabase.storage
         .from('chat-files')
-        .createSignedUrl(filePath, 300); // Link is valid for 5 minutes
+        .createSignedUrl(filePath, 300);
 
       if (error) throw error;
 
@@ -81,12 +80,12 @@ const DownloadableFile = ({ filePath, fileName, fileType }: { filePath: string; 
     <a
       href="#"
       onClick={handleDownload}
-      className="flex items-center gap-2 text-sm mt-1 underline"
+      className="d-flex align-items-center gap-2 small mt-1 text-decoration-underline"
     >
       {isLoading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 size={16} className="animate-spin" />
       ) : (
-        <Download className="h-4 w-4" />
+        <Download size={16} />
       )}
       {isLoading ? 'Wird geladen...' : fileName || 'Datei ansehen'}
     </a>
@@ -110,35 +109,28 @@ export const MessageList = ({ conversationId, currentUserId }: MessageListProps)
     }
   }, [messages]);
 
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '??';
-  };
-
   return (
-    <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-      {isLoading && Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-2/3" />)}
+    <div className="flex-grow-1 p-4 d-flex flex-column gap-3" style={{ overflowY: 'auto' }}>
+      {isLoading && Array.from({ length: 5 }).map((_, i) => <Placeholder key={i} animation="glow"><Placeholder xs={8} /></Placeholder>)}
       {messages?.map((msg) => (
         <div
           key={msg.id}
-          className={`flex items-end gap-2 ${msg.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
+          className={`d-flex align-items-end gap-2 ${msg.user_id === currentUserId ? 'justify-content-end' : 'justify-content-start'}`}
         >
           {msg.user_id !== currentUserId && (
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${msg.profiles?.first_name} ${msg.profiles?.last_name}`} />
-              <AvatarFallback>{getInitials(msg.profiles?.first_name, msg.profiles?.last_name)}</AvatarFallback>
-            </Avatar>
+            <Image src={`https://api.dicebear.com/8.x/initials/svg?seed=${msg.profiles?.first_name} ${msg.profiles?.last_name}`} roundedCircle style={{ width: 32, height: 32 }} />
           )}
           <div
-            className={`max-w-xs rounded-lg px-3 py-2 ${
-              msg.user_id === currentUserId ? 'bg-primary text-primary-foreground' : 'bg-muted'
+            className={`mw-75 rounded p-2 ${
+              msg.user_id === currentUserId ? 'bg-primary text-white' : 'bg-light'
             }`}
           >
             {msg.user_id !== currentUserId && (
-              <p className="text-xs font-semibold mb-1">
+              <p className="small fw-semibold mb-1">
                 {msg.profiles?.first_name || 'Benutzer'}
               </p>
             )}
-            {msg.content && <p className="text-sm">{msg.content}</p>}
+            {msg.content && <p className="small mb-0">{msg.content}</p>}
             {msg.file_url && (
               <DownloadableFile filePath={msg.file_url} fileName={msg.file_name} fileType={msg.file_type} />
             )}

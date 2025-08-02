@@ -1,29 +1,12 @@
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, Button, Table, Dropdown, Badge, Placeholder } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { AddRoleDialog } from '@/components/AddRoleDialog';
 import { EditRoleDialog } from '@/components/EditRoleDialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useError } from '@/contexts/ErrorContext';
-import { Badge } from '@/components/ui/badge';
 
 type Permission = {
   id: number;
@@ -84,82 +67,71 @@ const RoleManagement = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Rechte- & Gruppenverwaltung</h1>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <h1 className="h2">Rechte- & Gruppenverwaltung</h1>
         <Button onClick={() => setIsAddRoleDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
+          <PlusCircle className="me-2" size={16} />
           Gruppe hinzufügen
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Gruppenliste</CardTitle>
-          <CardDescription>Verwalten Sie hier Benutzergruppen und deren Zugriffsrechte.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Card.Header>
+          <Card.Title>Gruppenliste</Card.Title>
+          <Card.Text className="text-muted">Verwalten Sie hier Benutzergruppen und deren Zugriffsrechte.</Card.Text>
+        </Card.Header>
+        <Card.Body>
           {isLoading ? (
-            <p>Gruppen werden geladen...</p>
+            <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder>
           ) : roles && roles.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Beschreibung</TableHead>
-                  <TableHead>Berechtigungen</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Aktionen</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table responsive hover>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Beschreibung</th>
+                  <th>Berechtigungen</th>
+                  <th className="text-end">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
                 {roles.map((role) => (
-                  <TableRow key={role.id}>
-                    <TableCell className="font-medium">{role.name}</TableCell>
-                    <TableCell>{role.description}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
+                  <tr key={role.id}>
+                    <td className="fw-medium">{role.name}</td>
+                    <td>{role.description}</td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
                         {role.permissions.length > 0 ? (
-                          role.permissions.map(p => <Badge key={p.id} variant="outline">{p.description || p.name}</Badge>)
+                          role.permissions.map(p => <Badge key={p.id} bg="light" text="dark" className="border">{p.description || p.name}</Badge>)
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost" disabled={role.name === 'Admin'}>
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Menü</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditClick(role)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Bearbeiten
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => deleteRoleMutation.mutate(role.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Löschen
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                    <td className="text-end">
+                      <Dropdown>
+                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-role-${role.id}`} disabled={role.name === 'Admin'}>
+                          <MoreHorizontal size={16} />
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu>
+                          <Dropdown.Item onClick={() => handleEditClick(role)}>
+                            <Edit className="me-2" size={16} /> Bearbeiten
+                          </Dropdown.Item>
+                          <Dropdown.Item className="text-danger" onClick={() => deleteRoleMutation.mutate(role.id)}>
+                            <Trash2 className="me-2" size={16} /> Löschen
+                          </Dropdown.Item>
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
+              </tbody>
             </Table>
           ) : (
-            <p className="text-muted-foreground">Keine Gruppen gefunden. Fügen Sie eine neue Gruppe hinzu.</p>
+            <p className="text-muted">Keine Gruppen gefunden. Fügen Sie eine neue Gruppe hinzu.</p>
           )}
-        </CardContent>
+        </Card.Body>
       </Card>
-      <AddRoleDialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen} />
-      <EditRoleDialog role={selectedRole} open={isEditRoleDialogOpen} onOpenChange={setIsEditRoleDialogOpen} />
+      <AddRoleDialog show={isAddRoleDialogOpen} onHide={() => setIsAddRoleDialogOpen(false)} />
+      <EditRoleDialog role={selectedRole} show={isEditRoleDialogOpen} onHide={() => setIsEditRoleDialogOpen(false)} />
     </div>
   );
 };

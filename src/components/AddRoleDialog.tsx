@@ -1,25 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useState } from "react";
@@ -32,11 +14,11 @@ const formSchema = z.object({
 });
 
 type AddRoleDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
 };
 
-export function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps) {
+export function AddRoleDialog({ show, onHide }: AddRoleDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   const { addError } = useError();
@@ -62,7 +44,7 @@ export function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps) {
 
       showSuccess("Gruppe erfolgreich erstellt!");
       queryClient.invalidateQueries({ queryKey: ['roles'] });
-      onOpenChange(false);
+      onHide();
       form.reset();
     } catch (error: any) {
       addError(error, 'API');
@@ -73,50 +55,33 @@ export function AddRoleDialog({ open, onOpenChange }: AddRoleDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Neue Gruppe hinzufügen</DialogTitle>
-          <DialogDescription>
+    <Modal show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Neue Gruppe hinzufügen</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit(onSubmit)}>
+        <Modal.Body>
+          <p className="text-muted mb-4">
             Erstellen Sie eine neue Benutzergruppe mit einem Namen und einer optionalen Beschreibung.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gruppenname</FormLabel>
-                  <FormControl>
-                    <Input placeholder="z.B. Redakteure" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Beschreibung</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="z.B. Kann Blogartikel erstellen und bearbeiten." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Wird erstellt..." : "Gruppe erstellen"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          </p>
+          <Form.Group className="mb-3" controlId="roleName">
+            <Form.Label>Gruppenname</Form.Label>
+            <Form.Control type="text" placeholder="z.B. Redakteure" {...form.register("name")} isInvalid={!!form.formState.errors.name} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.name?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="roleDescription">
+            <Form.Label>Beschreibung</Form.Label>
+            <Form.Control as="textarea" rows={3} placeholder="z.B. Kann Blogartikel erstellen und bearbeiten." {...form.register("description")} isInvalid={!!form.formState.errors.description} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.description?.message}</Form.Control.Feedback>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <Spinner as="span" animation="border" size="sm" /> : "Gruppe erstellen"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }

@@ -2,31 +2,11 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useError } from "@/contexts/ErrorContext";
-import { ScrollArea } from "./ui/scroll-area";
 
 type Permission = {
   id: number;
@@ -49,8 +29,8 @@ const formSchema = z.object({
 
 type EditRoleDialogProps = {
   role: Role | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
 };
 
 const fetchPermissions = async (): Promise<Permission[]> => {
@@ -59,7 +39,7 @@ const fetchPermissions = async (): Promise<Permission[]> => {
   return data.permissions;
 };
 
-export function EditRoleDialog({ role, open, onOpenChange }: EditRoleDialogProps) {
+export function EditRoleDialog({ role, show, onHide }: EditRoleDialogProps) {
   const queryClient = useQueryClient();
   const { addError } = useError();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -69,7 +49,7 @@ export function EditRoleDialog({ role, open, onOpenChange }: EditRoleDialogProps
   const { data: allPermissions, isLoading: isLoadingPermissions } = useQuery<Permission[]>({
     queryKey: ['permissions'],
     queryFn: fetchPermissions,
-    enabled: open,
+    enabled: show,
   });
 
   useEffect(() => {
@@ -80,7 +60,7 @@ export function EditRoleDialog({ role, open, onOpenChange }: EditRoleDialogProps
         permissionIds: role.permissions.map(p => p.id),
       });
     }
-  }, [role, form, open]);
+  }, [role, form, show]);
 
   const updateMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -99,7 +79,7 @@ export function EditRoleDialog({ role, open, onOpenChange }: EditRoleDialogProps
       showSuccess("Gruppe erfolgreich aktualisiert!");
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['userPermissions'] });
-      onOpenChange(false);
+      onHide();
     },
     onError: (err: any) => {
       addError(err, 'API');
@@ -110,85 +90,53 @@ export function EditRoleDialog({ role, open, onOpenChange }: EditRoleDialogProps
   if (!role) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Gruppe bearbeiten</DialogTitle>
-          <DialogDescription>
+    <Modal show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Gruppe bearbeiten</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}>
+        <Modal.Body>
+          <p className="text-muted mb-4">
             Ändern Sie die Details und weisen Sie Berechtigungen zu.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gruppenname</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Beschreibung</FormLabel>
-                  <FormControl><Textarea {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid gap-2">
-              <FormLabel>Berechtigungen</FormLabel>
-              {isLoadingPermissions ? (
-                <p>Berechtigungen werden geladen...</p>
-              ) : (
-                <ScrollArea className="h-40 rounded-md border p-4">
-                  <FormField
-                    control={form.control}
-                    name="permissionIds"
-                    render={() => (
-                      <FormItem className="space-y-2">
-                        {allPermissions?.map((permission) => (
-                          <FormField
-                            key={permission.id}
-                            control={form.control}
-                            name="permissionIds"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(permission.id)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), permission.id])
-                                        : field.onChange(field.value?.filter((id) => id !== permission.id));
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal">{permission.description || permission.name}</FormLabel>
-                              </FormItem>
-                            )}
-                          />
-                        ))}
-                      </FormItem>
-                    )}
+          </p>
+          <Form.Group className="mb-3" controlId="editRoleName">
+            <Form.Label>Gruppenname</Form.Label>
+            <Form.Control type="text" {...form.register("name")} isInvalid={!!form.formState.errors.name} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.name?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="editRoleDescription">
+            <Form.Label>Beschreibung</Form.Label>
+            <Form.Control as="textarea" rows={3} {...form.register("description")} isInvalid={!!form.formState.errors.description} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.description?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group>
+            <Form.Label>Berechtigungen</Form.Label>
+            {isLoadingPermissions ? (
+              <p>Berechtigungen werden geladen...</p>
+            ) : (
+              <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                {allPermissions?.map((permission) => (
+                  <Form.Check 
+                    key={permission.id}
+                    type="checkbox"
+                    id={`perm-${permission.id}`}
+                    label={permission.description || permission.name}
+                    {...form.register("permissionIds")}
+                    value={permission.id}
+                    defaultChecked={role.permissions.some(p => p.id === permission.id)}
                   />
-                </ScrollArea>
-              )}
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={updateMutation.isPending || isLoadingPermissions}>
-                {updateMutation.isPending ? "Wird gespeichert..." : "Änderungen speichern"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+                ))}
+              </div>
+            )}
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={updateMutation.isPending || isLoadingPermissions}>
+            {updateMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }

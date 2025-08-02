@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle, X, Search, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from 'react-bootstrap';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { ConversationList } from './ConversationList';
@@ -101,30 +101,30 @@ export const ChatWidget = () => {
     switch (view) {
       case 'conversation':
         return (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setView('list')}>
-              <ArrowLeft className="h-5 w-5" />
+          <div className="d-flex align-items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setView('list')}>
+              <ArrowLeft size={20} />
             </Button>
-            <h3 className="font-semibold truncate">
+            <h3 className="h6 mb-0 text-truncate">
               {`${selectedConversation?.other_user_first_name || ''} ${selectedConversation?.other_user_last_name || ''}`.trim() || 'Chat'}
             </h3>
           </div>
         );
       case 'search':
         return (
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setView('list')}>
-              <ArrowLeft className="h-5 w-5" />
+          <div className="d-flex align-items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setView('list')}>
+              <ArrowLeft size={20} />
             </Button>
-            <h3 className="font-semibold">Neue Nachricht</h3>
+            <h3 className="h6 mb-0">Neue Nachricht</h3>
           </div>
         );
       case 'list':
       default:
         return (
-          <div className="flex items-center gap-2">
-            <MessageCircle className="h-6 w-6 text-primary" />
-            <h3 className="font-semibold">Chat</h3>
+          <div className="d-flex align-items-center gap-2">
+            <MessageCircle className="text-primary" size={24} />
+            <h3 className="h6 mb-0">Chat</h3>
           </div>
         );
     }
@@ -149,28 +149,28 @@ export const ChatWidget = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 1050 }}>
       {!isOpen && (
-        <Button onClick={() => setIsOpen(true)} size="lg" className="rounded-full shadow-lg">
-          <MessageCircle className="h-6 w-6" />
+        <Button onClick={() => setIsOpen(true)} size="lg" className="rounded-circle shadow-lg p-3">
+          <MessageCircle size={24} />
         </Button>
       )}
       {isOpen && (
-        <div className="bg-card border rounded-lg shadow-xl w-80 md:w-96 flex flex-col h-[32rem]">
-          <header className="p-3 flex justify-between items-center border-b">
+        <div className="card shadow-xl" style={{ width: '24rem', height: '32rem', display: 'flex', flexDirection: 'column' }}>
+          <header className="card-header p-3 d-flex justify-content-between align-items-center">
             {renderHeader()}
-            <div className="flex items-center">
+            <div className="d-flex align-items-center">
               {view === 'list' && (
-                <Button variant="ghost" size="icon" onClick={() => setView('search')}>
-                  <Search className="h-5 w-5" />
+                <Button variant="ghost" size="sm" onClick={() => setView('search')}>
+                  <Search size={20} />
                 </Button>
               )}
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                <X className="h-5 w-5" />
+              <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
+                <X size={20} />
               </Button>
             </div>
           </header>
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-grow-1 d-flex flex-column" style={{ overflow: 'hidden' }}>
             {renderContent()}
           </div>
         </div>
