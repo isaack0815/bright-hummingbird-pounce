@@ -131,7 +131,7 @@ const CustomerManagement = () => {
                         <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-customer-${customer.id}`}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>
-                        <Dropdown.Menu>
+                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
                           <Dropdown.Header>Aktionen</Dropdown.Header>
                           <Dropdown.Item onClick={() => handleEditClick(customer)}>
                             <Edit className="me-2" size={16} /> Bearbeiten

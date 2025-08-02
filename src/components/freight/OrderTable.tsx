@@ -67,7 +67,7 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
                 <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-order-${order.id}`}>
                   <MoreHorizontal size={16} />
                 </Dropdown.Toggle>
-                <Dropdown.Menu>
+                <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
                   <Dropdown.Item onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
                     <Edit className="me-2" size={16} />
                     Bearbeiten

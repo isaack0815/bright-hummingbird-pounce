@@ -118,7 +118,7 @@ const UserManagement = () => {
                         <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-user-${user.id}`}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>
-                        <Dropdown.Menu>
+                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
                           <Dropdown.Item onClick={() => handleEditClick(user)}>
                             <Edit className="me-2" size={16} /> Bearbeiten
                           </Dropdown.Item>

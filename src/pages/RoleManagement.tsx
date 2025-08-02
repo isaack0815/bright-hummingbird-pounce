@@ -112,7 +112,7 @@ const RoleManagement = () => {
                         <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-role-${role.id}`} disabled={role.name === 'Admin'}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>
-                        <Dropdown.Menu>
+                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
                           <Dropdown.Item onClick={() => handleEditClick(role)}>
                             <Edit className="me-2" size={16} /> Bearbeiten
                           </Dropdown.Item>
