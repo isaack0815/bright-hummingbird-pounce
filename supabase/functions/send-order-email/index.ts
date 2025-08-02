@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { Client } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,19 +61,12 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
-    const useTls = smtpSecure === 'ssl' || smtpSecure === 'tls';
-
-    const client = new Client({
-      connection: {
-        hostname: Deno.env.get('SMTP_HOST')!,
-        port: Number(Deno.env.get('SMTP_PORT')!),
-        tls: useTls,
-        auth: {
-          user: Deno.env.get('SMTP_USER')!,
-          pass: Deno.env.get('SMTP_PASS')!,
-        },
-      },
+    const client = new SMTPClient({
+      user: Deno.env.get('SMTP_USER')!,
+      password: Deno.env.get('SMTP_PASS')!,
+      host: Deno.env.get('SMTP_HOST')!,
+      port: Number(Deno.env.get('SMTP_PORT')!),
+      ssl: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl',
     });
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
@@ -84,7 +77,7 @@ serve(async (req) => {
     await client.send({
       from: fromEmail,
       to: order.external_email,
-      bcc: bccEmail ? [bccEmail] : undefined,
+      bcc: bccEmail || undefined,
       subject: `Transportauftrag ${order.order_number} von ${companyName}`,
       html: `
         <p>Sehr geehrte Damen und Herren,</p>
@@ -93,15 +86,14 @@ serve(async (req) => {
         <br/>
         ${signature}
       `,
-      attachments: [
+      attachment: [
         {
-          filename: pdfFile.file_name,
-          content: new Uint8Array(pdfContent),
+          data: new Uint8Array(pdfContent),
+          name: pdfFile.file_name,
+          type: 'application/pdf',
         },
       ],
     });
-    
-    await client.close();
 
     return new Response(JSON.stringify({ success: true, message: `Email sent to ${order.external_email}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
