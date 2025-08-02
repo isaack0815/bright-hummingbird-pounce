@@ -1,18 +1,17 @@
 import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar';
+import Header from './Header';
 import { ChatWidget } from './chat/ChatWidget';
+import { Container } from 'react-bootstrap';
 
 const Layout = () => {
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <div className="hidden border-r bg-muted/40 md:block">
-        <Sidebar />
-      </div>
-      <div className="flex flex-col">
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
+    <div className="d-flex flex-column min-vh-100">
+      <Header />
+      <main className="flex-grow-1">
+        <Container fluid className="p-4">
           <Outlet />
-        </main>
-      </div>
+        </Container>
+      </main>
       <ChatWidget />
     </div>
   );
