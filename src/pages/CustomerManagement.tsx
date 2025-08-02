@@ -1,28 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, Button, Form, Table, Dropdown, Placeholder } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { EditCustomerDialog } from '@/components/EditCustomerDialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useError } from '@/contexts/ErrorContext';
 
 export type Customer = {
@@ -103,82 +86,72 @@ const CustomerManagement = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Kundenverwaltung</h1>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <h1 className="h2">Kundenverwaltung</h1>
         <Button onClick={() => setIsAddDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
+          <PlusCircle className="me-2" size={16} />
           Kunde hinzufügen
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Kundenliste</CardTitle>
-          <CardDescription>Suchen, bearbeiten und verwalten Sie Ihre Kunden.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Card.Header>
+          <Card.Title>Kundenliste</Card.Title>
+          <Card.Text className="text-muted">Suchen, bearbeiten und verwalten Sie Ihre Kunden.</Card.Text>
+        </Card.Header>
+        <Card.Body>
           <div className="mb-4">
-            <Input
+            <Form.Control
               placeholder="Kunden suchen..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
+              style={{ maxWidth: '24rem' }}
             />
           </div>
           {isLoading ? (
-            <p>Kunden werden geladen...</p>
+            <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder>
           ) : filteredCustomers.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Firma</TableHead>
-                  <TableHead>Ansprechpartner</TableHead>
-                  <TableHead>Standort</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Aktionen</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table responsive hover>
+              <thead>
+                <tr>
+                  <th>Firma</th>
+                  <th>Ansprechpartner</th>
+                  <th>Standort</th>
+                  <th className="text-end">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.company_name}</TableCell>
-                    <TableCell>{`${customer.contact_first_name || ''} ${customer.contact_last_name || ''}`.trim()}</TableCell>
-                    <TableCell>{`${customer.postal_code || ''} ${customer.city || ''}`.trim()}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Menü</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditClick(customer)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Bearbeiten
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteClick(customer.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Löschen
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                  <tr key={customer.id}>
+                    <td className="fw-medium">{customer.company_name}</td>
+                    <td>{`${customer.contact_first_name || ''} ${customer.contact_last_name || ''}`.trim()}</td>
+                    <td>{`${customer.postal_code || ''} ${customer.city || ''}`.trim()}</td>
+                    <td className="text-end">
+                      <Dropdown>
+                        <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-customer-${customer.id}`}>
+                          <MoreHorizontal size={16} />
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu>
+                          <Dropdown.Header>Aktionen</Dropdown.Header>
+                          <Dropdown.Item onClick={() => handleEditClick(customer)}>
+                            <Edit className="me-2" size={16} /> Bearbeiten
+                          </Dropdown.Item>
+                          <Dropdown.Item className="text-danger" onClick={() => handleDeleteClick(customer.id)}>
+                            <Trash2 className="me-2" size={16} /> Löschen
+                          </Dropdown.Item>
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
+              </tbody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center py-4">Keine Kunden gefunden.</p>
+            <p className="text-muted text-center py-4">Keine Kunden gefunden.</p>
           )}
-        </CardContent>
+        </Card.Body>
       </Card>
-      <AddCustomerDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
-      <EditCustomerDialog customer={selectedCustomer} open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} />
+      <AddCustomerDialog show={isAddDialogOpen} onHide={() => setIsAddDialogOpen(false)} />
+      <EditCustomerDialog customer={selectedCustomer} show={isEditDialogOpen} onHide={() => setIsEditDialogOpen(false)} />
     </div>
   );
 };

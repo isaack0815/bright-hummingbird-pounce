@@ -1,25 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button, Modal, Form, Spinner, Row, Col } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,12 +23,12 @@ const formSchema = z.object({
 });
 
 type AddCustomerDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
   onCustomerCreated?: (customer: Customer) => void;
 };
 
-export function AddCustomerDialog({ open, onOpenChange, onCustomerCreated }: AddCustomerDialogProps) {
+export function AddCustomerDialog({ show, onHide, onCustomerCreated }: AddCustomerDialogProps) {
   const queryClient = useQueryClient();
   const { addError } = useError();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -80,7 +62,7 @@ export function AddCustomerDialog({ open, onOpenChange, onCustomerCreated }: Add
       if (onCustomerCreated) {
         onCustomerCreated(newCustomer);
       } else {
-        onOpenChange(false);
+        onHide();
       }
       form.reset();
     },
@@ -91,113 +73,75 @@ export function AddCustomerDialog({ open, onOpenChange, onCustomerCreated }: Add
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Neuen Kunden anlegen</DialogTitle>
-          <DialogDescription>
-            Füllen Sie die Details aus, um einen neuen Kunden zu erstellen.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))}>
-            <ScrollArea className="h-96 p-4">
-              <div className="space-y-4">
-                <FormField control={form.control} name="company_name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Firma</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="contact_first_name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Vorname (Ansprechpartner)</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="contact_last_name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nachname (Ansprechpartner)</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>E-Mail</FormLabel>
-                    <FormControl><Input type="email" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField control={form.control} name="street" render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Straße</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="house_number" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hausnr.</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField control={form.control} name="postal_code" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>PLZ</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="city" render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Ort</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                <FormField control={form.control} name="country" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Land</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="tax_number" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Steuernummer</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="lex_id" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lex-ID</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-              </div>
-            </ScrollArea>
-            <DialogFooter className="pt-4">
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Wird erstellt..." : "Kunde erstellen"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <Modal show={show} onHide={onHide} size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Neuen Kunden anlegen</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))}>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          <p className="text-muted mb-4">Füllen Sie die Details aus, um einen neuen Kunden zu erstellen.</p>
+          <Form.Group className="mb-3">
+            <Form.Label>Firma</Form.Label>
+            <Form.Control {...form.register("company_name")} isInvalid={!!form.formState.errors.company_name} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.company_name?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Row className="mb-3">
+            <Form.Group as={Col}>
+              <Form.Label>Vorname (Ansprechpartner)</Form.Label>
+              <Form.Control {...form.register("contact_first_name")} />
+            </Form.Group>
+            <Form.Group as={Col}>
+              <Form.Label>Nachname (Ansprechpartner)</Form.Label>
+              <Form.Control {...form.register("contact_last_name")} />
+            </Form.Group>
+          </Row>
+          <Form.Group className="mb-3">
+            <Form.Label>E-Mail</Form.Label>
+            <Form.Control type="email" {...form.register("email")} isInvalid={!!form.formState.errors.email} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.email?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Row className="mb-3">
+            <Form.Group as={Col} xs={8}>
+              <Form.Label>Straße</Form.Label>
+              <Form.Control {...form.register("street")} />
+            </Form.Group>
+            <Form.Group as={Col} xs={4}>
+              <Form.Label>Hausnr.</Form.Label>
+              <Form.Control {...form.register("house_number")} />
+            </Form.Group>
+          </Row>
+          <Row className="mb-3">
+            <Form.Group as={Col} xs={4}>
+              <Form.Label>PLZ</Form.Label>
+              <Form.Control {...form.register("postal_code")} />
+            </Form.Group>
+            <Form.Group as={Col} xs={8}>
+              <Form.Label>Ort</Form.Label>
+              <Form.Control {...form.register("city")} />
+            </Form.Group>
+          </Row>
+          <Form.Group className="mb-3">
+            <Form.Label>Land</Form.Label>
+            <Form.Control {...form.register("country")} />
+          </Form.Group>
+          <Row>
+            <Form.Group as={Col}>
+              <Form.Label>Steuernummer</Form.Label>
+              <Form.Control {...form.register("tax_number")} />
+            </Form.Group>
+            <Form.Group as={Col}>
+              <Form.Label>Lex-ID</Form.Label>
+              <Form.Control {...form.register("lex_id")} />
+            </Form.Group>
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Kunde erstellen"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }
