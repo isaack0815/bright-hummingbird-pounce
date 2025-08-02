@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { SmtpClient } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
+import { createSmtpClient } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,13 +65,16 @@ serve(async (req) => {
     const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
     const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
 
-    const smtpClient = new SmtpClient();
-    await smtpClient.connect({
-      hostname: Deno.env.get('SMTP_HOST'),
-      port: Number(Deno.env.get('SMTP_PORT')),
-      username: Deno.env.get('SMTP_USER'),
-      password: Deno.env.get('SMTP_PASS'),
-      tls: useTls,
+    const smtpClient = createSmtpClient({
+      connection: {
+        hostname: Deno.env.get('SMTP_HOST')!,
+        port: Number(Deno.env.get('SMTP_PORT')!),
+        tls: useTls,
+        auth: {
+          user: Deno.env.get('SMTP_USER')!,
+          pass: Deno.env.get('SMTP_PASS')!,
+        },
+      },
     });
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'

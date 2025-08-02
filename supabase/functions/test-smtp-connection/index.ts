@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { SmtpClient } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
+import { SmtpConnection } from "https://deno.land/x/denomailer@1.0.0/smtp.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,20 +36,21 @@ serve(async (req) => {
     steps.push(`TLS/SSL mode: ${useTls} (based on SMTP_SECURE value: ${smtpSecure})`);
 
     // 4. Instantiate and connect
-    const smtpClient = new SmtpClient();
-    steps.push("SMTP client instantiated.");
-
-    await smtpClient.connect({
-      hostname: Deno.env.get('SMTP_HOST'),
+    const connection = new SmtpConnection({
+      hostname: Deno.env.get('SMTP_HOST')!,
       port: port,
-      username: Deno.env.get('SMTP_USER'),
-      password: Deno.env.get('SMTP_PASS'),
       tls: useTls,
+      auth: {
+        user: Deno.env.get('SMTP_USER')!,
+        pass: Deno.env.get('SMTP_PASS')!,
+      },
     });
-    steps.push("Connection to SMTP server successful.");
+    steps.push("SMTP connection object created.");
 
-    // 5. Close connection
-    await smtpClient.close();
+    await connection.connect();
+    steps.push("Connection to SMTP server successful (connect() method resolved).");
+
+    await connection.close();
     steps.push("Connection closed successfully.");
 
     return new Response(JSON.stringify({ success: true, message: "SMTP connection successful!", steps }), {
