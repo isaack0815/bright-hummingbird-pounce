@@ -1,8 +1,7 @@
 import * as React from "react"
 import { PlusCircle } from "lucide-react"
 import { Button } from "react-bootstrap"
-import Select, { components } from 'react-select';
-import type { NoOptionsMessageProps } from 'react-select';
+import Select, { components, NoticeProps } from 'react-select';
 import type { Customer } from "@/pages/CustomerManagement"
 
 type CustomerComboboxProps = {
@@ -20,7 +19,7 @@ export function CustomerCombobox({ customers, value, onChange, onAddNew }: Custo
 
   const selectedOption = options.find(option => option.value === value);
 
-  const NoOptionsMessage = (props: NoOptionsMessageProps) => {
+  const NoOptionsMessage = (props: NoticeProps) => {
     return (
       <components.NoOptionsMessage {...props}>
         <Button variant="link" className="w-100" onClick={onAddNew}>

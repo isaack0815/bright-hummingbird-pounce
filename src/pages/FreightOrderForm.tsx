@@ -203,9 +203,9 @@ const FreightOrderForm = () => {
     <Form onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
       <div className="d-flex align-items-center justify-content-between mb-4">
           <div className='d-flex align-items-center gap-3'>
-              <Button as={NavLink} to="/freight-orders" variant="outline-secondary" size="sm" className="p-2 lh-1">
+              <NavLink to="/freight-orders" className="btn btn-outline-secondary btn-sm p-2 lh-1">
                   <ArrowLeft size={16} />
-              </Button>
+              </NavLink>
               <h1 className="h2 mb-0">
                   {isEditMode ? `Auftrag ${existingOrder?.order_number} bearbeiten` : 'Neuer Frachtauftrag'}
               </h1>
