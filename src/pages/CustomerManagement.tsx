@@ -128,7 +128,7 @@ const CustomerManagement = () => {
                     <td>{`${customer.postal_code || ''} ${customer.city || ''}`.trim()}</td>
                     <td className="text-end">
                       <Dropdown renderOnMount>
-                        <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-customer-${customer.id}`}>
+                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-customer-${customer.id}`}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>
                         <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>

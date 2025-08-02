@@ -115,7 +115,7 @@ const UserManagement = () => {
                     <td>{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="text-end">
                       <Dropdown renderOnMount>
-                        <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-user-${user.id}`}>
+                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-user-${user.id}`}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>
                         <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
