@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
+import { Terminal, Wifi } from "lucide-react";
 import type { Setting } from "@/types/settings";
 
 const settingsSchema = z.object({
@@ -86,6 +86,21 @@ const Settings = () => {
     },
     onError: (err: any) => {
       showError(err.message || "Fehler beim Speichern der Einstellungen.");
+    },
+  });
+
+  const testSmtpMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('test-smtp-connection');
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      showSuccess(data.message || "Verbindung erfolgreich!");
+    },
+    onError: (err: any) => {
+      showError(err.message || "Verbindung fehlgeschlagen. Prüfen Sie die Logs und Secrets.");
     },
   });
 
@@ -187,6 +202,23 @@ const Settings = () => {
                   Die SMTP-Zugangsdaten (Host, Port, Benutzer, Passwort) müssen als Secrets direkt in Ihrem Supabase-Projekt unter "Edge Functions" &gt; "Manage Secrets" hinterlegt werden. Die Schlüssel müssen `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` und `SMTP_FROM_EMAIL` lauten.
                 </AlertDescription>
               </Alert>
+
+              <div className="border p-4 rounded-lg space-y-3 mb-6">
+                <h4 className="font-semibold">SMTP-Verbindung testen</h4>
+                <p className="text-sm text-muted-foreground">
+                  Klicken Sie hier, um zu überprüfen, ob die in den Supabase Secrets hinterlegten SMTP-Zugangsdaten korrekt sind und eine Verbindung hergestellt werden kann.
+                </p>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => testSmtpMutation.mutate()}
+                  disabled={testSmtpMutation.isPending}
+                >
+                  <Wifi className="mr-2 h-4 w-4" />
+                  {testSmtpMutation.isPending ? 'Teste Verbindung...' : 'Verbindung testen'}
+                </Button>
+              </div>
+
               {isLoading ? <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-24 w-full" /></div> : (
                 <div className="space-y-4">
                   <FormField control={form.control} name="email_bcc" render={({ field }) => (
