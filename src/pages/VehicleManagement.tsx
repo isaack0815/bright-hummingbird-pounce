@@ -1,30 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, Button, Form, Table, Dropdown, Badge, Placeholder } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useError } from '@/contexts/ErrorContext';
 import type { Vehicle } from '@/types/vehicle';
-import { Badge } from '@/components/ui/badge';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 
 const fetchVehicles = async (): Promise<Vehicle[]> => {
@@ -70,12 +52,12 @@ const VehicleManagement = () => {
     );
   }, [vehicles, searchTerm]);
 
-  const getDateBadgeVariant = (dateStr: string | null): 'destructive' | 'default' | 'secondary' => {
+  const getDateBadgeVariant = (dateStr: string | null): string => {
     if (!dateStr) return 'secondary';
     try {
       const daysUntil = differenceInCalendarDays(parseISO(dateStr), new Date());
-      if (daysUntil < 0) return 'destructive';
-      if (daysUntil <= 30) return 'default';
+      if (daysUntil < 0) return 'danger';
+      if (daysUntil <= 30) return 'warning';
       return 'secondary';
     } catch (e) {
       console.error("Error parsing date:", e);
@@ -90,85 +72,83 @@ const VehicleManagement = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Fahrzeugverwaltung</h1>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <h1 className="h2">Fahrzeugverwaltung</h1>
         <Button onClick={() => navigate('/vehicles/new')}>
-          <PlusCircle className="mr-2 h-4 w-4" />
+          <PlusCircle className="me-2" size={16} />
           Fahrzeug hinzufügen
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Fahrzeugliste</CardTitle>
-          <CardDescription>Suchen, bearbeiten und verwalten Sie Ihren Fuhrpark.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Card.Header>
+          <Card.Title>Fahrzeugliste</Card.Title>
+          <Card.Text className="text-muted">Suchen, bearbeiten und verwalten Sie Ihren Fuhrpark.</Card.Text>
+        </Card.Header>
+        <Card.Body>
           <div className="mb-4">
-            <Input
+            <Form.Control
               placeholder="Fahrzeuge suchen (Kennzeichen, Fahrer...)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
+              style={{ maxWidth: '24rem' }}
             />
           </div>
           {isLoading ? (
-            <p>Fahrzeuge werden geladen...</p>
+             <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder>
           ) : filteredVehicles.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Kennzeichen</TableHead>
-                  <TableHead>Marke & Modell</TableHead>
-                  <TableHead>Fahrer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Nächste HU</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Gasdurchsicht</TableHead>
-                  <TableHead><span className="sr-only">Aktionen</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table responsive hover>
+              <thead>
+                <tr>
+                  <th>Kennzeichen</th>
+                  <th>Marke & Modell</th>
+                  <th>Fahrer</th>
+                  <th>Status</th>
+                  <th>Nächste HU</th>
+                  <th>Service</th>
+                  <th>Gasdurchsicht</th>
+                  <th className="text-end"><span className="sr-only">Aktionen</span></th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredVehicles.map((vehicle) => (
-                  <TableRow key={vehicle.id}>
-                    <TableCell className="font-medium">{vehicle.license_plate}</TableCell>
-                    <TableCell>{`${vehicle.brand || ''} ${vehicle.model || ''}`.trim()}</TableCell>
-                    <TableCell>{vehicle.profiles ? `${vehicle.profiles.first_name || ''} ${vehicle.profiles.last_name || ''}`.trim() : '-'}</TableCell>
-                    <TableCell><Badge variant={vehicle.status === 'Verfügbar' ? 'default' : 'secondary'}>{vehicle.status}</Badge></TableCell>
-                    <TableCell>
-                      <Badge variant={getDateBadgeVariant(vehicle.inspection_due_date)}>
+                  <tr key={vehicle.id}>
+                    <td className="fw-medium">{vehicle.license_plate}</td>
+                    <td>{`${vehicle.brand || ''} ${vehicle.model || ''}`.trim()}</td>
+                    <td>{vehicle.profiles ? `${vehicle.profiles.first_name || ''} ${vehicle.profiles.last_name || ''}`.trim() : '-'}</td>
+                    <td><Badge bg={vehicle.status === 'Verfügbar' ? 'success' : 'secondary'}>{vehicle.status}</Badge></td>
+                    <td>
+                      <Badge bg={getDateBadgeVariant(vehicle.inspection_due_date)}>
                         {vehicle.inspection_due_date ? new Date(vehicle.inspection_due_date).toLocaleDateString() : '-'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getDateBadgeVariant(vehicle.next_service_date)}>
+                    </td>
+                    <td>
+                      <Badge bg={getDateBadgeVariant(vehicle.next_service_date)}>
                         {vehicle.next_service_date ? new Date(vehicle.next_service_date).toLocaleDateString() : '-'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getDateBadgeVariant(vehicle.gas_inspection_due_date)}>
+                    </td>
+                    <td>
+                      <Badge bg={getDateBadgeVariant(vehicle.gas_inspection_due_date)}>
                         {vehicle.gas_inspection_due_date ? new Date(vehicle.gas_inspection_due_date).toLocaleDateString() : '-'}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}><Edit className="mr-2 h-4 w-4" />Bearbeiten</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(vehicle.id)}><Trash2 className="mr-2 h-4 w-4" />Löschen</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                    <td className="text-end">
+                      <Dropdown>
+                        <Dropdown.Toggle variant="ghost" size="sm"><MoreHorizontal size={16} /></Dropdown.Toggle>
+                        <Dropdown.Menu align="end">
+                          <Dropdown.Header>Aktionen</Dropdown.Header>
+                          <Dropdown.Item onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}><Edit className="me-2" size={16} />Bearbeiten</Dropdown.Item>
+                          <Dropdown.Item className="text-danger" onClick={() => deleteMutation.mutate(vehicle.id)}><Trash2 className="me-2" size={16} />Löschen</Dropdown.Item>
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
+              </tbody>
             </Table>
           ) : (
-            <p className="text-muted-foreground text-center py-4">Keine Fahrzeuge gefunden.</p>
+            <p className="text-muted text-center py-4">Keine Fahrzeuge gefunden.</p>
           )}
-        </CardContent>
+        </Card.Body>
       </Card>
     </div>
   );

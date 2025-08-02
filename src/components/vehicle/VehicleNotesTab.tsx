@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Card, Form, Button, Placeholder, Image, Badge } from "react-bootstrap";
 import { showError, showSuccess } from "@/utils/toast";
-import { Skeleton } from "../ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { VehicleNote } from "@/types/vehicle";
@@ -56,26 +52,23 @@ const VehicleNotesTab = ({ vehicleId }: { vehicleId: number | null }) => {
     mutation.mutate({ vehicleId, note: newNote, categoryId: selectedCategoryId });
   };
 
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '??';
-  };
-
   if (!vehicleId) {
     return null;
   }
 
   return (
     <Card>
-      <CardHeader><CardTitle>Notizen</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Textarea
+      <Card.Header><Card.Title>Notizen</Card.Title></Card.Header>
+      <Card.Body>
+        <div className="d-flex flex-column gap-2">
+          <Form.Control
+            as="textarea"
             placeholder="Neue Notiz hinzufügen..."
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
           />
-          <div className="flex gap-2">
-            <div className="w-1/2">
+          <div className="d-flex gap-2">
+            <div className="w-50">
                 <CategoryCombobox value={selectedCategoryId} onChange={setSelectedCategoryId} />
             </div>
             <Button onClick={handleAddNote} disabled={mutation.isPending || !newNote.trim() || !selectedCategoryId}>
@@ -83,31 +76,28 @@ const VehicleNotesTab = ({ vehicleId }: { vehicleId: number | null }) => {
             </Button>
           </div>
         </div>
-        <div className="space-y-4">
-          {isLoading && <Skeleton className="h-20 w-full" />}
+        <div className="d-flex flex-column gap-4 mt-4">
+          {isLoading && <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '80px' }} /></Placeholder>}
           {notes?.map(note => (
-            <div key={note.id} className="flex items-start gap-4">
-              <Avatar>
-                <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${note.first_name} ${note.last_name}`} />
-                <AvatarFallback>{getInitials(note.first_name, note.last_name)}</AvatarFallback>
-              </Avatar>
-              <div className="w-full rounded-md border bg-muted/50 p-3">
-                <div className="flex justify-between items-start">
+            <div key={note.id} className="d-flex align-items-start gap-3">
+              <Image src={`https://api.dicebear.com/8.x/initials/svg?seed=${note.first_name} ${note.last_name}`} roundedCircle style={{ width: 40, height: 40 }} />
+              <div className="w-100 rounded border bg-light p-3">
+                <div className="d-flex justify-content-between align-items-start">
                   <div>
-                    <p className="font-semibold text-sm">{`${note.first_name || ''} ${note.last_name || ''}`.trim()}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="fw-semibold small mb-0">{`${note.first_name || ''} ${note.last_name || ''}`.trim()}</p>
+                    <p className="small text-muted">
                       {formatDistanceToNow(new Date(note.created_at), { addSuffix: true, locale: de })}
                     </p>
                   </div>
-                  <span className="text-xs font-medium bg-secondary text-secondary-foreground px-2 py-1 rounded-full">{note.category_name}</span>
+                  <Badge bg="secondary" pill>{note.category_name}</Badge>
                 </div>
-                <p className="text-sm mt-2 whitespace-pre-wrap">{note.note}</p>
+                <p className="small mt-2" style={{ whiteSpace: 'pre-wrap' }}>{note.note}</p>
               </div>
             </div>
           ))}
-          {!isLoading && notes?.length === 0 && <p className="text-muted-foreground text-center">Keine Notizen vorhanden.</p>}
+          {!isLoading && notes?.length === 0 && <p className="text-muted text-center">Keine Notizen vorhanden.</p>}
         </div>
-      </CardContent>
+      </Card.Body>
     </Card>
   );
 };

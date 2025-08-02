@@ -2,12 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Button, Card, Form, Tabs, Tab, Row, Col } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +11,6 @@ import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import type { Vehicle } from '@/types/vehicle';
 import type { ChatUser } from '@/types/chat';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VehicleNotesTab from '@/components/vehicle/VehicleNotesTab';
 
 const formSchema = z.object({
@@ -140,132 +134,63 @@ const VehicleForm = () => {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-6">
-        <div className="flex items-center justify-between">
-            <div className='flex items-center gap-4'>
-                <Button asChild variant="outline" size="icon">
-                    <NavLink to="/vehicles"><ArrowLeft className="h-4 w-4" /></NavLink>
-                </Button>
-                <h1 className="text-3xl font-bold">
-                    {isEditMode ? `Fahrzeug ${existingVehicle?.license_plate} bearbeiten` : 'Neues Fahrzeug'}
-                </h1>
-            </div>
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Wird gespeichert...' : 'Fahrzeug speichern'}
-          </Button>
-        </div>
+    <Form onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+          <div className='d-flex align-items-center gap-4'>
+              <NavLink to="/vehicles" className="btn btn-outline-secondary p-2 lh-1"><ArrowLeft size={16} /></NavLink>
+              <h1 className="h2 mb-0">
+                  {isEditMode ? `Fahrzeug ${existingVehicle?.license_plate} bearbeiten` : 'Neues Fahrzeug'}
+              </h1>
+          </div>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Wird gespeichert...' : 'Fahrzeug speichern'}
+        </Button>
+      </div>
 
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="general">Allgemein</TabsTrigger>
-            <TabsTrigger value="notes" disabled={!isEditMode}>Notizen</TabsTrigger>
-            <TabsTrigger value="files" disabled>Dateien (bald)</TabsTrigger>
-          </TabsList>
-          <TabsContent value="general" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Fahrzeugdetails</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="license_plate" render={({ field }) => (
-                      <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField
-                      control={form.control}
-                      name="driver_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fahrer</FormLabel>
-                          <Select
-                            onValueChange={(value) => field.onChange(value === "none" ? null : value)}
-                            value={field.value ?? "none"}
-                            disabled={isLoadingUsers}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Fahrer auswählen..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">- Kein Fahrer -</SelectItem>
-                              {users?.map((user) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField control={form.control} name="brand" render={({ field }) => (
-                        <FormItem><FormLabel>Marke</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="model" render={({ field }) => (
-                        <FormItem><FormLabel>Modell</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="type" render={({ field }) => (
-                      <FormItem><FormLabel>Fahrzeugtyp</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="Sattelzugmaschine">Sattelzugmaschine</SelectItem>
-                            <SelectItem value="Anhänger">Anhänger</SelectItem>
-                            <SelectItem value="Transporter">Transporter</SelectItem>
-                            <SelectItem value="LKW">LKW</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      <FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="vin" render={({ field }) => (
-                      <FormItem><FormLabel>Fahrgestellnummer (VIN)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="year_of_manufacture" render={({ field }) => (
-                        <FormItem><FormLabel>Baujahr</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="loading_area" render={({ field }) => (
-                        <FormItem><FormLabel>Ladefläche (m²)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="inspection_due_date" render={({ field }) => (
-                        <FormItem><FormLabel>Nächste HU</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="next_service_date" render={({ field }) => (
-                        <FormItem><FormLabel>Nächster Service</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="gas_inspection_due_date" render={({ field }) => (
-                        <FormItem><FormLabel>Nächste Gasdurchsicht</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="status" render={({ field }) => (
-                      <FormItem><FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            <SelectItem value="Verfügbar">Verfügbar</SelectItem>
-                            <SelectItem value="In Reparatur">In Reparatur</SelectItem>
-                            <SelectItem value="Unterwegs">Unterwegs</SelectItem>
-                            <SelectItem value="Außer Betrieb">Außer Betrieb</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      <FormMessage /></FormItem>
-                    )} />
-                </div>
-                <FormField control={form.control} name="notes" render={({ field }) => (
-                  <FormItem><FormLabel>Notizen</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="notes" className="mt-6">
-            <VehicleNotesTab vehicleId={id ? Number(id) : null} />
-          </TabsContent>
-          <TabsContent value="files">
-            {/* Placeholder for future files component */}
-          </TabsContent>
-        </Tabs>
-      </form>
+      <Tabs defaultActiveKey="general" className="mb-3 nav-fill">
+        <Tab eventKey="general" title="Allgemein">
+          <Card>
+            <Card.Header>
+              <Card.Title>Fahrzeugdetails</Card.Title>
+            </Card.Header>
+            <Card.Body>
+              <Row className="g-3">
+                  <Col md={6}><Form.Group><Form.Label>Kennzeichen</Form.Label><Form.Control {...form.register("license_plate")} isInvalid={!!form.formState.errors.license_plate} /><Form.Control.Feedback type="invalid">{form.formState.errors.license_plate?.message}</Form.Control.Feedback></Form.Group></Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Fahrer</Form.Label>
+                      <Form.Select {...form.register("driver_id")} value={form.watch("driver_id") ?? "none"} disabled={isLoadingUsers}>
+                        <option value="none">- Kein Fahrer -</option>
+                        {users?.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}><Form.Group><Form.Label>Marke</Form.Label><Form.Control {...form.register("brand")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Modell</Form.Label><Form.Control {...form.register("model")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Fahrzeugtyp</Form.Label><Form.Select {...form.register("type")}><option value="Sattelzugmaschine">Sattelzugmaschine</option><option value="Anhänger">Anhänger</option><option value="Transporter">Transporter</option><option value="LKW">LKW</option></Form.Select></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Fahrgestellnummer (VIN)</Form.Label><Form.Control {...form.register("vin")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Baujahr</Form.Label><Form.Control type="number" {...form.register("year_of_manufacture")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Ladefläche (m²)</Form.Label><Form.Control type="number" step="0.01" {...form.register("loading_area")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Nächste HU</Form.Label><Form.Control type="date" {...form.register("inspection_due_date")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Nächster Service</Form.Label><Form.Control type="date" {...form.register("next_service_date")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Nächste Gasdurchsicht</Form.Label><Form.Control type="date" {...form.register("gas_inspection_due_date")} /></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Status</Form.Label><Form.Select {...form.register("status")}><option value="Verfügbar">Verfügbar</option><option value="In Reparatur">In Reparatur</option><option value="Unterwegs">Unterwegs</option><option value="Außer Betrieb">Außer Betrieb</option></Form.Select></Form.Group></Col>
+                  <Col md={12}><Form.Group><Form.Label>Notizen</Form.Label><Form.Control as="textarea" {...form.register("notes")} /></Form.Group></Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        </Tab>
+        <Tab eventKey="notes" title="Notizen" disabled={!isEditMode}>
+          <VehicleNotesTab vehicleId={id ? Number(id) : null} />
+        </Tab>
+        <Tab eventKey="files" title="Dateien (bald)" disabled>
+          {/* Placeholder for future files component */}
+        </Tab>
+      </Tabs>
     </Form>
   );
 };

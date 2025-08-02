@@ -1,7 +1,8 @@
 import * as React from "react"
 import { PlusCircle } from "lucide-react"
 import { Button } from "react-bootstrap"
-import Select, { components, NoOptionsMessageProps } from 'react-select';
+import Select, { components } from 'react-select';
+import type { NoOptionsMessageProps } from 'react-select';
 import type { Customer } from "@/pages/CustomerManagement"
 
 type CustomerComboboxProps = {

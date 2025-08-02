@@ -1,6 +1,5 @@
 import { ShieldOff } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
-import { Button } from 'react-bootstrap';
 
 const AccessDenied = () => {
   return (
@@ -10,7 +9,7 @@ const AccessDenied = () => {
       <p className="text-muted mt-2 mb-4">
         Sie haben nicht die erforderlichen Berechtigungen, um auf diese Seite zuzugreifen.
       </p>
-      <Button as={NavLink} to="/">Zurück zum Dashboard</Button>
+      <NavLink to="/" className="btn btn-primary">Zurück zum Dashboard</NavLink>
     </div>
   );
 };
