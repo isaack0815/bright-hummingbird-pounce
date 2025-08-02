@@ -13,7 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    // Check for required environment variables first
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
     if (missingEnv.length > 0) {
@@ -106,7 +105,7 @@ serve(async (req) => {
     console.error('Critical error in send-order-email function:', e)
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: 200, // Return 200 OK to ensure the browser can read the error payload
     })
   }
 })
