@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Card, Button, Table, Dropdown, Badge, Placeholder } from 'react-bootstrap';
+import { Card, Button, Table, Dropdown, Badge } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
+import TablePlaceholder from '@/components/TablePlaceholder';
 
 type User = {
   id: string;
@@ -83,9 +84,7 @@ const UserManagement = () => {
         </Card.Header>
         <Card.Body>
           {isLoading ? (
-            <Placeholder as="div" animation="glow">
-              <Placeholder xs={12} style={{ height: '150px' }} />
-            </Placeholder>
+            <TablePlaceholder cols={5} />
           ) : users && users.length > 0 ? (
             <Table responsive hover>
               <thead>

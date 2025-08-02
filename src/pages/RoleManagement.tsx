@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Button, Table, Dropdown, Badge, Placeholder } from 'react-bootstrap';
+import { Card, Button, Table, Dropdown, Badge } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -7,6 +7,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { AddRoleDialog } from '@/components/AddRoleDialog';
 import { EditRoleDialog } from '@/components/EditRoleDialog';
 import { useError } from '@/contexts/ErrorContext';
+import TablePlaceholder from '@/components/TablePlaceholder';
 
 type Permission = {
   id: number;
@@ -81,7 +82,7 @@ const RoleManagement = () => {
         </Card.Header>
         <Card.Body>
           {isLoading ? (
-            <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder>
+            <TablePlaceholder cols={4} />
           ) : roles && roles.length > 0 ? (
             <Table responsive hover>
               <thead>

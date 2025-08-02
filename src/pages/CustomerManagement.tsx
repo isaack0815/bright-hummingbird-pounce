@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Form, Table, Dropdown, Placeholder } from 'react-bootstrap';
+import { Card, Button, Form, Table, Dropdown } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -7,6 +7,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { EditCustomerDialog } from '@/components/EditCustomerDialog';
 import { useError } from '@/contexts/ErrorContext';
+import TablePlaceholder from '@/components/TablePlaceholder';
 
 export type Customer = {
   id: number;
@@ -108,7 +109,7 @@ const CustomerManagement = () => {
             />
           </div>
           {isLoading ? (
-            <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder>
+            <TablePlaceholder cols={4} />
           ) : filteredCustomers.length > 0 ? (
             <Table responsive hover>
               <thead>

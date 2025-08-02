@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Form, Table, Dropdown, Badge, Placeholder } from 'react-bootstrap';
+import { Card, Button, Form, Table, Dropdown, Badge } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useError } from '@/contexts/ErrorContext';
 import type { Vehicle } from '@/types/vehicle';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import TablePlaceholder from '@/components/TablePlaceholder';
 
 const fetchVehicles = async (): Promise<Vehicle[]> => {
   const { data, error } = await supabase.functions.invoke('get-vehicles');
@@ -94,7 +95,7 @@ const VehicleManagement = () => {
             />
           </div>
           {isLoading ? (
-             <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder>
+             <TablePlaceholder cols={8} />
           ) : filteredVehicles.length > 0 ? (
             <Table responsive hover>
               <thead>

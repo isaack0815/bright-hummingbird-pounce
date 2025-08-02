@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Card, Button, Tabs, Tab, Placeholder } from 'react-bootstrap';
+import { Card, Button, Tabs, Tab } from 'react-bootstrap';
 import { PlusCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +9,7 @@ import type { FreightOrder } from '@/types/freight';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrderTable } from '@/components/freight/OrderTable';
+import TablePlaceholder from '@/components/TablePlaceholder';
 
 const fetchFreightOrders = async (): Promise<FreightOrder[]> => {
   const { data, error } = await supabase.functions.invoke('get-freight-orders');
@@ -85,13 +86,13 @@ const FreightOrderManagement = () => {
         <Card.Body>
           <Tabs defaultActiveKey="my-orders" id="order-tabs" className="mb-3 nav-fill">
             <Tab eventKey="my-orders" title="Meine Aufträge">
-              {isLoading ? <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} />}
+              {isLoading ? <TablePlaceholder cols={7} /> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} />}
             </Tab>
             <Tab eventKey="other-orders" title="Aufträge anderer">
-              {isLoading ? <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder> : <OrderTable orders={otherOrders} onDelete={handleDeleteClick} />}
+              {isLoading ? <TablePlaceholder cols={7} /> : <OrderTable orders={otherOrders} onDelete={handleDeleteClick} />}
             </Tab>
             <Tab eventKey="completed-orders" title="Abgeschlossen">
-              {isLoading ? <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder> : <OrderTable orders={completedOrders} onDelete={handleDeleteClick} />}
+              {isLoading ? <TablePlaceholder cols={7} /> : <OrderTable orders={completedOrders} onDelete={handleDeleteClick} />}
             </Tab>
           </Tabs>
         </Card.Body>
