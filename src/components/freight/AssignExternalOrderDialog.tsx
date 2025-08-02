@@ -76,10 +76,11 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
 
   const emailMutation = useMutation({
     mutationFn: async (orderId: number) => {
-      const { error } = await supabase.functions.invoke('send-order-email', {
+      const { data, error } = await supabase.functions.invoke('send-order-email', {
         body: { orderId },
       });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       showSuccess("E-Mail wurde erfolgreich versendet!");
@@ -152,10 +153,11 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
   const cancelMutation = useMutation({
     mutationFn: async () => {
       if (!order) return;
-      const { error } = await supabase.functions.invoke('cancel-external-assignment', {
+      const { data, error } = await supabase.functions.invoke('cancel-external-assignment', {
         body: { orderId: order.id },
       });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       showSuccess("Externe Vergabe storniert.");

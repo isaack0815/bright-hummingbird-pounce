@@ -97,10 +97,11 @@ const Settings = () => {
   const updateSettingsMutation = useMutation({
     mutationFn: async (values: z.infer<typeof settingsSchema>) => {
       const settingsToUpdate = Object.entries(values).map(([key, value]) => ({ key, value: String(value) }));
-      const { error } = await supabase.functions.invoke('update-settings', {
+      const { data, error } = await supabase.functions.invoke('update-settings', {
         body: settingsToUpdate,
       });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       showSuccess("Einstellungen erfolgreich gespeichert!");
@@ -118,16 +119,24 @@ const Settings = () => {
       return data;
     },
     onSuccess: (data) => {
-      setTestResult({
-        success: data.success,
-        message: data.success ? data.message : data.error,
-        steps: data.steps || [],
-      });
+      if (typeof data === 'object' && data !== null) {
+        setTestResult({
+          success: data.success,
+          message: data.success ? data.message : (data.error || "Ein unbekannter Fehler ist aufgetreten."),
+          steps: data.steps || [],
+        });
+      } else {
+        setTestResult({
+          success: false,
+          message: "Unerwartetes Antwortformat vom Server erhalten.",
+          steps: [`Antwort: ${JSON.stringify(data)}`],
+        });
+      }
     },
     onError: (err: any) => {
       setTestResult({
         success: false,
-        message: err.message || "Failed to invoke Edge Function. Check browser console for CORS errors.",
+        message: err.data?.error || err.message || "Aufruf der Edge-Funktion fehlgeschlagen. CORS-Fehler in der Browser-Konsole prüfen.",
         steps: [],
       });
     },
