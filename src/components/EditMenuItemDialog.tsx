@@ -2,25 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
@@ -35,8 +17,8 @@ const formSchema = z.object({
 
 type EditMenuItemDialogProps = {
   item: MenuItem | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
 };
 
 const fetchAllMenuItems = async (): Promise<MenuItem[]> => {
@@ -45,7 +27,7 @@ const fetchAllMenuItems = async (): Promise<MenuItem[]> => {
   return data.items;
 };
 
-export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDialogProps) {
+export function EditMenuItemDialog({ item, show, onHide }: EditMenuItemDialogProps) {
   const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,7 +36,7 @@ export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDia
   const { data: allItems } = useQuery<MenuItem[]>({
     queryKey: ['menuItems'],
     queryFn: fetchAllMenuItems,
-    enabled: open,
+    enabled: show,
   });
 
   const getDescendantIds = (itemId: number, items: MenuItem[]): number[] => {
@@ -82,7 +64,7 @@ export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDia
         parentId: item.parent_id,
       });
     }
-  }, [item, form, open]);
+  }, [item, form, show]);
 
   const updateMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
@@ -101,7 +83,7 @@ export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDia
     onSuccess: () => {
       showSuccess("Menüpunkt aktualisiert!");
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
-      onOpenChange(false);
+      onHide();
     },
     onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
   });
@@ -109,68 +91,45 @@ export function EditMenuItemDialog({ item, open, onOpenChange }: EditMenuItemDia
   if (!item) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Menüpunkt bearbeiten</DialogTitle>
-          <DialogDescription>Ändern Sie die Details des Menüpunkts.</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))} className="space-y-4">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="link" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Link</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="icon" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Icon Name (optional)</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField
-              control={form.control}
-              name="parentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Übergeordnetes Element</FormLabel>
-                  <Select onValueChange={field.onChange} value={String(field.value ?? 'null')}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kein übergeordnetes Element" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={'null'}>- Kein übergeordnetes Element -</SelectItem>
-                      {possibleParents.map(parent => (
-                        <SelectItem key={parent.id} value={String(parent.id)}>
-                          {parent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Wird gespeichert..." : "Speichern"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <Modal show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Menüpunkt bearbeiten</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}>
+        <Modal.Body>
+          <p className="text-muted">Ändern Sie die Details des Menüpunkts.</p>
+          <Form.Group className="mb-3">
+            <Form.Label>Name</Form.Label>
+            <Form.Control {...form.register("name")} isInvalid={!!form.formState.errors.name} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.name?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Link</Form.Label>
+            <Form.Control {...form.register("link")} />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Icon Name (optional)</Form.Label>
+            <Form.Control {...form.register("icon")} />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Übergeordnetes Element</Form.Label>
+            <Form.Select {...form.register("parentId")} value={String(form.watch("parentId") ?? 'null')}>
+              <option value={'null'}>- Kein übergeordnetes Element -</option>
+              {possibleParents.map(parent => (
+                <option key={parent.id} value={String(parent.id)}>
+                  {parent.name}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? <Spinner as="span" size="sm" /> : "Speichern"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }

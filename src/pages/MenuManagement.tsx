@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, Button } from 'react-bootstrap';
 import { PlusCircle, GripVertical, Edit, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -109,17 +108,17 @@ function SortableTreeItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center bg-background rounded-lg my-1 shadow-sm group">
-      <div {...attributes} {...listeners} className="p-3 cursor-grab active:cursor-grabbing">
-        <GripVertical className="h-5 w-5 text-muted-foreground" />
+    <div ref={setNodeRef} style={style} className="d-flex align-items-center bg-white rounded my-1 shadow-sm group">
+      <div {...attributes} {...listeners} className="p-3 cursor-grab active-cursor-grabbing">
+        <GripVertical className="h-5 w-5 text-muted" />
       </div>
-      <div className="flex-grow p-3">{item.name}</div>
-      <div className="flex items-center gap-1 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" onClick={() => onEdit(item)}>
-          <Edit className="h-4 w-4" />
+      <div className="flex-grow-1 p-3">{item.name}</div>
+      <div className="d-flex align-items-center gap-1 p-3 opacity-0 group-hover-opacity-100 transition-opacity">
+        <Button variant="ghost" size="sm" onClick={() => onEdit(item)}>
+          <Edit size={16} />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => onDelete(item.id)} className="text-destructive hover:text-destructive">
-          <Trash2 className="h-4 w-4" />
+        <Button variant="ghost" size="sm" onClick={() => onDelete(item.id)} className="text-danger">
+          <Trash2 size={16} />
         </Button>
       </div>
     </div>
@@ -272,19 +271,19 @@ const MenuManagement = () => {
       onDragCancel={handleDragCancel}
     >
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-foreground">Menüverwaltung</h1>
+        <div className="d-flex align-items-center justify-content-between mb-4">
+          <h1 className="h2">Menüverwaltung</h1>
           <Button onClick={() => setIsAddDialogOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
+            <PlusCircle className="me-2" size={16} />
             Menüpunkt hinzufügen
           </Button>
         </div>
         <Card>
-          <CardHeader>
-            <CardTitle>Menü-Editor</CardTitle>
-            <CardDescription>Ordnen Sie Menüpunkte per Drag & Drop an. Ziehen Sie sie nach rechts, um sie zu verschachteln.</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <Card.Header>
+            <Card.Title>Menü-Editor</Card.Title>
+            <Card.Text className="text-muted">Ordnen Sie Menüpunkte per Drag & Drop an. Ziehen Sie sie nach rechts, um sie zu verschachteln.</Card.Text>
+          </Card.Header>
+          <Card.Body>
             {isLoading ? (
               <p>Menüpunkte werden geladen...</p>
             ) : (
@@ -314,10 +313,10 @@ const MenuManagement = () => {
                 )}
               </SortableContext>
             )}
-          </CardContent>
+          </Card.Body>
         </Card>
-        <AddMenuItemDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
-        <EditMenuItemDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} item={selectedItem} />
+        <AddMenuItemDialog show={isAddDialogOpen} onHide={() => setIsAddDialogOpen(false)} />
+        <EditMenuItemDialog show={isEditDialogOpen} onHide={() => setIsEditDialogOpen(false)} item={selectedItem} />
       </div>
     </DndContext>
   );

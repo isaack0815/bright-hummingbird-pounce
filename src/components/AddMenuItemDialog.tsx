@@ -1,24 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
@@ -30,11 +13,11 @@ const formSchema = z.object({
 });
 
 type AddMenuItemDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
 };
 
-export function AddMenuItemDialog({ open, onOpenChange }: AddMenuItemDialogProps) {
+export function AddMenuItemDialog({ show, onHide }: AddMenuItemDialogProps) {
   const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,50 +34,41 @@ export function AddMenuItemDialog({ open, onOpenChange }: AddMenuItemDialogProps
     onSuccess: () => {
       showSuccess("Menüpunkt erstellt!");
       queryClient.invalidateQueries({ queryKey: ['menuItems'] });
-      onOpenChange(false);
+      onHide();
       form.reset();
     },
     onError: (err: any) => showError(err.message || "Fehler beim Erstellen."),
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Neuen Menüpunkt hinzufügen</DialogTitle>
-          <DialogDescription>Geben Sie die Details für den neuen Menüpunkt ein.</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))} className="space-y-4">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl><Input placeholder="z.B. Dashboard" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="link" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Link</FormLabel>
-                <FormControl><Input placeholder="/dashboard oder https://..." {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="icon" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Icon Name (optional)</FormLabel>
-                <FormControl><Input placeholder="z.B. Home" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Wird erstellt..." : "Erstellen"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <Modal show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Neuen Menüpunkt hinzufügen</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit((v) => createMutation.mutate(v))}>
+        <Modal.Body>
+          <p className="text-muted">Geben Sie die Details für den neuen Menüpunkt ein.</p>
+          <Form.Group className="mb-3">
+            <Form.Label>Name</Form.Label>
+            <Form.Control placeholder="z.B. Dashboard" {...form.register("name")} isInvalid={!!form.formState.errors.name} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.name?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Link</Form.Label>
+            <Form.Control placeholder="/dashboard oder https://..." {...form.register("link")} />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Icon Name (optional)</Form.Label>
+            <Form.Control placeholder="z.B. Home" {...form.register("icon")} />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Spinner as="span" size="sm" /> : "Erstellen"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }
