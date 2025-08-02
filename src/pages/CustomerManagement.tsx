@@ -127,7 +127,7 @@ const CustomerManagement = () => {
                     <td>{`${customer.contact_first_name || ''} ${customer.contact_last_name || ''}`.trim()}</td>
                     <td>{`${customer.postal_code || ''} ${customer.city || ''}`.trim()}</td>
                     <td className="text-end">
-                      <Dropdown>
+                      <Dropdown renderOnMount>
                         <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-customer-${customer.id}`}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>

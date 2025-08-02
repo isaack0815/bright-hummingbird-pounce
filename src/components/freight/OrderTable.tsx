@@ -63,7 +63,7 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
             <td>{order.destination_address}</td>
             <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString() : '-'}</td>
             <td className="text-end">
-              <Dropdown>
+              <Dropdown renderOnMount>
                 <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-order-${order.id}`}>
                   <MoreHorizontal size={16} />
                 </Dropdown.Toggle>

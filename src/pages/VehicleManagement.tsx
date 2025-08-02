@@ -133,9 +133,9 @@ const VehicleManagement = () => {
                       </Badge>
                     </td>
                     <td className="text-end">
-                      <Dropdown>
+                      <Dropdown renderOnMount align="end">
                         <Dropdown.Toggle variant="ghost" size="sm"><MoreHorizontal size={16} /></Dropdown.Toggle>
-                        <Dropdown.Menu align="end" popperConfig={{ strategy: 'fixed' }}>
+                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
                           <Dropdown.Header>Aktionen</Dropdown.Header>
                           <Dropdown.Item onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}><Edit className="me-2" size={16} />Bearbeiten</Dropdown.Item>
                           <Dropdown.Item className="text-danger" onClick={() => deleteMutation.mutate(vehicle.id)}><Trash2 className="me-2" size={16} />Löschen</Dropdown.Item>

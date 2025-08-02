@@ -108,7 +108,7 @@ const RoleManagement = () => {
                       </div>
                     </td>
                     <td className="text-end">
-                      <Dropdown>
+                      <Dropdown renderOnMount>
                         <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-role-${role.id}`} disabled={role.name === 'Admin'}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>

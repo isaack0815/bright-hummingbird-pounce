@@ -114,7 +114,7 @@ const UserManagement = () => {
                     </td>
                     <td>{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="text-end">
-                      <Dropdown>
+                      <Dropdown renderOnMount>
                         <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-user-${user.id}`}>
                           <MoreHorizontal size={16} />
                         </Dropdown.Toggle>
