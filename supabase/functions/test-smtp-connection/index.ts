@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +13,7 @@ serve(async (req) => {
 
   const steps: string[] = [];
   try {
-    steps.push("Function started using emailjs library.");
+    steps.push("Function started using deno-smtp library.");
 
     // 1. Check for required environment variables
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
@@ -27,20 +27,19 @@ serve(async (req) => {
     const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
     const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
     
-    const client = new SMTPClient({
-      connection: {
-        hostname: Deno.env.get('SMTP_HOST')!,
-        port: Number(Deno.env.get('SMTP_PORT')!),
-        tls: useTls,
-        auth: {
-          user: Deno.env.get('SMTP_USER')!,
-          pass: Deno.env.get('SMTP_PASS')!,
-        },
-      },
-    });
-    steps.push("SMTP client created with provided configuration.");
+    const client = new SmtpClient();
+    steps.push("SMTP client created.");
 
-    // 3. Send a test email
+    // 3. Connect to server
+    await client.connect({
+      hostname: Deno.env.get('SMTP_HOST')!,
+      port: Number(Deno.env.get('SMTP_PORT')!),
+      username: Deno.env.get('SMTP_USER')!,
+      password: Deno.env.get('SMTP_PASS')!,
+    });
+    steps.push("Connection to SMTP server successful.");
+
+    // 4. Send a test email
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL')!;
     steps.push(`Attempting to send a test email to: ${fromEmail}`);
 
@@ -52,7 +51,7 @@ serve(async (req) => {
     });
     steps.push("Test email sent successfully.");
 
-    // 4. Close connection
+    // 5. Close connection
     await client.close();
     steps.push("Connection closed successfully.");
 

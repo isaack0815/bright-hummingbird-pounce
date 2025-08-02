@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,19 +62,12 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
-    const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
-
-    const client = new SMTPClient({
-      connection: {
+    const client = new SmtpClient();
+    await client.connect({
         hostname: Deno.env.get('SMTP_HOST')!,
         port: Number(Deno.env.get('SMTP_PORT')!),
-        tls: useTls,
-        auth: {
-          user: Deno.env.get('SMTP_USER')!,
-          pass: Deno.env.get('SMTP_PASS')!,
-        },
-      },
+        username: Deno.env.get('SMTP_USER')!,
+        password: Deno.env.get('SMTP_PASS')!,
     });
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
@@ -82,9 +75,10 @@ serve(async (req) => {
     const signature = settingsMap.get('email_signature') ?? `<p>Mit freundlichen Grüßen,<br/>${companyName}</p>`
     const bccEmail = settingsMap.get('email_bcc')
 
-    const emailOptions = {
+    await client.send({
       from: fromEmail,
       to: order.external_email,
+      bcc: bccEmail ? [bccEmail] : undefined,
       subject: `Transportauftrag ${order.order_number} von ${companyName}`,
       html: `
         <p>Sehr geehrte Damen und Herren,</p>
@@ -93,17 +87,15 @@ serve(async (req) => {
         <br/>
         ${signature}
       `,
-      attachment: [
+      attachments: [
         {
-          name: pdfFile.file_name,
+          filename: pdfFile.file_name,
           content: new Uint8Array(pdfContent),
           contentType: 'application/pdf',
         },
       ],
-      ...(bccEmail && { bcc: bccEmail }),
-    };
-
-    await client.send(emailOptions);
+    });
+    
     await client.close();
 
     return new Response(JSON.stringify({ success: true, message: `Email sent to ${order.external_email}` }), {
