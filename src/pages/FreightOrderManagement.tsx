@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, Button, Tabs, Tab, Placeholder } from 'react-bootstrap';
 import { PlusCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -9,7 +8,6 @@ import { useError } from '@/contexts/ErrorContext';
 import type { FreightOrder } from '@/types/freight';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrderTable } from '@/components/freight/OrderTable';
 
 const fetchFreightOrders = async (): Promise<FreightOrder[]> => {
@@ -72,36 +70,31 @@ const FreightOrderManagement = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Frachtaufträge</h1>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <h1 className="h2">Frachtaufträge</h1>
         <Button onClick={() => navigate('/freight-orders/new')}>
-          <PlusCircle className="mr-2 h-4 w-4" />
+          <PlusCircle className="me-2" size={16} />
           Auftrag hinzufügen
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Auftragsliste</CardTitle>
-          <CardDescription>Hier sehen Sie alle für Sie zugänglichen Aufträge, aufgeteilt nach Kategorien.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="my-orders">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="my-orders">Meine Aufträge</TabsTrigger>
-              <TabsTrigger value="other-orders">Aufträge anderer</TabsTrigger>
-              <TabsTrigger value="completed-orders">Abgeschlossen</TabsTrigger>
-            </TabsList>
-            <TabsContent value="my-orders" className="mt-4">
-              {isLoading ? <p>Lade Aufträge...</p> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} />}
-            </TabsContent>
-            <TabsContent value="other-orders" className="mt-4">
-              {isLoading ? <p>Lade Aufträge...</p> : <OrderTable orders={otherOrders} onDelete={handleDeleteClick} />}
-            </TabsContent>
-            <TabsContent value="completed-orders" className="mt-4">
-              {isLoading ? <p>Lade Aufträge...</p> : <OrderTable orders={completedOrders} onDelete={handleDeleteClick} />}
-            </TabsContent>
+        <Card.Header>
+          <Card.Title>Auftragsliste</Card.Title>
+          <Card.Text className="text-muted">Hier sehen Sie alle für Sie zugänglichen Aufträge, aufgeteilt nach Kategorien.</Card.Text>
+        </Card.Header>
+        <Card.Body>
+          <Tabs defaultActiveKey="my-orders" id="order-tabs" className="mb-3 nav-fill">
+            <Tab eventKey="my-orders" title="Meine Aufträge">
+              {isLoading ? <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} />}
+            </Tab>
+            <Tab eventKey="other-orders" title="Aufträge anderer">
+              {isLoading ? <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder> : <OrderTable orders={otherOrders} onDelete={handleDeleteClick} />}
+            </Tab>
+            <Tab eventKey="completed-orders" title="Abgeschlossen">
+              {isLoading ? <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '150px' }} /></Placeholder> : <OrderTable orders={completedOrders} onDelete={handleDeleteClick} />}
+            </Tab>
           </Tabs>
-        </CardContent>
+        </Card.Body>
       </Card>
     </div>
   );

@@ -1,10 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, Button, Placeholder, Image } from "react-bootstrap";
 import { showError, showSuccess } from "@/utils/toast";
-import { Skeleton } from "../ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Trash2, UserPlus } from "lucide-react";
 import Select from 'react-select';
 import type { ChatUser } from "@/types/chat";
@@ -68,10 +65,6 @@ const TeamTab = ({ orderId }: { orderId: number | null }) => {
     onError: (err: any) => showError(err.message || "Fehler beim Entfernen."),
   });
 
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
-    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '??';
-  };
-
   const userOptions = allUsers
     ?.filter(u => !team?.some(m => m.user_id === u.id))
     .map(u => ({ value: u.id, label: `${u.first_name || ''} ${u.last_name || ''}`.trim() })) || [];
@@ -79,44 +72,41 @@ const TeamTab = ({ orderId }: { orderId: number | null }) => {
   if (!orderId) {
     return (
       <Card>
-        <CardHeader><CardTitle>Team</CardTitle></CardHeader>
-        <CardContent><p className="text-muted-foreground">Bitte speichern Sie den Auftrag zuerst, um ein Team zuzuweisen.</p></CardContent>
+        <Card.Header><Card.Title>Team</Card.Title></Card.Header>
+        <Card.Body><p className="text-muted">Bitte speichern Sie den Auftrag zuerst, um ein Team zuzuweisen.</p></Card.Body>
       </Card>
     );
   }
 
   return (
     <Card>
-      <CardHeader><CardTitle>Team</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5 text-muted-foreground" />
+      <Card.Header><Card.Title>Team</Card.Title></Card.Header>
+      <Card.Body className="d-flex flex-column gap-4">
+        <div className="d-flex align-items-center gap-2">
+          <UserPlus className="h-5 w-5 text-muted" />
           <Select
             options={userOptions}
             onChange={(option) => option && addMutation.mutate(option.value)}
             isLoading={isLoadingUsers || addMutation.isPending}
             placeholder="Benutzer zum Team hinzufügen..."
-            className="flex-grow"
+            className="flex-grow-1"
             noOptionsMessage={() => 'Alle Benutzer sind bereits im Team'}
           />
         </div>
-        <div className="space-y-2">
-          {isLoadingTeam && <Skeleton className="h-12 w-full" />}
+        <div className="d-flex flex-column gap-2">
+          {isLoadingTeam && <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '50px' }} /></Placeholder>}
           {team?.map(member => (
-            <div key={member.user_id} className="flex items-center justify-between rounded-md border p-3">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={`https://api.dicebear.com/8.x/initials/svg?seed=${member.first_name} ${member.last_name}`} />
-                  <AvatarFallback>{getInitials(member.first_name, member.last_name)}</AvatarFallback>
-                </Avatar>
-                <span className="font-medium">{`${member.first_name || ''} ${member.last_name || ''}`.trim()}</span>
+            <div key={member.user_id} className="d-flex align-items-center justify-content-between rounded border p-3">
+              <div className="d-flex align-items-center gap-3">
+                <Image src={`https://api.dicebear.com/8.x/initials/svg?seed=${member.first_name} ${member.last_name}`} roundedCircle style={{ width: 32, height: 32 }} />
+                <span className="fw-medium">{`${member.first_name || ''} ${member.last_name || ''}`.trim()}</span>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => removeMutation.mutate(member.user_id)} disabled={removeMutation.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => removeMutation.mutate(member.user_id)} disabled={removeMutation.isPending}><Trash2 className="h-4 w-4 text-danger" /></Button>
             </div>
           ))}
-          {!isLoadingTeam && team?.length === 0 && <p className="text-muted-foreground text-center">Noch keine Teammitglieder zugewiesen.</p>}
+          {!isLoadingTeam && team?.length === 0 && <p className="text-muted text-center">Noch keine Teammitglieder zugewiesen.</p>}
         </div>
-      </CardContent>
+      </Card.Body>
     </Card>
   );
 };

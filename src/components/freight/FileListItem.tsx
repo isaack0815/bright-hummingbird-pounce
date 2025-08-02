@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
+import { Button } from "react-bootstrap";
 import { showError, showSuccess } from "@/utils/toast";
 import { File as FileIcon, Trash2, Download, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -89,21 +89,21 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
   };
 
   return (
-    <div className="flex items-center justify-between rounded-md border p-3">
-      <div className="flex items-center gap-3 overflow-hidden">
-        <FileIcon className="h-6 w-6 text-muted-foreground flex-shrink-0" />
-        <div className="flex-grow overflow-hidden">
-          <p className="font-medium truncate">{file.file_name}</p>
-          <p className="text-xs text-muted-foreground">
+    <div className="d-flex align-items-center justify-content-between rounded border p-3">
+      <div className="d-flex align-items-center gap-3 overflow-hidden">
+        <FileIcon className="h-6 w-6 text-muted flex-shrink-0" />
+        <div className="flex-grow-1 overflow-hidden">
+          <p className="fw-medium text-truncate">{file.file_name}</p>
+          <p className="small text-muted mb-0">
             Hochgeladen von {`${file.first_name || ''} ${file.last_name || ''}`.trim() || 'Unbekannt'} am {new Date(file.created_at).toLocaleString('de-DE')}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="d-flex align-items-center gap-2">
         <Button 
           type="button" 
           variant="ghost" 
-          size="icon" 
+          size="sm" 
           onClick={handleDownload}
           disabled={isDownloading || isDeleting}
         >
@@ -116,14 +116,14 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
         <Button 
           type="button" 
           variant="ghost" 
-          size="icon" 
+          size="sm" 
           onClick={handleDelete} 
           disabled={isDownloading || isDeleting}
         >
           {isDeleting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4 text-danger" />
           )}
         </Button>
       </div>

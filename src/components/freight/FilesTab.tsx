@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, Form, Placeholder } from "react-bootstrap";
 import { useAuth } from "@/contexts/AuthContext";
 import { showError, showSuccess } from "@/utils/toast";
-import { Skeleton } from "../ui/skeleton";
 import { v4 as uuidv4 } from 'uuid';
 import { FileListItem } from "./FileListItem";
 
@@ -74,28 +72,28 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
   if (!orderId) {
     return (
       <Card>
-        <CardHeader><CardTitle>Dateien</CardTitle></CardHeader>
-        <CardContent><p className="text-muted-foreground">Bitte speichern Sie den Auftrag zuerst, um Dateien hochzuladen.</p></CardContent>
+        <Card.Header><Card.Title>Dateien</Card.Title></Card.Header>
+        <Card.Body><p className="text-muted">Bitte speichern Sie den Auftrag zuerst, um Dateien hochzuladen.</p></Card.Body>
       </Card>
     );
   }
 
   return (
     <Card>
-      <CardHeader><CardTitle>Dateien</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
+      <Card.Header><Card.Title>Dateien</Card.Title></Card.Header>
+      <Card.Body className="d-flex flex-column gap-4">
         <div>
-          <Input type="file" onChange={handleFileUpload} disabled={uploading} />
-          {uploading && <p className="text-sm text-muted-foreground mt-2">Wird hochgeladen...</p>}
+          <Form.Control type="file" onChange={handleFileUpload} disabled={uploading} />
+          {uploading && <p className="small text-muted mt-2">Wird hochgeladen...</p>}
         </div>
-        <div className="space-y-2">
-          {isLoading && <Skeleton className="h-12 w-full" />}
+        <div className="d-flex flex-column gap-2">
+          {isLoading && <Placeholder animation="glow"><Placeholder xs={12} style={{ height: '50px' }} /></Placeholder>}
           {files?.map(file => (
             <FileListItem key={file.id} file={file} orderId={orderId} />
           ))}
-          {!isLoading && files?.length === 0 && <p className="text-muted-foreground text-center">Keine Dateien vorhanden.</p>}
+          {!isLoading && files?.length === 0 && <p className="text-muted text-center">Keine Dateien vorhanden.</p>}
         </div>
-      </CardContent>
+      </Card.Body>
     </Card>
   );
 };

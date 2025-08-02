@@ -1,25 +1,8 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Table, Dropdown, Button, Badge } from "react-bootstrap";
 import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { FreightOrder } from "@/types/freight";
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { cn } from "@/lib/utils";
 
 type OrderTableProps = {
   orders: FreightOrder[];
@@ -40,10 +23,10 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
       const daysUntilPickup = differenceInCalendarDays(pickupDate, today);
 
       if (daysUntilPickup <= 0) {
-        return 'bg-red-100 dark:bg-red-900/50'; // Red for past or today
+        return 'table-danger';
       }
       if (daysUntilPickup <= 7) {
-        return 'bg-orange-100 dark:bg-orange-900/50'; // Orange for within 7 days
+        return 'table-warning';
       }
     } catch (e) {
       console.error("Error parsing date for order:", order.id, order.pickup_date, e);
@@ -54,59 +37,54 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
   };
 
   if (orders.length === 0) {
-    return <p className="text-muted-foreground text-center py-8">Keine Aufträge in dieser Ansicht gefunden.</p>;
+    return <p className="text-muted text-center py-5">Keine Aufträge in dieser Ansicht gefunden.</p>;
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Auftragsnr.</TableHead>
-          <TableHead>Kunde</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Von</TableHead>
-          <TableHead>Nach</TableHead>
-          <TableHead>Abholdatum</TableHead>
-          <TableHead>
-            <span className="sr-only">Aktionen</span>
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <Table responsive hover>
+      <thead>
+        <tr>
+          <th>Auftragsnr.</th>
+          <th>Kunde</th>
+          <th>Status</th>
+          <th>Von</th>
+          <th>Nach</th>
+          <th>Abholdatum</th>
+          <th className="text-end">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
         {orders.map((order) => (
-          <TableRow key={order.id} className={cn(getRowClass(order))}>
-            <TableCell className="font-medium">{order.order_number}</TableCell>
-            <TableCell>{order.customers?.company_name || 'N/A'}</TableCell>
-            <TableCell><Badge>{order.status}</Badge></TableCell>
-            <TableCell>{order.origin_address}</TableCell>
-            <TableCell>{order.destination_address}</TableCell>
-            <TableCell>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString() : '-'}</TableCell>
-            <TableCell className="text-right">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button aria-haspopup="true" size="icon" variant="ghost">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
-                    <Edit className="mr-2 h-4 w-4" />
+          <tr key={order.id} className={getRowClass(order)}>
+            <td className="fw-medium">{order.order_number}</td>
+            <td>{order.customers?.company_name || 'N/A'}</td>
+            <td><Badge bg="secondary">{order.status}</Badge></td>
+            <td>{order.origin_address}</td>
+            <td>{order.destination_address}</td>
+            <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString() : '-'}</td>
+            <td className="text-end">
+              <Dropdown>
+                <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-order-${order.id}`}>
+                  <MoreHorizontal size={16} />
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
+                    <Edit className="me-2" size={16} />
                     Bearbeiten
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive"
+                  </Dropdown.Item>
+                  <Dropdown.Item
+                    className="text-danger"
                     onClick={() => onDelete(order.id)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
+                    <Trash2 className="me-2" size={16} />
                     Löschen
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </TableCell>
-          </TableRow>
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            </td>
+          </tr>
         ))}
-      </TableBody>
+      </tbody>
     </Table>
   );
 };

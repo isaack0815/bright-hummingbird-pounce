@@ -2,26 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Button, Modal, Form } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -175,111 +156,71 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
   const isAssigned = order.is_external;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isAssigned ? 'Externe Vergabe verwalten' : 'Auftrag extern vergeben'}</DialogTitle>
-          <DialogDescription>
-            {isAssigned 
-              ? `Dieser Auftrag ist an den folgenden Dienstleister vergeben.`
-              : `Füllen Sie die Daten des externen Dienstleisters aus.`
-            }
-          </DialogDescription>
-        </DialogHeader>
-        
+    <Modal show={open} onHide={() => onOpenChange(false)} size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>{isAssigned ? 'Externe Vergabe verwalten' : 'Auftrag extern vergeben'}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
         {isAssigned ? (
-          <div className="space-y-6 py-4 text-sm">
-            <h3 className="text-lg font-semibold text-foreground">Details Externer Transport</h3>
-
+          <div className="d-flex flex-column gap-4 py-2 small">
+            <h3 className="h5">Details Externer Transport</h3>
             <div>
-              <h4 className="font-semibold text-muted-foreground mb-2">Transporteur</h4>
-              <div className="pl-4 border-l-2 space-y-1">
+              <h4 className="h6 text-muted mb-2">Transporteur</h4>
+              <div className="ps-3 border-start d-flex flex-column gap-1">
                 <p><strong>Anschrift:</strong><br/>{order.external_company_address?.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) || '-'}</p>
                 <p><strong>E-Mail:</strong> {order.external_email || '-'}</p>
               </div>
             </div>
-
             <div>
-              <h4 className="font-semibold text-muted-foreground mb-2">Fahrer & Fahrzeug</h4>
-              <div className="pl-4 border-l-2 space-y-1">
+              <h4 className="h6 text-muted mb-2">Fahrer & Fahrzeug</h4>
+              <div className="ps-3 border-start d-flex flex-column gap-1">
                 <p><strong>Fahrer:</strong> {order.external_driver_name || '-'}</p>
                 <p><strong>Telefon:</strong> {order.external_driver_phone || '-'}</p>
                 <p><strong>Kennzeichen:</strong> {order.external_license_plate || '-'}</p>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h4 className="font-semibold text-muted-foreground mb-2">Preis</h4>
-                <div className="pl-4 border-l-2">
-                  <p>{order.price ? `${order.price.toFixed(2)} €` : '-'}</p>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-semibold text-muted-foreground mb-2">Erstellt am</h4>
-                <div className="pl-4 border-l-2">
-                  <p>{order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE') : '-'}</p>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="sm:justify-between gap-2 pt-4">
-              <Button variant="destructive" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
-                {cancelMutation.isPending ? 'Wird storniert...' : 'Vergabe stornieren'}
-              </Button>
-              <Button variant="outline" onClick={() => emailMutation.mutate(order.id)} disabled={emailMutation.isPending || !order.external_email}>
-                {emailMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                E-Mail erneut senden
-              </Button>
-            </DialogFooter>
           </div>
         ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit((v) => assignMutation.mutate(v))} className="space-y-4">
-              <FormField control={form.control} name="external_company_address" render={({ field }) => (
-                  <FormItem><FormLabel>Anschrift der Firma</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="external_email" render={({ field }) => (
-                  <FormItem><FormLabel>E-Mail-Adresse</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="external_driver_name" render={({ field }) => (
-                  <FormItem><FormLabel>Fahrername</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="external_driver_phone" render={({ field }) => (
-                  <FormItem><FormLabel>Fahrer Telefon</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="external_license_plate" render={({ field }) => (
-                  <FormItem><FormLabel>Kennzeichen</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="external_transporter_dimensions" render={({ field }) => (
-                  <FormItem><FormLabel>Transportermaße (LxBxH)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="payment_term_days" render={({ field }) => (
-                  <FormItem><FormLabel>Zahlungsfrist (Tage)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="send-email"
-                  checked={sendEmail}
-                  onCheckedChange={(checked) => setSendEmail(Boolean(checked))}
-                  disabled={!form.watch('external_email')}
-                />
-                <label
-                  htmlFor="send-email"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Transportauftrag nach Speichern per E-Mail senden
-                </label>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={assignMutation.isPending}>
-                  {assignMutation.isPending ? 'Wird vergeben...' : 'Extern vergeben & PDF erstellen'}
-                </Button>
-              </DialogFooter>
-            </form>
+          <Form id="assign-external-form" onSubmit={form.handleSubmit((v) => assignMutation.mutate(v))}>
+            <p className="text-muted">Füllen Sie die Daten des externen Dienstleisters aus.</p>
+            <Form.Group className="mb-3"><Form.Label>Anschrift der Firma</Form.Label><Form.Control as="textarea" {...form.register("external_company_address")} /></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>E-Mail-Adresse</Form.Label><Form.Control type="email" {...form.register("external_email")} /></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>Fahrername</Form.Label><Form.Control {...form.register("external_driver_name")} /></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>Fahrer Telefon</Form.Label><Form.Control {...form.register("external_driver_phone")} /></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>Kennzeichen</Form.Label><Form.Control {...form.register("external_license_plate")} /></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>Transportermaße (LxBxH)</Form.Label><Form.Control {...form.register("external_transporter_dimensions")} /></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_days")} /></Form.Group>
+            <Form.Check 
+              type="checkbox"
+              id="send-email"
+              label="Transportauftrag nach Speichern per E-Mail senden"
+              checked={sendEmail}
+              onChange={(e) => setSendEmail(e.target.checked)}
+              disabled={!form.watch('external_email')}
+            />
           </Form>
         )}
-      </DialogContent>
-    </Dialog>
+      </Modal.Body>
+      <Modal.Footer>
+        {isAssigned ? (
+          <>
+            <Button variant="danger" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
+              {cancelMutation.isPending ? 'Wird storniert...' : 'Vergabe stornieren'}
+            </Button>
+            <Button variant="outline-secondary" onClick={() => emailMutation.mutate(order.id)} disabled={emailMutation.isPending || !order.external_email}>
+              {emailMutation.isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : <Mail className="me-2 h-4 w-4" />}
+              E-Mail erneut senden
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+            <Button type="submit" form="assign-external-form" disabled={assignMutation.isPending}>
+              {assignMutation.isPending ? 'Wird vergeben...' : 'Extern vergeben & PDF erstellen'}
+            </Button>
+          </>
+        )}
+      </Modal.Footer>
+    </Modal>
   );
 }

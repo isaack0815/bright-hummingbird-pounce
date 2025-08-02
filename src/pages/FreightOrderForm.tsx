@@ -2,13 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button, Card, Form, Tabs, Tab, Row, Col } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -206,174 +200,110 @@ const FreightOrderForm = () => {
 
   return (
     <>
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-6">
-        <div className="flex items-center justify-between">
-            <div className='flex items-center gap-4'>
-                <Button asChild variant="outline" size="icon">
-                    <NavLink to="/freight-orders"><ArrowLeft className="h-4 w-4" /></NavLink>
+    <Form onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+          <div className='d-flex align-items-center gap-3'>
+              <Button as={NavLink} to="/freight-orders" variant="outline-secondary" size="sm" className="p-2 lh-1">
+                  <ArrowLeft size={16} />
+              </Button>
+              <h1 className="h2 mb-0">
+                  {isEditMode ? `Auftrag ${existingOrder?.order_number} bearbeiten` : 'Neuer Frachtauftrag'}
+              </h1>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+              {isEditMode && (
+                <Button type="button" variant={existingOrder?.is_external ? "secondary" : "outline-secondary"} onClick={() => setIsAssignModalOpen(true)} disabled={isFetchingOrder}>
+                  <Share2 className="me-2" size={16} />
+                  {isFetchingOrder ? 'Lade...' : (existingOrder?.is_external ? 'Externe Vergabe verwalten' : 'Extern vergeben')}
                 </Button>
-                <h1 className="text-3xl font-bold">
-                    {isEditMode ? `Auftrag ${existingOrder?.order_number} bearbeiten` : 'Neuer Frachtauftrag'}
-                </h1>
-            </div>
-            <div className="flex items-center gap-2">
-                {isEditMode && (
-                  <Button type="button" variant={existingOrder?.is_external ? "secondary" : "outline"} onClick={() => setIsAssignModalOpen(true)} disabled={isFetchingOrder}>
-                    <Share2 className="mr-2 h-4 w-4" />
-                    {isFetchingOrder ? 'Lade...' : (existingOrder?.is_external ? 'Externe Vergabe verwalten' : 'Extern vergeben')}
-                  </Button>
-                )}
-                <Button type="submit" disabled={mutation.isPending}>
-                    {mutation.isPending ? 'Wird gespeichert...' : 'Auftrag speichern'}
-                </Button>
-            </div>
-        </div>
+              )}
+              <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? 'Wird gespeichert...' : 'Auftrag speichern'}
+              </Button>
+          </div>
+      </div>
 
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="general">Allgemein</TabsTrigger>
-            <TabsTrigger value="notes">Notizen</TabsTrigger>
-            <TabsTrigger value="files">Dateien</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
-          </TabsList>
-          <TabsContent value="general" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Route & Stopps</CardTitle>
-                            <CardDescription>Definieren Sie hier die Abhol-, Liefer- und Zwischenstopps.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {stopFields.map((field, index) => (
-                                <Card key={field.id} className="p-4 relative">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <FormField control={form.control} name={`stops.${index}.address`} render={({ field }) => (
-                                            <FormItem className="md:col-span-2"><FormLabel>Adresse</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`stops.${index}.stop_type`} render={({ field }) => (
-                                            <FormItem><FormLabel>Stopp-Art</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="Abholung">Abholung</SelectItem>
-                                                        <SelectItem value="Teilladung">Teilladung</SelectItem>
-                                                        <SelectItem value="Teillieferung">Teillieferung</SelectItem>
-                                                        <SelectItem value="Lieferung">Lieferung</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            <FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`stops.${index}.stop_date`} render={({ field }) => (
-                                            <FormItem><FormLabel>Datum</FormLabel><FormControl><Input type="date" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`stops.${index}.time_start`} render={({ field }) => (
-                                            <FormItem><FormLabel>Zeitfenster (von)</FormLabel><FormControl><Input type="time" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`stops.${index}.time_end`} render={({ field }) => (
-                                            <FormItem><FormLabel>Zeitfenster (bis)</FormLabel><FormControl><Input type="time" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                    </div>
-                                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                </Card>
-                            ))}
-                            <Button type="button" variant="outline" onClick={() => appendStop({ stop_type: 'Teillieferung', address: '', stop_date: null, time_start: null, time_end: null, position: stopFields.length })}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Stopp hinzufügen
-                            </Button>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Ladungsdetails</CardTitle>
-                            <CardDescription>Fügen Sie hier die einzelnen Ladungspositionen hinzu.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {cargoFields.map((field, index) => (
-                                <Card key={field.id} className="p-4 relative">
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                        <FormField control={form.control} name={`cargoItems.${index}.quantity`} render={({ field }) => (
-                                            <FormItem><FormLabel>Anzahl</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`cargoItems.${index}.cargo_type`} render={({ field }) => (
-                                            <FormItem><FormLabel>Art</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`cargoItems.${index}.description`} render={({ field }) => (
-                                            <FormItem><FormLabel>Bezeichnung</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`cargoItems.${index}.weight`} render={({ field }) => (
-                                            <FormItem><FormLabel>Gewicht (kg)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`cargoItems.${index}.loading_meters`} render={({ field }) => (
-                                            <FormItem><FormLabel>Lademeter</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl></FormItem>
-                                        )} />
-                                    </div>
-                                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => removeCargo(index)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                                </Card>
-                            ))}
-                            <Button type="button" variant="outline" onClick={() => appendCargo({ quantity: 1, cargo_type: '', description: '', weight: null, loading_meters: null })}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Ladungsposition hinzufügen
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader><CardTitle>Allgemeine Informationen</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="customer_id"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel>Kunde</FormLabel>
-                                        <CustomerCombobox
-                                            customers={customers || []}
-                                            value={field.value}
-                                            onChange={(value) => form.setValue('customer_id', value)}
-                                            onAddNew={() => setIsAddCustomerDialogOpen(true)}
-                                        />
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField control={form.control} name="external_order_number" render={({ field }) => (
-                                <FormItem><FormLabel>Externe Auftragsnummer</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="status" render={({ field }) => (
-                                <FormItem><FormLabel>Status</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="Angelegt">Angelegt</SelectItem>
-                                            <SelectItem value="Geplant">Geplant</SelectItem>
-                                            <SelectItem value="Unterwegs">Unterwegs</SelectItem>
-                                            <SelectItem value="Zugestellt">Zugestellt</SelectItem>
-                                            <SelectItem value="Storniert">Storniert</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                <FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="price" render={({ field }) => (
-                                <FormItem><FormLabel>Preis (€)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="description" render={({ field }) => (
-                                <FormItem><FormLabel>Beschreibung / Notizen</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-          </TabsContent>
-          <TabsContent value="notes" className="mt-6"><NotesTab orderId={id ? Number(id) : null} /></TabsContent>
-          <TabsContent value="files" className="mt-6"><FilesTab orderId={id ? Number(id) : null} /></TabsContent>
-          <TabsContent value="team" className="mt-6"><TeamTab orderId={id ? Number(id) : null} /></TabsContent>
-        </Tabs>
-      </form>
+      <Tabs defaultActiveKey="general" id="order-form-tabs" className="mb-3 nav-fill">
+        <Tab eventKey="general" title="Allgemein">
+          <Row className="g-4">
+              <Col lg={8} className="d-flex flex-column gap-4">
+                  <Card>
+                      <Card.Header>
+                          <Card.Title>Route & Stopps</Card.Title>
+                          <Card.Text className="text-muted small">Definieren Sie hier die Abhol-, Liefer- und Zwischenstopps.</Card.Text>
+                      </Card.Header>
+                      <Card.Body className="d-flex flex-column gap-3">
+                          {stopFields.map((field, index) => (
+                              <Card key={field.id} className="p-3 position-relative bg-light">
+                                  <Row className="g-3">
+                                      <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
+                                      <Col md={6}><Form.Group><Form.Label>Stopp-Art</Form.Label><Form.Select {...form.register(`stops.${index}.stop_type`)}><option value="Abholung">Abholung</option><option value="Teilladung">Teilladung</option><option value="Teillieferung">Teillieferung</option><option value="Lieferung">Lieferung</option></Form.Select></Form.Group></Col>
+                                      <Col md={6}><Form.Group><Form.Label>Datum</Form.Label><Form.Control type="date" {...form.register(`stops.${index}.stop_date`)} /></Form.Group></Col>
+                                      <Col md={6}><Form.Group><Form.Label>Zeitfenster (von)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_start`)} /></Form.Group></Col>
+                                      <Col md={6}><Form.Group><Form.Label>Zeitfenster (bis)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_end`)} /></Form.Group></Col>
+                                  </Row>
+                                  <Button type="button" variant="ghost" size="sm" className="position-absolute top-0 end-0 mt-2 me-2" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
+                              </Card>
+                          ))}
+                          <Button type="button" variant="outline-secondary" onClick={() => appendStop({ stop_type: 'Teillieferung', address: '', stop_date: null, time_start: null, time_end: null, position: stopFields.length })}>
+                              <PlusCircle className="me-2" size={16} /> Stopp hinzufügen
+                          </Button>
+                      </Card.Body>
+                  </Card>
+                  <Card>
+                      <Card.Header>
+                          <Card.Title>Ladungsdetails</Card.Title>
+                          <Card.Text className="text-muted small">Fügen Sie hier die einzelnen Ladungspositionen hinzu.</Card.Text>
+                      </Card.Header>
+                      <Card.Body className="d-flex flex-column gap-3">
+                          {cargoFields.map((field, index) => (
+                              <Card key={field.id} className="p-3 position-relative bg-light">
+                                  <Row className="g-3">
+                                      <Col xs={6} md={2}><Form.Group><Form.Label>Anzahl</Form.Label><Form.Control type="number" {...form.register(`cargoItems.${index}.quantity`)} /></Form.Group></Col>
+                                      <Col xs={6} md={2}><Form.Group><Form.Label>Art</Form.Label><Form.Control {...form.register(`cargoItems.${index}.cargo_type`)} /></Form.Group></Col>
+                                      <Col md={4}><Form.Group><Form.Label>Bezeichnung</Form.Label><Form.Control {...form.register(`cargoItems.${index}.description`)} /></Form.Group></Col>
+                                      <Col xs={6} md={2}><Form.Group><Form.Label>Gewicht (kg)</Form.Label><Form.Control type="number" step="0.01" {...form.register(`cargoItems.${index}.weight`)} /></Form.Group></Col>
+                                      <Col xs={6} md={2}><Form.Group><Form.Label>Lademeter</Form.Label><Form.Control type="number" step="0.01" {...form.register(`cargoItems.${index}.loading_meters`)} /></Form.Group></Col>
+                                  </Row>
+                                  <Button type="button" variant="ghost" size="sm" className="position-absolute top-0 end-0 mt-2 me-2" onClick={() => removeCargo(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
+                              </Card>
+                          ))}
+                          <Button type="button" variant="outline-secondary" onClick={() => appendCargo({ quantity: 1, cargo_type: '', description: '', weight: null, loading_meters: null })}>
+                              <PlusCircle className="me-2" size={16} /> Ladungsposition hinzufügen
+                          </Button>
+                      </Card.Body>
+                  </Card>
+              </Col>
+              <Col lg={4}>
+                  <Card>
+                      <Card.Header><Card.Title>Allgemeine Informationen</Card.Title></Card.Header>
+                      <Card.Body className="d-flex flex-column gap-3">
+                          <Form.Group>
+                              <Form.Label>Kunde</Form.Label>
+                              <CustomerCombobox
+                                  customers={customers || []}
+                                  value={form.watch('customer_id')}
+                                  onChange={(value) => form.setValue('customer_id', value)}
+                                  onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                              />
+                          </Form.Group>
+                          <Form.Group><Form.Label>Externe Auftragsnummer</Form.Label><Form.Control {...form.register("external_order_number")} /></Form.Group>
+                          <Form.Group><Form.Label>Status</Form.Label><Form.Select {...form.register("status")}><option value="Angelegt">Angelegt</option><option value="Geplant">Geplant</option><option value="Unterwegs">Unterwegs</option><option value="Zugestellt">Zugestellt</option><option value="Storniert">Storniert</option></Form.Select></Form.Group>
+                          <Form.Group><Form.Label>Preis (€)</Form.Label><Form.Control type="number" step="0.01" {...form.register("price")} /></Form.Group>
+                          <Form.Group><Form.Label>Beschreibung / Notizen</Form.Label><Form.Control as="textarea" {...form.register("description")} /></Form.Group>
+                      </Card.Body>
+                  </Card>
+              </Col>
+          </Row>
+        </Tab>
+        <Tab eventKey="notes" title="Notizen"><NotesTab orderId={id ? Number(id) : null} /></Tab>
+        <Tab eventKey="files" title="Dateien"><FilesTab orderId={id ? Number(id) : null} /></Tab>
+        <Tab eventKey="team" title="Team"><TeamTab orderId={id ? Number(id) : null} /></Tab>
+      </Tabs>
     </Form>
     <AddCustomerDialog
-        open={isAddCustomerDialogOpen}
-        onOpenChange={setIsAddCustomerDialogOpen}
+        show={isAddCustomerDialogOpen}
+        onHide={() => setIsAddCustomerDialogOpen(false)}
         onCustomerCreated={(newCustomer) => {
             queryClient.invalidateQueries({ queryKey: ['customers'] });
             form.setValue('customer_id', newCustomer.id);
