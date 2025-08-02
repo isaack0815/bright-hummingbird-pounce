@@ -134,7 +134,9 @@ const VehicleManagement = () => {
                     </td>
                     <td className="text-end">
                       <Dropdown renderOnMount align="end">
-                        <Dropdown.Toggle as={Button} variant="ghost" size="sm"><MoreHorizontal size={16} /></Dropdown.Toggle>
+                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-vehicle-${vehicle.id}`}>
+                          <MoreHorizontal size={16} />
+                        </Dropdown.Toggle>
                         <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
                           <Dropdown.Header>Aktionen</Dropdown.Header>
                           <Dropdown.Item onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}><Edit className="me-2" size={16} />Bearbeiten</Dropdown.Item>
