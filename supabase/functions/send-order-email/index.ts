@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { Client } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,12 +61,19 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const client = new SmtpClient();
-    await client.connect({
+    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
+    const useTls = smtpSecure === 'ssl' || smtpSecure === 'tls';
+
+    const client = new Client({
+      connection: {
         hostname: Deno.env.get('SMTP_HOST')!,
         port: Number(Deno.env.get('SMTP_PORT')!),
-        username: Deno.env.get('SMTP_USER')!,
-        password: Deno.env.get('SMTP_PASS')!,
+        tls: useTls,
+        auth: {
+          user: Deno.env.get('SMTP_USER')!,
+          pass: Deno.env.get('SMTP_PASS')!,
+        },
+      },
     });
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
@@ -90,7 +97,6 @@ serve(async (req) => {
         {
           filename: pdfFile.file_name,
           content: new Uint8Array(pdfContent),
-          contentType: 'application/pdf',
         },
       ],
     });
@@ -105,7 +111,7 @@ serve(async (req) => {
     console.error('Critical error in send-order-email function:', e)
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200, // Return 200 OK to ensure the browser can read the error payload
+      status: 200,
     })
   }
 })
