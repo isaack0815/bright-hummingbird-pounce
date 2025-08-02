@@ -2,14 +2,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { SmtpClient } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
 
-// Explicitly allow 'content-type' for CORS preflight requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  // Immediately handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -35,7 +33,6 @@ serve(async (req) => {
       })
     }
 
-    // 1. Fetch order, settings, and the PDF file
     const { data: order, error: orderError } = await supabaseAdmin
       .from('freight_orders')
       .select('order_number, external_email, customers(company_name)')
@@ -59,23 +56,24 @@ serve(async (req) => {
       .single()
     if (fileError || !pdfFile) throw new Error(fileError?.message || 'Transport agreement PDF not found.')
 
-    // 2. Download PDF from storage
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from('order-files')
       .download(pdfFile.file_path)
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    // 3. Configure SMTP client
+    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
+    const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
+
     const smtpClient = new SmtpClient();
     await smtpClient.connect({
       hostname: Deno.env.get('SMTP_HOST'),
       port: Number(Deno.env.get('SMTP_PORT')),
       username: Deno.env.get('SMTP_USER'),
       password: Deno.env.get('SMTP_PASS'),
+      tls: useTls,
     });
 
-    // 4. Send email
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
     const companyName = settingsMap.get('company_name') ?? 'Your Company'
     const signature = settingsMap.get('email_signature') ?? `<p>Mit freundlichen Grüßen,<br/>${companyName}</p>`

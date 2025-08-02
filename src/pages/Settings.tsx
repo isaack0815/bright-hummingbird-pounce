@@ -12,7 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Wifi } from "lucide-react";
+import { Terminal, Wifi, CheckCircle2, XCircle } from "lucide-react";
 import type { Setting } from "@/types/settings";
 
 const settingsSchema = z.object({
@@ -33,11 +33,22 @@ const fetchSettings = async (): Promise<Setting[]> => {
   return data.settings;
 };
 
+const fetchSmtpStatus = async (): Promise<Record<string, boolean>> => {
+  const { data, error } = await supabase.functions.invoke('get-smtp-secrets-status');
+  if (error) throw error;
+  return data.status;
+};
+
 const Settings = () => {
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useQuery<Setting[]>({
     queryKey: ['settings'],
     queryFn: fetchSettings,
+  });
+
+  const { data: smtpStatus, isLoading: isLoadingSmtpStatus } = useQuery<Record<string, boolean>>({
+    queryKey: ['smtpStatus'],
+    queryFn: fetchSmtpStatus,
   });
 
   const form = useForm<z.infer<typeof settingsSchema>>({
@@ -107,6 +118,19 @@ const Settings = () => {
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateSettingsMutation.mutate(values);
   };
+
+  const SecretStatusItem = ({ name, isSet }: { name: string, isSet: boolean | undefined }) => (
+    <li className="flex items-center justify-between text-sm py-1 border-b">
+      <span className="font-mono text-muted-foreground">{name}</span>
+      {isSet === undefined ? (
+        <Skeleton className="h-5 w-5 rounded-full" />
+      ) : isSet ? (
+        <CheckCircle2 className="h-5 w-5 text-green-500" />
+      ) : (
+        <XCircle className="h-5 w-5 text-destructive" />
+      )}
+    </li>
+  );
 
   return (
     <div className="space-y-6">
@@ -199,28 +223,45 @@ const Settings = () => {
                 <Terminal className="h-4 w-4" />
                 <AlertTitle>Wichtiger Hinweis!</AlertTitle>
                 <AlertDescription>
-                  Die SMTP-Zugangsdaten (Host, Port, Benutzer, Passwort) müssen als Secrets direkt in Ihrem Supabase-Projekt unter "Edge Functions" &gt; "Manage Secrets" hinterlegt werden. Die Schlüssel müssen `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` und `SMTP_FROM_EMAIL` lauten.
+                  Die SMTP-Zugangsdaten müssen als Secrets direkt in Ihrem Supabase-Projekt hinterlegt werden. Fügen Sie auch `SMTP_SECURE` mit dem Wert `tls`, `ssl` oder `none` hinzu.
                 </AlertDescription>
               </Alert>
 
-              <div className="border p-4 rounded-lg space-y-3 mb-6">
-                <h4 className="font-semibold">SMTP-Verbindung testen</h4>
-                <p className="text-sm text-muted-foreground">
-                  Klicken Sie hier, um zu überprüfen, ob die in den Supabase Secrets hinterlegten SMTP-Zugangsdaten korrekt sind und eine Verbindung hergestellt werden kann.
-                </p>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => testSmtpMutation.mutate()}
-                  disabled={testSmtpMutation.isPending}
-                >
-                  <Wifi className="mr-2 h-4 w-4" />
-                  {testSmtpMutation.isPending ? 'Teste Verbindung...' : 'Verbindung testen'}
-                </Button>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="border p-4 rounded-lg space-y-3">
+                  <h4 className="font-semibold">Status der SMTP-Secrets</h4>
+                  {isLoadingSmtpStatus ? (
+                    <Skeleton className="h-36 w-full" />
+                  ) : (
+                    <ul className="space-y-1">
+                      <SecretStatusItem name="SMTP_HOST" isSet={smtpStatus?.SMTP_HOST} />
+                      <SecretStatusItem name="SMTP_PORT" isSet={smtpStatus?.SMTP_PORT} />
+                      <SecretStatusItem name="SMTP_USER" isSet={smtpStatus?.SMTP_USER} />
+                      <SecretStatusItem name="SMTP_PASS" isSet={smtpStatus?.SMTP_PASS} />
+                      <SecretStatusItem name="SMTP_FROM_EMAIL" isSet={smtpStatus?.SMTP_FROM_EMAIL} />
+                      <SecretStatusItem name="SMTP_SECURE" isSet={smtpStatus?.SMTP_SECURE} />
+                    </ul>
+                  )}
+                </div>
+                <div className="border p-4 rounded-lg space-y-3">
+                  <h4 className="font-semibold">SMTP-Verbindung testen</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Prüfen Sie, ob die in den Secrets hinterlegten Daten korrekt sind.
+                  </p>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => testSmtpMutation.mutate()}
+                    disabled={testSmtpMutation.isPending}
+                  >
+                    <Wifi className="mr-2 h-4 w-4" />
+                    {testSmtpMutation.isPending ? 'Teste Verbindung...' : 'Verbindung testen'}
+                  </Button>
+                </div>
               </div>
 
-              {isLoading ? <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-24 w-full" /></div> : (
-                <div className="space-y-4">
+              {isLoading ? <div className="space-y-4 mt-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-24 w-full" /></div> : (
+                <div className="space-y-4 mt-6">
                   <FormField control={form.control} name="email_bcc" render={({ field }) => (
                     <FormItem><FormLabel>BCC-Empfänger</FormLabel><FormControl><Input placeholder="bcc@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />

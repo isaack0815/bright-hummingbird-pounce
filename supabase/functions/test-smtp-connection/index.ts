@@ -20,12 +20,16 @@ serve(async (req) => {
     }
 
     // 2. Configure and connect SMTP client
+    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
+    const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
+
     const smtpClient = new SmtpClient();
     await smtpClient.connect({
       hostname: Deno.env.get('SMTP_HOST'),
       port: Number(Deno.env.get('SMTP_PORT')),
       username: Deno.env.get('SMTP_USER'),
       password: Deno.env.get('SMTP_PASS'),
+      tls: useTls,
     });
 
     // 3. If connection is successful, close it and return success
