@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,13 +61,24 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const client = new SMTPClient({
-      user: Deno.env.get('SMTP_USER')!,
-      password: Deno.env.get('SMTP_PASS')!,
-      host: Deno.env.get('SMTP_HOST')!,
-      port: Number(Deno.env.get('SMTP_PORT')!),
-      ssl: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl',
-    });
+    const client = new SmtpClient();
+    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
+
+    if (smtpSecure === 'ssl' || smtpSecure === 'tls') {
+        await client.connectTLS({
+            hostname: Deno.env.get('SMTP_HOST')!,
+            port: Number(Deno.env.get('SMTP_PORT')!),
+            username: Deno.env.get('SMTP_USER')!,
+            password: Deno.env.get('SMTP_PASS')!,
+        });
+    } else {
+        await client.connect({
+            hostname: Deno.env.get('SMTP_HOST')!,
+            port: Number(Deno.env.get('SMTP_PORT')!),
+            username: Deno.env.get('SMTP_USER')!,
+            password: Deno.env.get('SMTP_PASS')!,
+        });
+    }
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
     const companyName = settingsMap.get('company_name') ?? 'Your Company'
@@ -77,7 +88,7 @@ serve(async (req) => {
     await client.send({
       from: fromEmail,
       to: order.external_email,
-      bcc: bccEmail || undefined,
+      bcc: bccEmail ? [bccEmail] : undefined,
       subject: `Transportauftrag ${order.order_number} von ${companyName}`,
       html: `
         <p>Sehr geehrte Damen und Herren,</p>
@@ -86,14 +97,16 @@ serve(async (req) => {
         <br/>
         ${signature}
       `,
-      attachment: [
+      attachments: [
         {
-          data: new Uint8Array(pdfContent),
-          name: pdfFile.file_name,
-          type: 'application/pdf',
+          filename: pdfFile.file_name,
+          content: new Uint8Array(pdfContent),
+          contentType: 'application/pdf',
         },
       ],
     });
+    
+    await client.close();
 
     return new Response(JSON.stringify({ success: true, message: `Email sent to ${order.external_email}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

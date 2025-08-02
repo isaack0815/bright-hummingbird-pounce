@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,9 +12,8 @@ serve(async (req) => {
   }
 
   const steps: string[] = [];
-
   try {
-    steps.push("Function started using emailjs.");
+    steps.push("Function started using deno-smtp library.");
 
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
@@ -23,44 +22,59 @@ serve(async (req) => {
     }
     steps.push("All required secrets are present.");
 
-    const client = new SMTPClient({
-      user: Deno.env.get('SMTP_USER')!,
-      password: Deno.env.get('SMTP_PASS')!,
-      host: Deno.env.get('SMTP_HOST')!,
-      port: Number(Deno.env.get('SMTP_PORT')!),
-      ssl: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl',
-    });
-    steps.push("Client configured.");
+    const client = new SmtpClient();
+    steps.push("SMTP client created.");
 
+    const host = Deno.env.get('SMTP_HOST')!;
+    const port = Number(Deno.env.get('SMTP_PORT')!);
+    const user = Deno.env.get('SMTP_USER')!;
+    const pass = Deno.env.get('SMTP_PASS')!;
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL')!;
+    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
+    steps.push(`Host: ${host}, Port: ${port}, User: ${user}, Secure: ${smtpSecure}`);
+
+    if (smtpSecure === 'ssl' || smtpSecure === 'tls') {
+        steps.push(`Attempting to connect with TLS to ${host}:${port}...`);
+        await client.connectTLS({
+            hostname: host,
+            port: port,
+            username: user,
+            password: pass,
+        });
+    } else {
+        steps.push(`Attempting to connect (plain) to ${host}:${port}...`);
+        await client.connect({
+            hostname: host,
+            port: port,
+            username: user,
+            password: pass,
+        });
+    }
+    steps.push("Connection to SMTP server successful.");
+
     steps.push(`Attempting to send a test email to: ${fromEmail}`);
-    
     await client.send({
       from: fromEmail,
       to: fromEmail,
-      subject: "SMTP Test Email (Success)",
-      text: "This is a test email to confirm SMTP configuration.",
+      subject: "SMTP Connection Test (Success)",
+      html: "This is a test email to verify SMTP settings. If you received this, the connection is working.",
     });
+    steps.push("Test email sent successfully.");
 
-    steps.push("Email sent successfully.");
+    await client.close();
+    steps.push("Connection closed successfully.");
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: "SMTP connection successful. Test email sent.",
-      steps
-    }), {
+    return new Response(JSON.stringify({ success: true, message: "SMTP connection successful! A test email was sent.", steps }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    });
-
+    })
   } catch (e) {
-    console.error("SMTP Connection Test Error:", e);
+    console.error('SMTP Connection Test Error:', e);
     const errorMessage = e instanceof Error ? e.message : String(e);
     steps.push(`ERROR: ${errorMessage}`);
-
     return new Response(JSON.stringify({ success: false, error: errorMessage, steps }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    });
+    })
   }
 });
