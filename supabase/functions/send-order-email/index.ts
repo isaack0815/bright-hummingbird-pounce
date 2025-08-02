@@ -13,6 +13,13 @@ serve(async (req) => {
   }
 
   try {
+    // Check for required environment variables first
+    const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
+    const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
+    if (missingEnv.length > 0) {
+      throw new Error(`Missing required SMTP environment variables in Supabase secrets: ${missingEnv.join(', ')}`);
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
