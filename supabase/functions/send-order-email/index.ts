@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { createSmtpClient } from "https://deno.land/x/denomailer@1.0.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,7 +65,7 @@ serve(async (req) => {
     const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
     const useTls = smtpSecure === 'tls' || smtpSecure === 'ssl';
 
-    const smtpClient = createSmtpClient({
+    const client = new SMTPClient({
       connection: {
         hostname: Deno.env.get('SMTP_HOST')!,
         port: Number(Deno.env.get('SMTP_PORT')!),
@@ -86,16 +86,16 @@ serve(async (req) => {
       from: fromEmail,
       to: order.external_email,
       subject: `Transportauftrag ${order.order_number} von ${companyName}`,
-      content: `
+      html: `
         <p>Sehr geehrte Damen und Herren,</p>
         <p>anbei erhalten Sie den Transportauftrag mit der Nummer <strong>${order.order_number}</strong> für den Kunden <strong>${(order.customers as any)?.company_name ?? ''}</strong>.</p>
         <p>Bitte bestätigen Sie den Erhalt dieser E-Mail.</p>
         <br/>
         ${signature}
       `,
-      attachments: [
+      attachment: [
         {
-          filename: pdfFile.file_name,
+          name: pdfFile.file_name,
           content: new Uint8Array(pdfContent),
           contentType: 'application/pdf',
         },
@@ -103,8 +103,8 @@ serve(async (req) => {
       ...(bccEmail && { bcc: bccEmail }),
     };
 
-    await smtpClient.send(emailOptions);
-    await smtpClient.close();
+    await client.send(emailOptions);
+    await client.close();
 
     return new Response(JSON.stringify({ success: true, message: `Email sent to ${order.external_email}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
