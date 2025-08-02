@@ -8,16 +8,16 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
   try {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders })
+    }
+
     // Check for required environment variables first
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
     if (missingEnv.length > 0) {
-      throw new Error(`Missing required SMTP environment variables in Supabase secrets: ${missingEnv.join(', ')}`);
+      throw new Error(`Server configuration error: Missing required SMTP secrets: ${missingEnv.join(', ')}`);
     }
 
     const supabaseAdmin = createClient(
@@ -27,7 +27,10 @@ serve(async (req) => {
 
     const { orderId } = await req.json()
     if (!orderId) {
-      return new Response(JSON.stringify({ error: 'Order ID is required' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Order ID is required' }), { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // 1. Fetch order, settings, and the PDF file
@@ -105,7 +108,7 @@ serve(async (req) => {
       status: 200,
     })
   } catch (e) {
-    console.error('Error sending order email:', e)
+    console.error('Critical error in send-order-email function:', e)
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
