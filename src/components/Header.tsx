@@ -31,7 +31,7 @@ const Header = () => {
             {hasPermission('vehicles.manage') && <Nav.Link as={NavLink} to="/vehicles">Fahrzeuge</Nav.Link>}
 
             {(hasPermission('users.manage') || hasPermission('roles.manage') || hasPermission('menus.manage') || hasPermission('settings.manage')) && (
-              <NavDropdown title="Administration" id="admin-dropdown">
+              <NavDropdown title="Administration" id="admin-dropdown" renderOnMount>
                 {hasPermission('users.manage') && <NavDropdown.Item as={NavLink} to="/users"><Users className="me-2 h-4 w-4" />Benutzer</NavDropdown.Item>}
                 {hasPermission('roles.manage') && <NavDropdown.Item as={NavLink} to="/roles"><Shield className="me-2 h-4 w-4" />Gruppen & Rechte</NavDropdown.Item>}
                 {hasPermission('menus.manage') && <NavDropdown.Item as={NavLink} to="/menus"><MenuIcon className="me-2 h-4 w-4" />Menü-Editor</NavDropdown.Item>}
@@ -40,7 +40,7 @@ const Header = () => {
             )}
           </Nav>
           <Nav>
-            <NavDropdown title={<User />} id="user-dropdown" align="end">
+            <NavDropdown title={<User />} id="user-dropdown" align="end" renderOnMount>
               <NavDropdown.Item as={NavLink} to="/profile">
                 <User className="me-2 h-4 w-4" /> Mein Profil
               </NavDropdown.Item>
