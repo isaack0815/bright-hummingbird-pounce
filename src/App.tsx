@@ -1,6 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -33,8 +31,8 @@ const AppRoutes = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <p className="text-foreground">Sitzung wird geladen...</p>
+      <div className="d-flex align-items-center justify-content-center vh-100 bg-light">
+        <p className="text-dark">Sitzung wird geladen...</p>
       </div>
     );
   }
@@ -92,19 +90,16 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ErrorProvider>
-          <ErrorBoundary>
-            <SessionContextProvider supabaseClient={supabase}>
-              <AuthProvider>
-                <Toaster />
-                <Sonner />
-                <AppRoutes />
-              </AuthProvider>
-            </SessionContextProvider>
-          </ErrorBoundary>
-        </ErrorProvider>
-      </TooltipProvider>
+      <ErrorProvider>
+        <ErrorBoundary>
+          <SessionContextProvider supabaseClient={supabase}>
+            <AuthProvider>
+              <Sonner />
+              <AppRoutes />
+            </AuthProvider>
+          </SessionContextProvider>
+        </ErrorBoundary>
+      </ErrorProvider>
     </QueryClientProvider>
   );
 };
