@@ -30,8 +30,7 @@ import type { FreightOrder } from '@/types/freight';
 import { generateExternalOrderPDF } from '@/utils/pdfGenerator';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info, Mail, Loader2 } from 'lucide-react';
+import { Mail, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   external_company_address: z.string().min(1, "Anschrift ist erforderlich."),
@@ -189,18 +188,42 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
         </DialogHeader>
         
         {isAssigned ? (
-          <div className="space-y-4 py-4">
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Informationen zum Dienstleister</AlertTitle>
-              <AlertDescription className="text-sm space-y-2 mt-2">
-                <p><strong>Firma:</strong><br/>{order.external_company_address?.split('\n').map((line, i) => <span key={i}>{line}<br/></span>)}</p>
+          <div className="space-y-6 py-4 text-sm">
+            <h3 className="text-lg font-semibold text-foreground">Details Externer Transport</h3>
+
+            <div>
+              <h4 className="font-semibold text-muted-foreground mb-2">Transporteur</h4>
+              <div className="pl-4 border-l-2 space-y-1">
+                <p><strong>Anschrift:</strong><br/>{order.external_company_address?.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) || '-'}</p>
+                <p><strong>E-Mail:</strong> {order.external_email || '-'}</p>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-muted-foreground mb-2">Fahrer & Fahrzeug</h4>
+              <div className="pl-4 border-l-2 space-y-1">
                 <p><strong>Fahrer:</strong> {order.external_driver_name || '-'}</p>
                 <p><strong>Telefon:</strong> {order.external_driver_phone || '-'}</p>
                 <p><strong>Kennzeichen:</strong> {order.external_license_plate || '-'}</p>
-              </AlertDescription>
-            </Alert>
-            <DialogFooter className="sm:justify-between gap-2">
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-semibold text-muted-foreground mb-2">Preis</h4>
+                <div className="pl-4 border-l-2">
+                  <p>{order.price ? `${order.price.toFixed(2)} €` : '-'}</p>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-muted-foreground mb-2">Erstellt am</h4>
+                <div className="pl-4 border-l-2">
+                  <p>{order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE') : '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="sm:justify-between gap-2 pt-4">
               <Button variant="destructive" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
                 {cancelMutation.isPending ? 'Wird storniert...' : 'Vergabe stornieren'}
               </Button>
