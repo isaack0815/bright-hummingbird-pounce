@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SMTPClient } from "https://deno.land/x/emailjs@v3.2.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,24 +61,17 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const client = new SmtpClient();
-    const smtpSecure = Deno.env.get('SMTP_SECURE')?.toLowerCase();
-
-    if (smtpSecure === 'ssl' || smtpSecure === 'tls') {
-        await client.connectTLS({
-            hostname: Deno.env.get('SMTP_HOST')!,
-            port: Number(Deno.env.get('SMTP_PORT')!),
-            username: Deno.env.get('SMTP_USER')!,
-            password: Deno.env.get('SMTP_PASS')!,
-        });
-    } else {
-        await client.connect({
-            hostname: Deno.env.get('SMTP_HOST')!,
-            port: Number(Deno.env.get('SMTP_PORT')!),
-            username: Deno.env.get('SMTP_USER')!,
-            password: Deno.env.get('SMTP_PASS')!,
-        });
-    }
+    const client = new SMTPClient({
+      connection: {
+        hostname: Deno.env.get('SMTP_HOST')!,
+        port: Number(Deno.env.get('SMTP_PORT')!),
+        tls: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
+        auth: {
+          user: Deno.env.get('SMTP_USER')!,
+          pass: Deno.env.get('SMTP_PASS')!,
+        }
+      }
+    });
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
     const companyName = settingsMap.get('company_name') ?? 'Your Company'
@@ -88,7 +81,7 @@ serve(async (req) => {
     await client.send({
       from: fromEmail,
       to: order.external_email,
-      bcc: bccEmail ? [bccEmail] : undefined,
+      bcc: bccEmail || undefined,
       subject: `Transportauftrag ${order.order_number} von ${companyName}`,
       html: `
         <p>Sehr geehrte Damen und Herren,</p>
@@ -99,8 +92,8 @@ serve(async (req) => {
       `,
       attachments: [
         {
-          filename: pdfFile.file_name,
           content: new Uint8Array(pdfContent),
+          filename: pdfFile.file_name,
           contentType: 'application/pdf',
         },
       ],
