@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
+import nodemailer from "npm:nodemailer";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,9 +12,8 @@ serve(async (req) => {
   }
 
   const steps: string[] = [];
-
   try {
-    steps.push("Function started using emailjs@3.0.0.");
+    steps.push("Function started using nodemailer.");
 
     const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
@@ -23,30 +22,24 @@ serve(async (req) => {
     }
     steps.push("All required secrets are present.");
 
-    const client = new SMTPClient({
-      user: Deno.env.get('SMTP_USER')!,
-      password: Deno.env.get('SMTP_PASS')!,
+    const transporter = nodemailer.createTransport({
       host: Deno.env.get('SMTP_HOST')!,
       port: Number(Deno.env.get('SMTP_PORT')!),
-      ssl: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl',
+      secure: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
+      auth: {
+        user: Deno.env.get('SMTP_USER')!,
+        pass: Deno.env.get('SMTP_PASS')!,
+      },
     });
-    steps.push("Client configured.");
+    steps.push("Nodemailer transporter created.");
 
-    const fromEmail = Deno.env.get('SMTP_FROM_EMAIL')!;
-    steps.push(`Attempting to send a test email to: ${fromEmail}`);
-    
-    await client.send({
-      from: fromEmail,
-      to: fromEmail,
-      subject: "SMTP Test Email (Success)",
-      text: "This is a test email to confirm SMTP configuration.",
-    });
-
-    steps.push("Email sent successfully.");
+    steps.push("Verifying SMTP connection...");
+    await transporter.verify();
+    steps.push("SMTP connection verified successfully.");
 
     return new Response(JSON.stringify({
       success: true,
-      message: "SMTP connection successful. Test email sent.",
+      message: "SMTP connection successful! The server is ready to send emails.",
       steps
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -57,7 +50,6 @@ serve(async (req) => {
     console.error("SMTP Connection Test Error:", e);
     const errorMessage = e instanceof Error ? e.message : String(e);
     steps.push(`ERROR: ${errorMessage}`);
-
     return new Response(JSON.stringify({ success: false, error: errorMessage, steps }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

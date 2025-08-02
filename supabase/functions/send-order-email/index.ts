@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { SMTPClient } from "https://deno.land/x/emailjs@3.0.0/mod.ts";
+import nodemailer from "npm:nodemailer";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,12 +61,14 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const client = new SMTPClient({
-      user: Deno.env.get('SMTP_USER')!,
-      password: Deno.env.get('SMTP_PASS')!,
+    const transporter = nodemailer.createTransport({
       host: Deno.env.get('SMTP_HOST')!,
       port: Number(Deno.env.get('SMTP_PORT')!),
-      ssl: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl',
+      secure: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
+      auth: {
+        user: Deno.env.get('SMTP_USER')!,
+        pass: Deno.env.get('SMTP_PASS')!,
+      },
     });
 
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
@@ -74,8 +76,8 @@ serve(async (req) => {
     const signature = settingsMap.get('email_signature') ?? `<p>Mit freundlichen Grüßen,<br/>${companyName}</p>`
     const bccEmail = settingsMap.get('email_bcc')
 
-    await client.send({
-      from: fromEmail,
+    await transporter.sendMail({
+      from: `"${companyName}" <${fromEmail}>`,
       to: order.external_email,
       bcc: bccEmail || undefined,
       subject: `Transportauftrag ${order.order_number} von ${companyName}`,
@@ -86,11 +88,11 @@ serve(async (req) => {
         <br/>
         ${signature}
       `,
-      attachment: [
+      attachments: [
         {
-          data: new Uint8Array(pdfContent),
-          name: pdfFile.file_name,
-          type: 'application/pdf',
+          filename: pdfFile.file_name,
+          content: new Uint8Array(pdfContent),
+          contentType: 'application/pdf',
         },
       ],
     });
