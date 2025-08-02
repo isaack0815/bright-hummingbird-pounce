@@ -1,14 +1,10 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Button, Card, Form, Spinner, Placeholder } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect } from "react";
 
 const profileSchema = z.object({
@@ -88,69 +84,42 @@ const Profile = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6 text-foreground">Mein Profil</h1>
+      <h1 className="h2 mb-4">Mein Profil</h1>
       <Card>
-        <CardHeader>
-          <CardTitle>Profilinformationen</CardTitle>
-          <CardDescription>Bearbeiten Sie hier Ihre persönlichen Daten.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Card.Header>
+          <Card.Title>Profilinformationen</Card.Title>
+          <Card.Text className="text-muted">Bearbeiten Sie hier Ihre persönlichen Daten.</Card.Text>
+        </Card.Header>
+        <Card.Body>
           {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-32" />
-            </div>
+            <Placeholder as="div" animation="glow">
+              <Placeholder xs={12} className="mb-3" />
+              <Placeholder xs={12} className="mb-3" />
+              <Placeholder xs={12} className="mb-3" />
+              <Placeholder.Button xs={3} />
+            </Placeholder>
           ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} disabled />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Vorname</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Max" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nachname</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Mustermann" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={updateProfileMutation.isPending}>
-                  {updateProfileMutation.isPending ? "Wird gespeichert..." : "Änderungen speichern"}
-                </Button>
-              </form>
+            <Form onSubmit={form.handleSubmit(onSubmit)}>
+              <Form.Group className="mb-3" controlId="profileEmail">
+                <Form.Label>Email</Form.Label>
+                <Form.Control type="email" {...form.register("email")} disabled />
+              </Form.Group>
+              <Form.Group className="mb-3" controlId="profileFirstName">
+                <Form.Label>Vorname</Form.Label>
+                <Form.Control type="text" placeholder="Max" {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} />
+                <Form.Control.Feedback type="invalid">{form.formState.errors.firstName?.message}</Form.Control.Feedback>
+              </Form.Group>
+              <Form.Group className="mb-3" controlId="profileLastName">
+                <Form.Label>Nachname</Form.Label>
+                <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
+                <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
+              </Form.Group>
+              <Button type="submit" disabled={updateProfileMutation.isPending}>
+                {updateProfileMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}
+              </Button>
             </Form>
           )}
-        </CardContent>
+        </Card.Body>
       </Card>
     </div>
   );

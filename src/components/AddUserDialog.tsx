@@ -1,24 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useState } from "react";
@@ -31,12 +14,12 @@ const formSchema = z.object({
 });
 
 type AddUserDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
   onUserAdded: () => void;
 };
 
-export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialogProps) {
+export function AddUserDialog({ show, onHide, onUserAdded }: AddUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -60,13 +43,11 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
         },
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       showSuccess("Benutzer erfolgreich erstellt!");
       onUserAdded();
-      onOpenChange(false);
+      onHide();
       form.reset();
     } catch (error: any) {
       console.error("Fehler beim Erstellen des Benutzers:", error);
@@ -77,76 +58,43 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Neuen Nutzer hinzufügen</DialogTitle>
-          <DialogDescription>
+    <Modal show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Neuen Nutzer hinzufügen</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit(onSubmit)}>
+        <Modal.Body>
+          <p className="text-muted mb-4">
             Füllen Sie die Details aus, um einen neuen Benutzer zu erstellen.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vorname</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Max" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nachname</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Mustermann" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="m@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Passwort</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Wird erstellt..." : "Nutzer erstellen"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          </p>
+          <Form.Group className="mb-3" controlId="firstName">
+            <Form.Label>Vorname</Form.Label>
+            <Form.Control type="text" placeholder="Max" {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.firstName?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="lastName">
+            <Form.Label>Nachname</Form.Label>
+            <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="email">
+            <Form.Label>Email</Form.Label>
+            <Form.Control type="email" placeholder="m@example.com" {...form.register("email")} isInvalid={!!form.formState.errors.email} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.email?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="password">
+            <Form.Label>Passwort</Form.Label>
+            <Form.Control type="password" {...form.register("password")} isInvalid={!!form.formState.errors.password} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.password?.message}</Form.Control.Feedback>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : "Nutzer erstellen"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }

@@ -1,25 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useState, useEffect } from "react";
@@ -46,8 +28,8 @@ const formSchema = z.object({
 
 type EditUserDialogProps = {
   user: User | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  show: boolean;
+  onHide: () => void;
 };
 
 const fetchRoles = async (): Promise<Role[]> => {
@@ -56,14 +38,14 @@ const fetchRoles = async (): Promise<Role[]> => {
   return data.roles;
 };
 
-export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
+export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   
   const { data: allRoles, isLoading: isLoadingRoles } = useQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: fetchRoles,
-    enabled: open,
+    enabled: show,
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -83,7 +65,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
         roleIds: user.roles.map(role => role.id),
       });
     }
-  }, [user, form]);
+  }, [user, form, show]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) return;
@@ -102,7 +84,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
 
       showSuccess("Benutzer erfolgreich aktualisiert!");
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      onOpenChange(false);
+      onHide();
     } catch (error: any) {
       console.error("Fehler beim Aktualisieren des Benutzers:", error);
       showError(error.data?.error || "Ein Fehler ist aufgetreten.");
@@ -114,99 +96,54 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
   if (!user) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Nutzer bearbeiten</DialogTitle>
-          <DialogDescription>
+    <Modal show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Nutzer bearbeiten</Modal.Title>
+      </Modal.Header>
+      <Form onSubmit={form.handleSubmit(onSubmit)}>
+        <Modal.Body>
+          <p className="text-muted mb-4">
             Aktualisieren Sie die Benutzerdaten und weisen Sie Gruppen zu.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vorname</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Max" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nachname</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Mustermann" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid gap-2">
-              <FormLabel>Gruppen</FormLabel>
-              {isLoadingRoles ? (
-                <p>Gruppen werden geladen...</p>
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="roleIds"
-                  render={() => (
-                    <FormItem>
-                      {allRoles?.map((role) => (
-                        <FormField
-                          key={role.id}
-                          control={form.control}
-                          name="roleIds"
-                          render={({ field }) => {
-                            return (
-                              <FormItem
-                                key={role.id}
-                                className="flex flex-row items-start space-x-3 space-y-0"
-                              >
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(role.id)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), role.id])
-                                        : field.onChange(
-                                            field.value?.filter(
-                                              (value) => value !== role.id
-                                            )
-                                          );
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                  {role.name}
-                                </FormLabel>
-                              </FormItem>
-                            );
-                          }}
-                        />
-                      ))}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={isSubmitting || isLoadingRoles}>
-                {isSubmitting ? "Wird gespeichert..." : "Änderungen speichern"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          </p>
+          <Form.Group className="mb-3" controlId="editFirstName">
+            <Form.Label>Vorname</Form.Label>
+            <Form.Control type="text" placeholder="Max" {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.firstName?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="editLastName">
+            <Form.Label>Nachname</Form.Label>
+            <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
+          </Form.Group>
+          
+          <Form.Group>
+            <Form.Label>Gruppen</Form.Label>
+            {isLoadingRoles ? (
+              <p>Gruppen werden geladen...</p>
+            ) : (
+              <div className="border rounded p-3" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                {allRoles?.map((role) => (
+                  <Form.Check 
+                    type="checkbox"
+                    id={`role-${role.id}`}
+                    key={role.id}
+                    label={role.name}
+                    {...form.register("roleIds")}
+                    value={role.id}
+                    defaultChecked={user.roles.some(userRole => userRole.id === role.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
+          <Button type="submit" disabled={isSubmitting || isLoadingRoles}>
+            {isSubmitting ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
   );
 }

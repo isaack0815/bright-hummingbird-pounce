@@ -1,10 +1,10 @@
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "react-hot-toast";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ErrorProvider } from './contexts/ErrorContext';
 import ErrorBoundary from './components/ErrorBoundary';
-import { supabase } from './lib/supabase'; // Import the existing client
+import { supabase } from './lib/supabase';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 
 import Layout from './components/Layout';
@@ -42,7 +42,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
         
-        <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />}>
+        <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />} >
           <Route index element={<Dashboard />} />
           <Route path="profile" element={<Profile />} />
           
@@ -94,7 +94,7 @@ const App = () => {
         <ErrorBoundary>
           <SessionContextProvider supabaseClient={supabase}>
             <AuthProvider>
-              <Sonner />
+              <Toaster position="bottom-right" />
               <AppRoutes />
             </AuthProvider>
           </SessionContextProvider>

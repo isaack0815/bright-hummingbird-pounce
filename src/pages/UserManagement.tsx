@@ -1,27 +1,10 @@
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, Button, Table, Dropdown, Badge, Placeholder } from 'react-bootstrap';
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import { showSuccess, showError } from '@/utils/toast';
 
 type User = {
@@ -86,94 +69,90 @@ const UserManagement = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Nutzerverwaltung</h1>
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <h1 className="h2">Nutzerverwaltung</h1>
         <Button onClick={() => setIsAddUserDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
+          <PlusCircle className="me-2" size={16} />
           Nutzer hinzufügen
         </Button>
       </div>
       <Card>
-        <CardHeader>
-          <CardTitle>Benutzerliste</CardTitle>
-          <CardDescription>Hier können Sie alle Benutzer sehen und verwalten.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <Card.Header>
+          <Card.Title>Benutzerliste</Card.Title>
+          <Card.Text className="text-muted">Hier können Sie alle Benutzer sehen und verwalten.</Card.Text>
+        </Card.Header>
+        <Card.Body>
           {isLoading ? (
-            <p className="text-muted-foreground">Benutzer werden geladen...</p>
+            <Placeholder as="div" animation="glow">
+              <Placeholder xs={12} style={{ height: '150px' }} />
+            </Placeholder>
           ) : users && users.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Gruppen</TableHead>
-                  <TableHead>Erstellt am</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Aktionen</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <Table responsive hover>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Gruppen</th>
+                  <th>Erstellt am</th>
+                  <th className="text-end">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
                 {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
+                  <tr key={user.id}>
+                    <td className="fw-medium">
                       {user.first_name || user.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'N/A'}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
+                    </td>
+                    <td>{user.email}</td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
                         {user.roles.length > 0 ? (
-                          user.roles.map(role => <Badge key={role.id} variant="secondary">{role.name}</Badge>)
+                          user.roles.map(role => <Badge key={role.id} bg="secondary">{role.name}</Badge>)
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Menü umschalten</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Aktionen</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditClick(user)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Bearbeiten
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
+                    </td>
+                    <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                    <td className="text-end">
+                      <Dropdown>
+                        <Dropdown.Toggle variant="ghost" size="sm" id={`dropdown-user-${user.id}`}>
+                          <MoreHorizontal size={16} />
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu>
+                          <Dropdown.Item onClick={() => handleEditClick(user)}>
+                            <Edit className="me-2" size={16} /> Bearbeiten
+                          </Dropdown.Item>
+                          <Dropdown.Item
+                            className="text-danger"
                             onClick={() => handleDeleteClick(user.id)}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Löschen
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                            <Trash2 className="me-2" size={16} /> Löschen
+                          </Dropdown.Item>
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
+              </tbody>
             </Table>
           ) : (
-            <p className="text-muted-foreground">Keine Benutzer gefunden.</p>
+            <p className="text-muted">Keine Benutzer gefunden.</p>
           )}
-        </CardContent>
+        </Card.Body>
       </Card>
       <AddUserDialog
-        open={isAddUserDialogOpen}
-        onOpenChange={setIsAddUserDialogOpen}
+        show={isAddUserDialogOpen}
+        onHide={() => setIsAddUserDialogOpen(false)}
         onUserAdded={handleUserAdded}
       />
-      <EditUserDialog
-        user={selectedUser}
-        open={isEditUserDialogOpen}
-        onOpenChange={setIsEditUserDialogOpen}
-      />
+      {selectedUser && (
+        <EditUserDialog
+          user={selectedUser}
+          show={isEditUserDialogOpen}
+          onHide={() => setIsEditUserDialogOpen(false)}
+        />
+      )}
     </div>
   );
 };
