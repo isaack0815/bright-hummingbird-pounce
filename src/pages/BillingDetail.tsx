@@ -86,6 +86,27 @@ const BillingDetail = () => {
     }
   }, [order, form]);
 
+  const createLexofficeInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      if (!order || !order.customers) {
+        throw new Error("Auftrags- oder Kundendaten fehlen.");
+      }
+      const { data, error } = await supabase.functions.invoke('create-lexoffice-invoice', {
+        body: { orderIds: [order.id], customerId: order.customers.id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      showSuccess(data.message || "Rechnungsentwurf erfolgreich in Lexoffice erstellt!");
+      queryClient.invalidateQueries({ queryKey: ['billingDetail', id] });
+      queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
+    },
+    onError: (err: any) => {
+      showError(err.data?.error || "Fehler beim Erstellen des Rechnungsentwurfs.");
+    }
+  });
+
   const updateBillingMutation = useMutation({
     mutationFn: async (values: z.infer<typeof billingSchema>) => {
       const { error } = await supabase.functions.invoke('update-billing-with-line-items', {
@@ -102,8 +123,8 @@ const BillingDetail = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      showSuccess("Abrechnungsdetails gespeichert!");
-      queryClient.invalidateQueries({ queryKey: ['billingDetail', id] });
+      showSuccess("Abrechnungsdetails zwischengespeichert!");
+      createLexofficeInvoiceMutation.mutate();
     },
     onError: (err: any) => {
       showError(err.message || "Fehler beim Speichern der Details.");
@@ -158,8 +179,9 @@ const BillingDetail = () => {
           <NavLink to="/fernverkehr" className="btn btn-outline-secondary btn-sm p-2 lh-1"><ArrowLeft size={16} /></NavLink>
           <h1 className="h2 mb-0">Abrechnung für Auftrag {order.order_number}</h1>
         </div>
-        <Button type="submit" disabled={updateBillingMutation.isPending}>
-          {updateBillingMutation.isPending ? <Spinner size="sm" /> : <Save size={16} />} Änderungen speichern
+        <Button type="submit" disabled={updateBillingMutation.isPending || createLexofficeInvoiceMutation.isPending || !!order.lex_invoice_id}>
+          {updateBillingMutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
+          {createLexofficeInvoiceMutation.isPending ? 'Erstelle Entwurf...' : (order.lex_invoice_id ? 'Bereits abgerechnet' : 'Speichern & Lexoffice-Entwurf erstellen')}
         </Button>
       </div>
 

@@ -25,7 +25,7 @@ serve(async (req) => {
       throw new Error("Order IDs and Customer ID are required.");
     }
 
-    // 1. Fetch customer details, especially the lex_id
+    // 1. Fetch customer details
     const { data: customer, error: customerError } = await supabaseAdmin
       .from('customers')
       .select('lex_id, company_name, street, house_number, postal_code, city, country')
@@ -35,29 +35,50 @@ serve(async (req) => {
       throw new Error("Customer not found or missing Lexoffice ID.");
     }
 
-    // 2. Fetch selected orders
+    // 2. Fetch selected orders and their line items
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from('freight_orders')
-      .select('id, order_number, price, origin_address, destination_address')
+      .select('*, billing_line_items(*)')
       .in('id', orderIds);
     if (ordersError) throw ordersError;
+    if (!orders || orders.length === 0) throw new Error("Selected orders not found.");
 
     // 3. Construct Lexoffice invoice payload
-    const lineItems = orders.map(order => ({
-      type: "service",
-      name: `Transportauftrag ${order.order_number}`,
-      description: `Strecke: ${order.origin_address} -> ${order.destination_address}`,
-      quantity: 1,
-      unitName: "Stück",
-      unitPrice: {
-        currency: "EUR",
-        netAmount: order.price || 0,
-        taxRatePercentage: 19,
-      },
-    }));
+    const allLineItems = orders.flatMap(order => order.billing_line_items || []);
+    if (allLineItems.length === 0) {
+      throw new Error("Die ausgewählten Aufträge haben keine abrechenbaren Positionen. Bitte fügen Sie zuerst Positionen in den Abrechnungsdetails hinzu.");
+    }
+
+    const lexLineItems = allLineItems.map(item => {
+      let discountPercentage = 0;
+      if (item.discount_type === 'percentage') {
+        discountPercentage = item.discount;
+      } else if (item.discount_type === 'fixed' && item.unit_price > 0 && item.quantity > 0) {
+        discountPercentage = (item.discount / (item.unit_price * item.quantity)) * 100;
+      }
+
+      return {
+        type: "service",
+        name: item.description,
+        quantity: item.quantity,
+        unitName: "Stück",
+        unitPrice: {
+          currency: "EUR",
+          netAmount: item.unit_price,
+          taxRatePercentage: item.vat_rate,
+        },
+        discountPercentage: discountPercentage > 0 ? discountPercentage : undefined,
+      };
+    });
+    
+    const firstOrder = orders[0];
+    const isIntraCommunity = firstOrder.is_intra_community;
+    const introductionText = isIntraCommunity 
+      ? "Innergemeinschaftliche Lieferung. Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren)."
+      : "";
 
     const lexofficePayload = {
-      archived: false, // This creates a draft
+      archived: false, // Creates a draft
       voucherDate: new Date().toISOString(),
       address: {
         contactId: customer.lex_id,
@@ -67,11 +88,12 @@ serve(async (req) => {
         city: customer.city,
         countryCode: customer.country,
       },
-      lineItems,
+      lineItems: lexLineItems,
       taxConditions: {
         taxType: "net",
       },
       title: "Sammelrechnung",
+      introduction: introductionText,
     };
 
     // 4. Send to Lexoffice
