@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, NavLink } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Button, ListGroup, Placeholder, Alert } from 'react-bootstrap';
-import { ArrowLeft, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Card, Row, Col, Button, ListGroup, Placeholder, Alert, Form, InputGroup, Spinner } from 'react-bootstrap';
+import { ArrowLeft, CheckCircle2, XCircle, Loader2, Save } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { FreightOrder } from '@/types/freight';
 import type { Customer } from '@/pages/CustomerManagement';
+import { useState, useEffect } from 'react';
 
-// The freight order type needs to be adjusted to include the full customer object
 type BillingOrder = Omit<FreightOrder, 'customers'> & {
   customers: Customer | null;
 };
@@ -24,10 +24,46 @@ const BillingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
 
+  const [price, setPrice] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [vatRate, setVatRate] = useState(19);
+  const [isIntraCommunity, setIsIntraCommunity] = useState(false);
+
   const { data: order, isLoading, error } = useQuery({
     queryKey: ['billingDetail', id],
     queryFn: () => fetchBillingDetails(id!),
     enabled: !!id,
+  });
+
+  useEffect(() => {
+    if (order) {
+      setPrice(order.price || 0);
+      setDiscount(order.discount_amount || 0);
+      setVatRate(order.vat_rate ?? 19);
+      setIsIntraCommunity(order.is_intra_community || false);
+    }
+  }, [order]);
+
+  const updateBillingMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke('update-billing-details', {
+        body: {
+          orderId: order!.id,
+          price,
+          discount_amount: discount,
+          vat_rate: vatRate,
+          is_intra_community: isIntraCommunity,
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Abrechnungsdetails gespeichert!");
+      queryClient.invalidateQueries({ queryKey: ['billingDetail', id] });
+    },
+    onError: (err: any) => {
+      showError(err.message || "Fehler beim Speichern der Details.");
+    }
   });
 
   const toggleBilledMutation = useMutation({
@@ -45,11 +81,20 @@ const BillingDetail = () => {
     }
   });
 
+  const handleIntraCommunityToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setIsIntraCommunity(checked);
+    if (checked) {
+      setVatRate(0);
+    } else {
+      setVatRate(19); // Reset to default
+    }
+  };
+
   const customer = order?.customers;
-  const netPrice = order?.price || 0;
-  const vatRate = 0.19; // 19% VAT
-  const vatAmount = netPrice * vatRate;
-  const grossPrice = netPrice + vatAmount;
+  const netAfterDiscount = price - discount;
+  const vatAmount = netAfterDiscount * (vatRate / 100);
+  const grossPrice = netAfterDiscount + vatAmount;
 
   if (isLoading) {
     return (
@@ -104,17 +149,35 @@ const BillingDetail = () => {
         </Col>
         <Col lg={6}>
           <Card>
-            <Card.Header><Card.Title>Preisübersicht</Card.Title></Card.Header>
+            <Card.Header><Card.Title>Preisübersicht & Bearbeitung</Card.Title></Card.Header>
             <Card.Body>
-              <ListGroup variant="flush">
-                <ListGroup.Item className="d-flex justify-content-between"><span>Frachtpreis (Netto)</span> <strong>{netPrice.toFixed(2)} €</strong></ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between"><span>MwSt. (19%)</span> <span>{vatAmount.toFixed(2)} €</span></ListGroup.Item>
+              <Form.Group className="mb-3">
+                <Form.Label>Frachtpreis (Netto)</Form.Label>
+                <InputGroup><Form.Control type="number" step="0.01" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} /><InputGroup.Text>€</InputGroup.Text></InputGroup>
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Rabatt</Form.Label>
+                <InputGroup><Form.Control type="number" step="0.01" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)} /><InputGroup.Text>€</InputGroup.Text></InputGroup>
+              </Form.Group>
+              <hr />
+              <ListGroup variant="flush" className="mb-3">
+                <ListGroup.Item className="d-flex justify-content-between"><span>Summe (Netto)</span> <strong>{netAfterDiscount.toFixed(2)} €</strong></ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between">
+                  <Form.Check type="switch" id="intra-community-switch" label="Innergemeinschaftliche Leistung" checked={isIntraCommunity} onChange={handleIntraCommunityToggle} />
+                  <Form.Select size="sm" style={{width: '100px'}} value={vatRate} onChange={e => setVatRate(parseInt(e.target.value))} disabled={isIntraCommunity}>
+                    <option value="19">19%</option><option value="7">7%</option><option value="0">0%</option>
+                  </Form.Select>
+                </ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between"><span>MwSt. ({vatRate}%)</span> <span>{vatAmount.toFixed(2)} €</span></ListGroup.Item>
                 <ListGroup.Item className="d-flex justify-content-between fw-bold h5 mb-0"><span>Gesamt (Brutto)</span> <span>{grossPrice.toFixed(2)} €</span></ListGroup.Item>
               </ListGroup>
+              <Button variant="primary" className="w-100" onClick={() => updateBillingMutation.mutate()} disabled={updateBillingMutation.isPending}>
+                {updateBillingMutation.isPending ? <Spinner size="sm" /> : <Save size={16} />} Änderungen speichern
+              </Button>
             </Card.Body>
           </Card>
           <Card className="mt-4">
-            <Card.Header><Card.Title>Aktionen</Card.Title></Card.Header>
+            <Card.Header><Card.Title>Abrechnungsstatus</Card.Title></Card.Header>
             <Card.Body>
               <div className="d-flex align-items-center justify-content-between">
                 <span>Status: {order.is_billed ? 'Abgerechnet' : 'Offen'}</span>

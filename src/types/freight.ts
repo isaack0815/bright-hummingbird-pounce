@@ -45,6 +45,7 @@ export type FreightOrder = {
   
   is_external: boolean | null;
   is_billed: boolean;
+  lex_invoice_id: string | null;
   external_company_address: string | null;
   external_email: string | null;
   external_driver_name: string | null;
@@ -52,6 +53,10 @@ export type FreightOrder = {
   external_license_plate: string | null;
   external_transporter_dimensions: string | null;
   payment_term_days: number | null;
+
+  discount_amount: number | null;
+  vat_rate: number | null;
+  is_intra_community: boolean | null;
 
   customers: Pick<Customer, 'id' | 'company_name'> | null;
   freight_order_stops: Stop[];
