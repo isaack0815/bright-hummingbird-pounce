@@ -23,6 +23,24 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Order ID is required' }), { status: 400 })
     }
 
+    if (orderData.status === 'Storniert') {
+        // Fetch the current order state from DB
+        const { data: currentOrder, error: fetchError } = await supabase
+            .from('freight_orders')
+            .select('is_billed, lex_invoice_id')
+            .eq('id', orderId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        if (currentOrder.is_billed || currentOrder.lex_invoice_id) {
+            return new Response(JSON.stringify({ error: 'Dieser Auftrag wurde bereits abgerechnet und kann nicht storniert werden. Entfernen Sie zuerst die Rechnungszuordnung.' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403, // Forbidden
+            });
+        }
+    }
+
     // Update main order
     const { data: updatedOrder, error: orderError } = await supabase
       .from('freight_orders')

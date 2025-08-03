@@ -23,6 +23,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Order ID is required' }), { status: 400 })
     }
 
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('freight_orders')
+      .select('is_billed, lex_invoice_id')
+      .eq('id', orderId)
+      .single()
+
+    if (fetchError) throw fetchError;
+
+    if (order.is_billed || order.lex_invoice_id) {
+      return new Response(JSON.stringify({ error: 'Dieser Auftrag wurde bereits abgerechnet und die externe Vergabe kann nicht storniert werden. Entfernen Sie zuerst die Rechnungszuordnung.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      })
+    }
+
     // 1. Reset external assignment fields on the order
     const { data, error: updateError } = await supabaseAdmin
       .from('freight_orders')

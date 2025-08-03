@@ -26,6 +26,23 @@ serve(async (req) => {
       })
     }
 
+    // 1. Fetch the order to check its status
+    const { data: order, error: fetchError } = await supabase
+      .from('freight_orders')
+      .select('is_billed, lex_invoice_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) throw fetchError;
+
+    // 2. Check if the order is billed
+    if (order.is_billed || order.lex_invoice_id) {
+      return new Response(JSON.stringify({ error: 'Dieser Auftrag wurde bereits abgerechnet und kann nicht gelöscht werden. Entfernen Sie zuerst die Rechnungszuordnung.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403, // Forbidden
+      })
+    }
+
     const { error } = await supabase.from('freight_orders').delete().eq('id', id)
 
     if (error) throw error
