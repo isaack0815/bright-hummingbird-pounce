@@ -1,0 +1,56 @@
+{
+  "archived": false,
+  "voucherDate": "2024-08-03T14:30:00.000Z", // Aktuelles Datum und Uhrzeit
+  "address": {
+    // Daten aus der "customers" Tabelle, nach der Synchronisierung
+    "contactId": "a1b2c3d4-e5f6-7890-1234-567890abcdef", // Die korrekte UUID des Kunden
+    "name": "Musterfirma GmbH",
+    "street": "Musterstraße 42",
+    "zip": "79112",
+    "city": "Freiburg",
+    "countryCode": "DE"
+  },
+  "lineItems": [
+    // Dies sind die Positionen aus den "Abrechnungsdetails" der ausgewählten Aufträge
+    {
+      "type": "service",
+      "name": "Transportauftrag FRA-2024-01",
+      "quantity": 1,
+      "unitName": "Stück",
+      "unitPrice": {
+        "currency": "EUR",
+        "netAmount": 450.00,
+        "taxRatePercentage": 19
+      }
+      // "discountPercentage" wird nur gesendet, wenn ein Rabatt > 0 ist
+    },
+    {
+      "type": "service",
+      "name": "Zusatzleistung: Einlagerung",
+      "quantity": 2,
+      "unitName": "Stück",
+      "unitPrice": {
+        "currency": "EUR",
+        "netAmount": 75.50,
+        "taxRatePercentage": 19
+      },
+      "discountPercentage": 5 // Beispiel für einen 5% Rabatt auf diese Position
+    },
+    {
+      "type": "service",
+      "name": "Transportauftrag FRA-2024-02",
+      "quantity": 1,
+      "unitName": "Stück",
+      "unitPrice": {
+        "currency": "EUR",
+        "netAmount": 620.00,
+        "taxRatePercentage": 19
+      }
+    }
+  ],
+  "taxConditions": {
+    "taxType": "net" // Wir übergeben immer Nettopreise
+  },
+  "title": "Sammelrechnung",
+  "introduction": "" // Wird nur bei innergemeinschaftlicher Lieferung gefüllt
+}
