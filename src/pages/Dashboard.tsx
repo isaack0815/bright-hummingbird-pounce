@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
 import { StatsWidget } from '@/components/dashboard/StatsWidget';
+import { FreightOrderWidget } from '@/components/dashboard/freight/FreightOrderWidget';
 import type { DashboardLayout } from '@/types/dashboard';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -16,6 +17,7 @@ const fetchLayout = async (): Promise<DashboardLayout> => {
 const componentMap: { [key: string]: React.ComponentType } = {
   todos: TodoWidget,
   stats: StatsWidget,
+  freightOrders: FreightOrderWidget,
 };
 
 const Dashboard = () => {
