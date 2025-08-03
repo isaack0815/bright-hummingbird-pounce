@@ -10,7 +10,6 @@ import type { Customer } from "@/pages/CustomerManagement";
 
 const formSchema = z.object({
   company_name: z.string().min(1, "Firmenname ist erforderlich."),
-  lex_id: z.string().optional(),
   contact_first_name: z.string().optional(),
   contact_last_name: z.string().optional(),
   email: z.string().email({ message: "Ungültige E-Mail." }).optional().or(z.literal('')),
@@ -35,7 +34,6 @@ export function AddCustomerDialog({ show, onHide, onCustomerCreated }: AddCustom
     resolver: zodResolver(formSchema),
     defaultValues: {
       company_name: "",
-      lex_id: "",
       contact_first_name: "",
       contact_last_name: "",
       email: "",
@@ -128,10 +126,6 @@ export function AddCustomerDialog({ show, onHide, onCustomerCreated }: AddCustom
             <Form.Group as={Col}>
               <Form.Label>Steuernummer</Form.Label>
               <Form.Control {...form.register("tax_number")} />
-            </Form.Group>
-            <Form.Group as={Col}>
-              <Form.Label>Lex-ID</Form.Label>
-              <Form.Control {...form.register("lex_id")} />
             </Form.Group>
           </Row>
         </Modal.Body>

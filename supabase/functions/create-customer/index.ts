@@ -22,50 +22,41 @@ serve(async (req) => {
 
     const customerData = await req.json()
 
-    // 1. Insert customer into local DB first
-    const { data: newCustomer, error: insertError } = await supabase
-      .from('customers')
-      .insert(customerData)
-      .select()
-      .single()
-
-    if (insertError) throw insertError
-
-    // 2. Prepare payload for Lexoffice
+    // 1. Prepare payload for Lexoffice
     const lexofficePayload: any = {
       version: 0,
       roles: {
         customer: {}
       },
       company: {
-        name: newCustomer.company_name,
-        vatRegistrationId: newCustomer.tax_number,
+        name: customerData.company_name,
+        vatRegistrationId: customerData.tax_number,
         addresses: {
           billing: [{
-            street: `${newCustomer.street || ''} ${newCustomer.house_number || ''}`.trim(),
-            zip: newCustomer.postal_code,
-            city: newCustomer.city,
-            countryCode: newCustomer.country,
+            street: `${customerData.street || ''} ${customerData.house_number || ''}`.trim(),
+            zip: customerData.postal_code,
+            city: customerData.city,
+            countryCode: customerData.country,
           }]
         }
       }
     };
 
-    if (newCustomer.contact_first_name || newCustomer.contact_last_name) {
+    if (customerData.contact_first_name || customerData.contact_last_name) {
       lexofficePayload.company.contactPersons = [{
-        firstName: newCustomer.contact_first_name,
-        lastName: newCustomer.contact_last_name,
-        emailAddress: newCustomer.email,
+        firstName: customerData.contact_first_name,
+        lastName: customerData.contact_last_name,
+        emailAddress: customerData.email,
       }];
     }
     
-    if (newCustomer.email && !lexofficePayload.company.contactPersons) {
+    if (customerData.email && !lexofficePayload.company.contactPersons) {
         lexofficePayload.company.emailAddresses = {
-            business: [newCustomer.email]
+            business: [customerData.email]
         }
     }
 
-    // 3. Send to Lexoffice
+    // 2. Send to Lexoffice FIRST
     const lexResponse = await fetch('https://api.lexoffice.io/v1/contacts', {
       method: 'POST',
       headers: {
@@ -78,26 +69,32 @@ serve(async (req) => {
 
     if (!lexResponse.ok) {
       const errorBody = await lexResponse.text();
-      // The customer is created locally, but Lexoffice sync failed.
-      // We will throw an error to notify the user. The local customer will remain.
+      // If Lexoffice fails, we don't create the customer locally.
       throw new Error(`Lexoffice API Error: ${lexResponse.status} - ${errorBody}`);
     }
 
     const lexData = await lexResponse.json();
     const lexId = lexData.id;
 
-    // 4. Update local customer with lex_id
-    const { data: updatedCustomer, error: updateError } = await supabase
+    // 3. If Lexoffice succeeds, insert the customer into local DB with the new lex_id
+    const finalCustomerData = {
+        ...customerData,
+        lex_id: lexId
+    };
+
+    const { data: newCustomer, error: insertError } = await supabase
       .from('customers')
-      .update({ lex_id: lexId })
-      .eq('id', newCustomer.id)
+      .insert(finalCustomerData)
       .select()
-      .single();
+      .single()
 
-    if (updateError) throw updateError;
+    if (insertError) {
+        console.error(`CRITICAL: Customer created in Lexoffice (lex_id: ${lexId}) but failed to save to local DB. Error: ${insertError.message}`);
+        throw new Error(`Customer created in Lexoffice, but failed to save locally. Please check logs. DB Error: ${insertError.message}`);
+    }
 
-    // 5. Return the final, updated customer data
-    return new Response(JSON.stringify({ customer: updatedCustomer }), {
+    // 4. Return the final, created customer data
+    return new Response(JSON.stringify({ customer: newCustomer }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
     })
