@@ -25,10 +25,10 @@ serve(async (req) => {
       throw new Error("Order IDs and Customer ID are required.");
     }
 
-    // 1. Fetch customer details
+    // 1. Fetch customer details to get the lex_id
     const { data: customer, error: customerError } = await supabaseAdmin
       .from('customers')
-      .select('lex_id, company_name, street, house_number, postal_code, city, country')
+      .select('lex_id')
       .eq('id', customerId)
       .single();
     if (customerError || !customer || !customer.lex_id) {
@@ -82,11 +82,6 @@ serve(async (req) => {
       voucherDate: new Date().toISOString(),
       address: {
         contactId: customer.lex_id,
-        name: customer.company_name,
-        street: `${customer.street || ''} ${customer.house_number || ''}`.trim(),
-        zip: customer.postal_code,
-        city: customer.city,
-        countryCode: customer.country,
       },
       lineItems: lexLineItems,
       taxConditions: {
