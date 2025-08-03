@@ -44,6 +44,7 @@ export type FreightOrder = {
   created_by: string | null;
   
   is_external: boolean | null;
+  is_billed: boolean;
   external_company_address: string | null;
   external_email: string | null;
   external_driver_name: string | null;

@@ -21,7 +21,8 @@ const FreightOrderManagement = () => {
   const queryClient = useQueryClient();
   const { addError } = useError();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canBill = hasPermission('Abrechnung Fernverkehr');
 
   const { data: orders, isLoading, error } = useQuery<FreightOrder[]>({
     queryKey: ['freightOrders'],
@@ -69,6 +70,8 @@ const FreightOrderManagement = () => {
     showError(`Fehler beim Laden der Aufträge: ${error.message}`);
   }
 
+  const tableCols = canBill ? 10 : 9;
+
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
@@ -86,13 +89,13 @@ const FreightOrderManagement = () => {
         <Card.Body>
           <Tabs defaultActiveKey="my-orders" id="order-tabs" className="mb-3 nav-fill">
             <Tab eventKey="my-orders" title="Meine Aufträge">
-              {isLoading ? <TablePlaceholder cols={7} /> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} />}
+              {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} showBillingColumn={canBill} />}
             </Tab>
             <Tab eventKey="other-orders" title="Aufträge anderer">
-              {isLoading ? <TablePlaceholder cols={7} /> : <OrderTable orders={otherOrders} onDelete={handleDeleteClick} />}
+              {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={otherOrders} onDelete={handleDeleteClick} showBillingColumn={canBill} />}
             </Tab>
             <Tab eventKey="completed-orders" title="Abgeschlossen">
-              {isLoading ? <TablePlaceholder cols={7} /> : <OrderTable orders={completedOrders} onDelete={handleDeleteClick} />}
+              {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={completedOrders} onDelete={handleDeleteClick} showBillingColumn={canBill} />}
             </Tab>
           </Tabs>
         </Card.Body>
