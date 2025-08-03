@@ -64,7 +64,7 @@ const Fernverkehr = () => {
           <Card.Text className="text-muted">Hier sehen Sie alle im System erfassten Frachtaufträge.</Card.Text>
         </Card.Header>
         <Card.Body>
-          {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={orders || []} onDelete={handleDeleteClick} showBillingColumn={canBill} />}
+          {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={orders || []} onDelete={handleDeleteClick} showBillingColumn={canBill} isBillingContext={true} />}
         </Card.Body>
       </Card>
     </div>

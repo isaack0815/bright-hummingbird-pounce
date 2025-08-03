@@ -11,9 +11,10 @@ type OrderTableProps = {
   orders: FreightOrder[];
   onDelete: (id: number) => void;
   showBillingColumn: boolean;
+  isBillingContext?: boolean;
 };
 
-export const OrderTable = ({ orders, onDelete, showBillingColumn }: OrderTableProps) => {
+export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingContext = false }: OrderTableProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -53,6 +54,11 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn }: OrderTablePr
     }
 
     return '';
+  };
+
+  const handleEditClick = (orderId: number) => {
+    const path = isBillingContext ? `/billing/${orderId}` : `/freight-orders/edit/${orderId}`;
+    navigate(path);
   };
 
   if (orders.length === 0) {
@@ -107,7 +113,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn }: OrderTablePr
             <td>{order.creator ? `${order.creator.first_name || ''} ${order.creator.last_name || ''}`.trim() : 'N/A'}</td>
             <td className="text-end">
               <div className="d-flex justify-content-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
+                <Button variant="ghost" size="sm" onClick={() => handleEditClick(order.id)}>
                   <Edit size={16} />
                 </Button>
                 <Button variant="ghost" size="sm" className="text-danger" onClick={() => onDelete(order.id)}>
