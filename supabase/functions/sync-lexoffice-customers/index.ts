@@ -12,44 +12,35 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Get API Key from secrets
     const lexApiKey = Deno.env.get('LEX_API_KEY');
     if (!lexApiKey) {
       throw new Error('LEX_API_KEY secret is not set in Supabase project.');
     }
 
-    // 2. Create Supabase admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 3. Fetch all existing customers' lex_id from our DB
     const { data: existingCustomers, error: dbError } = await supabaseAdmin
       .from('customers')
-      .select('lex_id')
-      .not('lex_id', 'is', null);
+      .select('id, lex_id, email');
     if (dbError) throw dbError;
-    const existingLexIds = new Set(existingCustomers.map(c => c.lex_id));
 
-    // 4. Fetch all contacts from Lexoffice (handles pagination)
+    const existingLexIds = new Set(existingCustomers.map(c => c.lex_id).filter(Boolean));
+    const emailToDbIdMap = new Map(existingCustomers.filter(c => c.email).map(c => [c.email, c.id]));
+
     const allContacts = [];
     let page = 0;
     let hasMore = true;
-
     while (hasMore) {
       const response = await fetch(`https://api.lexoffice.io/v1/contacts?customer=true&page=${page}&size=100`, {
-        headers: {
-          'Authorization': `Bearer ${lexApiKey}`,
-          'Accept': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${lexApiKey}`, 'Accept': 'application/json' },
       });
-
       if (!response.ok) {
         const errorBody = await response.text();
         throw new Error(`Lexoffice API error: ${response.status} - ${errorBody}`);
       }
-
       const pageData = await response.json();
       if (pageData.content && pageData.content.length > 0) {
         allContacts.push(...pageData.content);
@@ -60,97 +51,68 @@ serve(async (req) => {
       }
     }
 
-    // 5. Filter for new contacts
-    const newContacts = allContacts.filter(contact => !existingLexIds.has(contact.id));
+    const customersToInsert = [];
+    const customersToUpdate = [];
     let skippedCount = 0;
 
-    if (newContacts.length === 0) {
-      return new Response(JSON.stringify({ message: 'Alle Kunden sind bereits auf dem neuesten Stand.', count: 0 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+    for (const contact of allContacts) {
+      if (existingLexIds.has(contact.id)) {
+        continue; // Already synced by lex_id, skip.
+      }
+
+      const isCompany = contact.company && contact.company.name;
+      let customerData: any = { lex_id: contact.id };
+      let contactEmail: string | null = null;
+
+      if (isCompany) {
+        const company = contact.company;
+        const billingAddress = (company.addresses?.billing?.[0]) || {};
+        const contactPerson = (company.contactPersons?.[0]) || {};
+        contactEmail = contactPerson.emailAddress;
+        customerData = { ...customerData, company_name: company.name, contact_first_name: contactPerson.firstName, contact_last_name: contactPerson.lastName, email: contactEmail, street: billingAddress.street, postal_code: billingAddress.zip, city: billingAddress.city, country: billingAddress.countryCode, tax_number: company.vatRegistrationId };
+      } else if (contact.person && (contact.person.firstName || contact.person.lastName)) {
+        const person = contact.person;
+        const addresses = person.addresses || {};
+        const billingAddress = (addresses.business?.[0] || addresses.private?.[0]) || {};
+        const emailAddresses = contact.emailAddresses || {};
+        contactEmail = (emailAddresses.business?.[0] || emailAddresses.private?.[0] || emailAddresses.other?.[0]);
+        customerData = { ...customerData, company_name: `${person.firstName || ''} ${person.lastName || ''}`.trim(), contact_first_name: person.firstName, contact_last_name: person.lastName, email: contactEmail, street: billingAddress.street, postal_code: billingAddress.zip, city: billingAddress.city, country: billingAddress.countryCode, tax_number: null };
+      } else {
+        skippedCount++;
+        continue;
+      }
+
+      if (!customerData.company_name) {
+        skippedCount++;
+        continue;
+      }
+      
+      customerData.house_number = null;
+
+      if (contactEmail && emailToDbIdMap.has(contactEmail)) {
+        const dbId = emailToDbIdMap.get(contactEmail);
+        customersToUpdate.push({ id: dbId, ...customerData });
+      } else {
+        customersToInsert.push(customerData);
+      }
     }
-
-    // 6. Map and insert new contacts, handling different customer types
-    const customersToInsert = newContacts
-      .map(contact => {
-        const isCompany = contact.company && contact.company.name;
-        let customerData: any = { lex_id: contact.id };
-
-        if (isCompany) {
-          // Handle as a company customer
-          const company = contact.company;
-          const billingAddress = (company.addresses?.billing?.[0]) || {};
-          const contactPerson = (company.contactPersons?.[0]) || {};
-
-          customerData = {
-            ...customerData,
-            company_name: company.name,
-            contact_first_name: contactPerson.firstName,
-            contact_last_name: contactPerson.lastName,
-            email: contactPerson.emailAddress,
-            street: billingAddress.street,
-            postal_code: billingAddress.zip,
-            city: billingAddress.city,
-            country: billingAddress.countryCode,
-            tax_number: company.vatRegistrationId,
-          };
-        } else if (contact.person && (contact.person.firstName || contact.person.lastName)) {
-          // Handle as a private customer
-          const person = contact.person;
-          const addresses = person.addresses || {};
-          const billingAddress = (addresses.business?.[0] || addresses.private?.[0]) || {};
-          const emailAddresses = contact.emailAddresses || {};
-          const email = (emailAddresses.business?.[0] || emailAddresses.private?.[0] || emailAddresses.other?.[0]);
-
-          customerData = {
-            ...customerData,
-            company_name: `${person.firstName || ''} ${person.lastName || ''}`.trim(),
-            contact_first_name: person.firstName,
-            contact_last_name: person.lastName,
-            email: email,
-            street: billingAddress.street,
-            postal_code: billingAddress.zip,
-            city: billingAddress.city,
-            country: billingAddress.countryCode,
-            tax_number: null,
-          };
-        } else {
-          // Cannot determine customer type, skip
-          console.warn(`Skipping contact with Lexoffice ID ${contact.id} due to missing company and person name.`);
-          skippedCount++;
-          return null;
-        }
-        
-        // Final check for company_name, as it's a required field
-        if (!customerData.company_name) {
-            console.warn(`Skipping contact with Lexoffice ID ${contact.id} because a final company_name could not be determined.`);
-            skippedCount++;
-            return null;
-        }
-
-        // Lexoffice doesn't provide house_number separately
-        customerData.house_number = null;
-
-        return customerData;
-      })
-      .filter(Boolean); // Remove null (skipped) entries
 
     if (customersToInsert.length > 0) {
-        const { error: insertError } = await supabaseAdmin
-          .from('customers')
-          .insert(customersToInsert);
-
-        if (insertError) throw insertError;
+      const { error: insertError } = await supabaseAdmin.from('customers').insert(customersToInsert);
+      if (insertError) throw insertError;
     }
 
-    // 7. Return success response
-    let message = `${customersToInsert.length} neue Kunden erfolgreich importiert.`;
+    if (customersToUpdate.length > 0) {
+      const { error: updateError } = await supabaseAdmin.from('customers').upsert(customersToUpdate);
+      if (updateError) throw updateError;
+    }
+
+    let message = `Synchronisierung abgeschlossen: ${customersToInsert.length} neue Kunden importiert, ${customersToUpdate.length} bestehende Kunden aktualisiert.`;
     if (skippedCount > 0) {
-        message += ` ${skippedCount} Kontakte wurden übersprungen, da kein Name vorhanden war.`
+      message += ` ${skippedCount} Kontakte wurden übersprungen.`
     }
 
-    return new Response(JSON.stringify({ message, count: customersToInsert.length }), {
+    return new Response(JSON.stringify({ message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
