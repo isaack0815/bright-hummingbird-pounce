@@ -37,7 +37,7 @@ const DashboardSettings = () => {
         const saved = savedLayout.find(l => l.i === widget.i);
         return saved || { 
           i: widget.i, 
-          x: 0, y: Infinity,
+          x: 0, y: 999, // Use a large but finite number for initial placement
           w: widget.defaultW, h: widget.defaultH, 
           enabled: false 
         };
@@ -71,12 +71,22 @@ const DashboardSettings = () => {
 
   const onToggleWidget = (widgetId: string, isEnabled: boolean) => {
     setCurrentLayout(prev => {
-      return prev.map(widget => {
-        if (widget.i === widgetId) {
-          return { ...widget, enabled: isEnabled };
-        }
-        return widget;
-      });
+      const newLayout = [...prev];
+      const widgetIndex = newLayout.findIndex(w => w.i === widgetId);
+      if (widgetIndex === -1) return prev;
+
+      const widget = { ...newLayout[widgetIndex], enabled: isEnabled };
+      
+      // If we just enabled a widget, place it at the bottom.
+      if (isEnabled) {
+          const enabledWidgets = newLayout.filter(w => w.enabled && w.i !== widgetId);
+          const maxY = Math.max(0, ...enabledWidgets.map(w => w.y + w.h));
+          widget.y = maxY;
+          widget.x = 0;
+      }
+      
+      newLayout[widgetIndex] = widget;
+      return newLayout;
     });
   };
 
