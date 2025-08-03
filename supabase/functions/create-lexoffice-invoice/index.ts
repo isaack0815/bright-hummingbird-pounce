@@ -57,6 +57,10 @@ serve(async (req) => {
     console.log(`STEP 7: Found ${allLineItems.length} total line items.`);
 
     const lexLineItems = allLineItems.map(item => {
+      if (!item.id) {
+        throw new Error(`Line item '${item.description}' is missing a database ID and cannot be sent to Lexoffice.`);
+      }
+      
       let discountPercentage = 0;
       if (item.discount_type === 'percentage') {
         discountPercentage = item.discount;
@@ -65,6 +69,7 @@ serve(async (req) => {
       }
 
       return {
+        id: item.id.toString(),
         type: "service",
         name: item.description,
         quantity: item.quantity,
@@ -84,7 +89,6 @@ serve(async (req) => {
       ? "Innergemeinschaftliche Lieferung. Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren)."
       : "";
 
-    // Helper to get YYYY-MM-DD from a Date object
     const toLexDate = (date: Date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -95,7 +99,6 @@ serve(async (req) => {
     const lexofficePayload = {
       archived: false,
       voucherDate: `${toLexDate(new Date())}T00:00:00.000+01:00`,
-      voucherstatus: "open",
       address: {
         contactId: customer.lex_id,
       },
