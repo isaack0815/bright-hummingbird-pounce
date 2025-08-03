@@ -94,58 +94,49 @@ serve(async (req) => {
       }
     }
 
-    // 2. De-duplicate contacts from Lexoffice based on email. First one wins.
-    const uniqueContactsMap = new Map<string, any>();
-    for (const contact of allContacts) {
-        const mapped = mapContactToCustomer(contact);
-        if (!mapped) continue;
-
-        const email = mapped.email;
-        if (email && !uniqueContactsMap.has(email)) {
-            uniqueContactsMap.set(email, mapped);
-        } else if (!email) {
-            // For contacts without email, use their lex_id as a unique key
-            uniqueContactsMap.set(mapped.lex_id, mapped);
-        }
-    }
-    const uniqueLexofficeCustomers = Array.from(uniqueContactsMap.values());
-
-    // 3. Fetch existing customers from our DB and create lookup maps
-    const { data: existingCustomers, error: dbError } = await supabaseAdmin.from('customers').select('id, lex_id, email');
+    // 2. Fetch existing customers from our DB and create a lookup map based on lex_id
+    const { data: existingCustomers, error: dbError } = await supabaseAdmin.from('customers').select('id, lex_id');
     if (dbError) throw dbError;
 
-    const lexIdToDbCustomer = new Map(existingCustomers.map(c => [c.lex_id, c]));
-    const emailToDbCustomer = new Map(existingCustomers.filter(c => c.email).map(c => [c.email.toLowerCase(), c]));
+    const lexIdToDbId = new Map(existingCustomers.map(c => [c.lex_id, c.id]));
 
-    // 4. Process the de-duplicated contacts
+    // 3. Process contacts to decide whether to insert or update
     const customersToUpsert = [];
     let updatedCount = 0;
     let insertedCount = 0;
+    let skippedCount = 0;
 
-    for (const mappedCustomer of uniqueLexofficeCustomers) {
-      const existingByLexId = lexIdToDbCustomer.get(mappedCustomer.lex_id);
-      const existingByEmail = mappedCustomer.email ? emailToDbCustomer.get(mappedCustomer.email) : null;
+    for (const contact of allContacts) {
+      const mappedCustomer = mapContactToCustomer(contact);
+      if (!mappedCustomer) {
+        skippedCount++;
+        continue;
+      }
 
-      if (existingByLexId) {
-        customersToUpsert.push({ id: existingByLexId.id, ...mappedCustomer });
-        updatedCount++;
-      } else if (existingByEmail) {
-        customersToUpsert.push({ id: existingByEmail.id, ...mappedCustomer });
+      const existingDbId = lexIdToDbId.get(mappedCustomer.lex_id);
+
+      if (existingDbId) {
+        // Match by lex_id. This is an update.
+        customersToUpsert.push({ id: existingDbId, ...mappedCustomer });
         updatedCount++;
       } else {
+        // No match by lex_id. This is a new customer.
         customersToUpsert.push(mappedCustomer);
         insertedCount++;
       }
     }
 
-    // 5. Perform the database operation
+    // 4. Perform the database operation
     if (customersToUpsert.length > 0) {
       const { error: upsertError } = await supabaseAdmin.from('customers').upsert(customersToUpsert);
       if (upsertError) throw upsertError;
     }
 
-    // 6. Return success response
-    const message = `Synchronisierung abgeschlossen: ${insertedCount} Kunden neu importiert, ${updatedCount} Kunden aktualisiert.`;
+    // 5. Return success response
+    let message = `Synchronisierung abgeschlossen: ${insertedCount} Kunden neu importiert, ${updatedCount} Kunden aktualisiert.`;
+    if (skippedCount > 0) {
+      message += ` ${skippedCount} Kontakte wurden übersprungen.`
+    }
 
     return new Response(JSON.stringify({ message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
