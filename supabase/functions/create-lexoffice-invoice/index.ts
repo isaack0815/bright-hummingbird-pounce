@@ -91,6 +91,8 @@ serve(async (req) => {
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
+    
+    const paymentTermDuration = firstOrder.payment_term_days || 30;
 
     const lexofficePayload = {
       archived: false,
@@ -99,8 +101,15 @@ serve(async (req) => {
         contactId: customer.lex_id,
       },
       lineItems: lexLineItems,
+      totalPrice: {
+        currency: "EUR",
+      },
       taxConditions: {
         taxType: "net",
+      },
+      paymentConditions: {
+        paymentTermLabel: `Zahlbar innerhalb von ${paymentTermDuration} Tagen netto.`,
+        paymentTermDuration: paymentTermDuration,
       },
       shippingConditions: {
         shippingDate: `${toLexDate(new Date())}T00:00:00.000+01:00`,
@@ -108,6 +117,7 @@ serve(async (req) => {
       },
       title: "Rechnung",
       introduction: introductionText,
+      remark: "Vielen Dank für Ihren Auftrag."
     };
     
     console.log("STEP 8: Payload construction complete.");
