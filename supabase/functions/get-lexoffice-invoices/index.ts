@@ -5,6 +5,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const fetchVouchersByStatus = async (lexApiKey: string, statuses: string): Promise<any[]> => {
+  const allVouchers = [];
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const url = `https://api.lexoffice.io/v1/voucherlist?voucherType=invoice&voucherStatus=${statuses}&page=${page}&size=100`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${lexApiKey}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Lexoffice API error for status ${statuses}: ${response.status} - ${await response.text()}`);
+    }
+
+    const pageData = await response.json();
+    if (pageData.content && pageData.content.length > 0) {
+      allVouchers.push(...pageData.content);
+      page++;
+      hasMore = !pageData.last;
+    } else {
+      hasMore = false;
+    }
+  }
+  return allVouchers;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -14,32 +44,16 @@ serve(async (req) => {
     const lexApiKey = Deno.env.get('LEX_API_KEY');
     if (!lexApiKey) throw new Error('LEX_API_KEY secret is not set in Supabase project.');
 
-    const allInvoices = [];
-    let page = 0;
-    let hasMore = true;
+    // Fetch invoices with standard statuses
+    const standardStatuses = 'open,paid,voided';
+    const standardInvoices = await fetchVouchersByStatus(lexApiKey, standardStatuses);
 
-    while (hasMore) {
-      const url = `https://api.lexoffice.io/v1/voucherlist?voucherType=invoice&voucherStatus=open,paid,overdue,voided&page=${page}&size=100`;
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${lexApiKey}`,
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Lexoffice API error: ${response.status} - ${await response.text()}`);
-      }
-
-      const pageData = await response.json();
-      if (pageData.content && pageData.content.length > 0) {
-        allInvoices.push(...pageData.content);
-        page++;
-        hasMore = !pageData.last;
-      } else {
-        hasMore = false;
-      }
-    }
+    // Fetch invoices with overdue status
+    const overdueStatus = 'overdue';
+    const overdueInvoices = await fetchVouchersByStatus(lexApiKey, overdueStatus);
+    
+    // Combine the results
+    const allInvoices = [...standardInvoices, ...overdueInvoices];
 
     return new Response(JSON.stringify({ invoices: allInvoices }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
