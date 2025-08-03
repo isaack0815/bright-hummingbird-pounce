@@ -1,4 +1,5 @@
-import { Card } from 'react-bootstrap';
+import { useMemo } from 'react';
+import { Card, Tabs, Tab } from 'react-bootstrap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -46,6 +47,16 @@ const Fernverkehr = () => {
     }
   };
 
+  const { openBillings, archivedBillings } = useMemo(() => {
+    if (!orders) {
+      return { openBillings: [], archivedBillings: [] };
+    }
+    return {
+      openBillings: orders.filter(o => !o.is_billed),
+      archivedBillings: orders.filter(o => o.is_billed),
+    };
+  }, [orders]);
+
   if (error) {
     addError(error, 'API');
     showError(`Fehler beim Laden der Aufträge: ${error.message}`);
@@ -60,11 +71,18 @@ const Fernverkehr = () => {
       </div>
       <Card>
         <Card.Header>
-          <Card.Title>Alle Aufträge</Card.Title>
-          <Card.Text className="text-muted">Hier sehen Sie alle im System erfassten Frachtaufträge.</Card.Text>
+          <Card.Title>Abrechnungsübersicht</Card.Title>
+          <Card.Text className="text-muted">Hier sehen Sie alle offenen und bereits abgerechneten Aufträge.</Card.Text>
         </Card.Header>
         <Card.Body>
-          {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={orders || []} onDelete={handleDeleteClick} showBillingColumn={canBill} isBillingContext={true} />}
+          <Tabs defaultActiveKey="open" id="billing-tabs" className="mb-3 nav-fill">
+            <Tab eventKey="open" title="Offene Abrechnungen">
+              {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={openBillings} onDelete={handleDeleteClick} showBillingColumn={canBill} isBillingContext={true} />}
+            </Tab>
+            <Tab eventKey="archive" title="Archiv">
+              {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={archivedBillings} onDelete={handleDeleteClick} showBillingColumn={canBill} isBillingContext={true} />}
+            </Tab>
+          </Tabs>
         </Card.Body>
       </Card>
     </div>
