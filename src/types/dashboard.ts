@@ -1,10 +1,8 @@
-export type DashboardWidgetConfig = {
-  id: string;
-  col: number;
-  row: number;
-  width: number; // in grid columns (1-12)
-  height: number; // in rows
+import type { Layout } from 'react-grid-layout';
+
+// Wir kombinieren die react-grid-layout Eigenschaften mit unseren eigenen.
+export type DashboardWidget = Layout & {
   enabled: boolean;
 };
 
-export type DashboardLayout = DashboardWidgetConfig[];
+export type DashboardLayout = DashboardWidget[];

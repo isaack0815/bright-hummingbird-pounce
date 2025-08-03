@@ -1,16 +1,19 @@
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from '@/lib/supabase';
 import { Card, Button, Form, Row, Col, Spinner } from 'react-bootstrap';
 import { Save, ArrowLeft } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { showError, showSuccess } from '@/utils/toast';
-import type { DashboardLayout } from '@/types/dashboard';
-import { useEffect } from 'react';
+import type { DashboardLayout, DashboardWidget } from '@/types/dashboard';
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import type { Layout } from 'react-grid-layout';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const availableWidgets = [
-  { id: 'stats', name: 'Statistiken', description: 'Zeigt Nutzer- und Gruppenzahlen an.', defaultWidth: 6 },
-  { id: 'todos', name: 'Meine ToDos', description: 'Listet Ihre persönlichen Aufgaben auf.', defaultWidth: 6 },
+  { i: 'stats', name: 'Statistiken', description: 'Zeigt Nutzer- und Gruppenzahlen an.', defaultW: 12, defaultH: 1 },
+  { i: 'todos', name: 'Meine ToDos', description: 'Listet Ihre persönlichen Aufgaben auf.', defaultW: 6, defaultH: 4 },
 ];
 
 const fetchLayout = async (): Promise<DashboardLayout> => {
@@ -21,31 +24,27 @@ const fetchLayout = async (): Promise<DashboardLayout> => {
 
 const DashboardSettings = () => {
   const queryClient = useQueryClient();
-  const { data: layout, isLoading } = useQuery<DashboardLayout>({
+  const [currentLayout, setCurrentLayout] = useState<DashboardLayout>([]);
+
+  const { data: savedLayout, isLoading } = useQuery<DashboardLayout>({
     queryKey: ['dashboardLayout'],
     queryFn: fetchLayout,
   });
 
-  const { control, handleSubmit, reset } = useForm<{ layout: DashboardLayout }>({
-    defaultValues: { layout: [] },
-  });
-
-  const { fields, update } = useFieldArray({
-    control,
-    name: 'layout',
-    keyName: 'key',
-  });
-
   useEffect(() => {
-    if (layout) {
-      // Sync available widgets with saved layout
-      const newLayout = availableWidgets.map(widget => {
-        const savedWidget = layout.find(l => l.id === widget.id);
-        return savedWidget || { ...widget, col: 1, row: 99, enabled: false, height: 1 };
+    if (savedLayout) {
+      const fullLayout = availableWidgets.map(widget => {
+        const saved = savedLayout.find(l => l.i === widget.i);
+        return saved || { 
+          i: widget.i, 
+          x: 0, y: Infinity,
+          w: widget.defaultW, h: widget.defaultH, 
+          enabled: false 
+        };
       });
-      reset({ layout: newLayout });
+      setCurrentLayout(fullLayout);
     }
-  }, [layout, reset]);
+  }, [savedLayout]);
 
   const mutation = useMutation({
     mutationFn: async (newLayout: DashboardLayout) => {
@@ -61,16 +60,38 @@ const DashboardSettings = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern."),
   });
 
-  const onSubmit = (data: { layout: DashboardLayout }) => {
-    mutation.mutate(data.layout);
+  const onLayoutChange = (newLayout: Layout[]) => {
+    setCurrentLayout(prevLayout => {
+      return prevLayout.map(widget => {
+        const layoutItem = newLayout.find(l => l.i === widget.i);
+        return layoutItem ? { ...widget, ...layoutItem } : widget;
+      });
+    });
+  };
+
+  const onToggleWidget = (widgetId: string, isEnabled: boolean) => {
+    setCurrentLayout(prev => {
+      return prev.map(widget => {
+        if (widget.i === widgetId) {
+          return { ...widget, enabled: isEnabled };
+        }
+        return widget;
+      });
+    });
+  };
+
+  const onSubmit = () => {
+    mutation.mutate(currentLayout);
   };
 
   if (isLoading) {
     return <p>Lade Layout...</p>;
   }
 
+  const enabledWidgets = currentLayout.filter(w => w.enabled);
+
   return (
-    <Form onSubmit={handleSubmit(onSubmit)}>
+    <Form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div className="d-flex align-items-center gap-3">
           <NavLink to="/profile" className="btn btn-outline-secondary btn-sm p-2 lh-1"><ArrowLeft size={16} /></NavLink>
@@ -82,52 +103,58 @@ const DashboardSettings = () => {
         </Button>
       </div>
 
-      <Card>
-        <Card.Header>
-          <Card.Title>Module verwalten</Card.Title>
-          <Card.Text className="text-muted">Aktivieren und konfigurieren Sie die Module für Ihr Dashboard.</Card.Text>
-        </Card.Header>
-        <Card.Body>
-          <Row className="g-3">
-            {fields.map((field, index) => {
-              const widgetInfo = availableWidgets.find(w => w.id === field.id)!;
-              return (
-                <Col md={6} key={field.key}>
-                  <Card className="h-100">
-                    <Card.Body>
-                      <div className="d-flex justify-content-between align-items-start">
-                        <div>
-                          <Card.Title as="h6">{widgetInfo.name}</Card.Title>
-                          <Card.Text className="small text-muted">{widgetInfo.description}</Card.Text>
-                        </div>
-                        <Form.Check
-                          type="switch"
-                          id={`enabled-${index}`}
-                          checked={field.enabled}
-                          onChange={(e) => update(index, { ...field, enabled: e.target.checked })}
-                        />
-                      </div>
-                      {field.enabled && (
-                        <Row className="g-2 mt-2">
-                          <Col xs={4}>
-                            <Form.Group><Form.Label className="small">Breite</Form.Label><Form.Select size="sm" value={field.width} onChange={(e) => update(index, { ...field, width: parseInt(e.target.value) })}><option value="3">25%</option><option value="4">33%</option><option value="6">50%</option><option value="8">66%</option><option value="9">75%</option><option value="12">100%</option></Form.Select></Form.Group>
-                          </Col>
-                          <Col xs={4}>
-                            <Form.Group><Form.Label className="small">Reihe</Form.Label><Form.Control size="sm" type="number" value={field.row} onChange={(e) => update(index, { ...field, row: parseInt(e.target.value) })} /></Form.Group>
-                          </Col>
-                          <Col xs={4}>
-                            <Form.Group><Form.Label className="small">Position</Form.Label><Form.Control size="sm" type="number" value={field.col} onChange={(e) => update(index, { ...field, col: parseInt(e.target.value) })} /></Form.Group>
-                          </Col>
-                        </Row>
-                      )}
-                    </Card.Body>
-                  </Card>
-                </Col>
-              );
-            })}
-          </Row>
-        </Card.Body>
-      </Card>
+      <Row className="g-4">
+        <Col lg={8}>
+          <Card>
+            <Card.Header>
+              <Card.Title>Layout-Vorschau</Card.Title>
+              <Card.Text className="text-muted">Verschieben Sie die Module und passen Sie ihre Größe an.</Card.Text>
+            </Card.Header>
+            <Card.Body style={{ minHeight: '60vh' }}>
+              <ResponsiveGridLayout
+                layouts={{ lg: enabledWidgets }}
+                onLayoutChange={onLayoutChange}
+                breakpoints={{ lg: 1200 }}
+                cols={{ lg: 12 }}
+                rowHeight={100}
+              >
+                {enabledWidgets.map(widget => (
+                  <div key={widget.i}>
+                    <div className="h-100 d-flex align-items-center justify-content-center bg-light border rounded">
+                      <span className="text-muted fw-bold">{availableWidgets.find(w => w.i === widget.i)?.name}</span>
+                    </div>
+                  </div>
+                ))}
+              </ResponsiveGridLayout>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col lg={4}>
+          <Card>
+            <Card.Header>
+              <Card.Title>Module</Card.Title>
+              <Card.Text className="text-muted">Aktivieren oder deaktivieren Sie Module.</Card.Text>
+            </Card.Header>
+            <Card.Body>
+              {availableWidgets.map(widget => {
+                const currentWidget = currentLayout.find(l => l.i === widget.i);
+                return (
+                  <div key={widget.i} className="mb-2">
+                    <Form.Check 
+                      type="switch"
+                      id={`widget-switch-${widget.i}`}
+                      label={widget.name}
+                      checked={currentWidget?.enabled || false}
+                      onChange={(e) => onToggleWidget(widget.i, e.target.checked)}
+                    />
+                    <p className="small text-muted ms-4">{widget.description}</p>
+                  </div>
+                );
+              })}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
     </Form>
   );
 };

@@ -7,8 +7,8 @@ const corsHeaders = {
 }
 
 const defaultLayout = [
-  { id: 'stats', col: 1, row: 1, width: 6, height: 1, enabled: true },
-  { id: 'todos', col: 1, row: 2, width: 6, height: 1, enabled: true },
+  { i: 'stats', x: 0, y: 0, w: 12, h: 1, enabled: true },
+  { i: 'todos', x: 0, y: 1, w: 6, h: 4, enabled: true },
 ];
 
 serve(async (req) => {
