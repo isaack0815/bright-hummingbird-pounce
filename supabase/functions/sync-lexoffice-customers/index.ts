@@ -22,14 +22,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Fetch existing customers and create maps for quick lookups.
+    // Emails are normalized to lowercase to prevent case-sensitivity issues.
     const { data: existingCustomers, error: dbError } = await supabaseAdmin
       .from('customers')
       .select('id, lex_id, email');
     if (dbError) throw dbError;
 
     const existingLexIds = new Set(existingCustomers.map(c => c.lex_id).filter(Boolean));
-    const emailToDbIdMap = new Map(existingCustomers.filter(c => c.email).map(c => [c.email, c.id]));
+    const emailToDbIdMap = new Map(existingCustomers.filter(c => c.email).map(c => [c.email.toLowerCase(), c.id]));
 
+    // Fetch all contacts from Lexoffice, handling pagination.
     const allContacts = [];
     let page = 0;
     let hasMore = true;
@@ -54,12 +57,15 @@ serve(async (req) => {
     const customersToInsert = [];
     const customersToUpdate = [];
     let skippedCount = 0;
+    // This set tracks emails we are about to insert in this run to avoid duplicates within the batch.
+    const newEmailsInThisBatch = new Set<string>();
 
     for (const contact of allContacts) {
       if (existingLexIds.has(contact.id)) {
         continue; // Already synced by lex_id, skip.
       }
 
+      // Logic to parse contact data into a standardized format
       const isCompany = contact.company && contact.company.name;
       let customerData: any = { lex_id: contact.id };
       let contactEmail: string | null = null;
@@ -88,15 +94,30 @@ serve(async (req) => {
       }
       
       customerData.house_number = null;
+      const lowerCaseEmail = contactEmail ? contactEmail.toLowerCase() : null;
+      if (lowerCaseEmail) {
+        customerData.email = lowerCaseEmail; // Ensure we store the normalized email
+      }
 
-      if (contactEmail && emailToDbIdMap.has(contactEmail)) {
-        const dbId = emailToDbIdMap.get(contactEmail);
+      // Decide whether to insert, update, or skip
+      if (lowerCaseEmail && emailToDbIdMap.has(lowerCaseEmail)) {
+        // Email exists in DB -> update existing record
+        const dbId = emailToDbIdMap.get(lowerCaseEmail);
         customersToUpdate.push({ id: dbId, ...customerData });
+      } else if (lowerCaseEmail && newEmailsInThisBatch.has(lowerCaseEmail)) {
+        // Email is a duplicate within this sync batch -> skip
+        skippedCount++;
+        continue;
       } else {
+        // New customer -> add to insert list
         customersToInsert.push(customerData);
+        if (lowerCaseEmail) {
+          newEmailsInThisBatch.add(lowerCaseEmail);
+        }
       }
     }
 
+    // Perform DB operations
     if (customersToInsert.length > 0) {
       const { error: insertError } = await supabaseAdmin.from('customers').insert(customersToInsert);
       if (insertError) throw insertError;
@@ -109,7 +130,7 @@ serve(async (req) => {
 
     let message = `Synchronisierung abgeschlossen: ${customersToInsert.length} neue Kunden importiert, ${customersToUpdate.length} bestehende Kunden aktualisiert.`;
     if (skippedCount > 0) {
-      message += ` ${skippedCount} Kontakte wurden übersprungen.`
+      message += ` ${skippedCount} Kontakte wurden übersprungen (Duplikate oder fehlende Daten).`
     }
 
     return new Response(JSON.stringify({ message }), {
