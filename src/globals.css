@@ -1,3 +1,12 @@
 body {
   background-color: #f8f9fa;
 }
+
+.menu-item-row .menu-item-actions {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.menu-item-row:hover .menu-item-actions {
+  opacity: 1;
+}

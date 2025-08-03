@@ -108,12 +108,12 @@ function SortableTreeItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="d-flex align-items-center bg-white rounded my-1 shadow-sm group">
+    <div ref={setNodeRef} style={style} className="d-flex align-items-center bg-white rounded my-1 shadow-sm menu-item-row">
       <div {...attributes} {...listeners} className="p-3 cursor-grab active-cursor-grabbing">
         <GripVertical className="h-5 w-5 text-muted" />
       </div>
       <div className="flex-grow-1 p-3">{item.name}</div>
-      <div className="d-flex align-items-center gap-1 p-3 opacity-0 group-hover-opacity-100 transition-opacity">
+      <div className="d-flex align-items-center gap-1 p-3 menu-item-actions">
         <Button variant="ghost" size="sm" onClick={() => onEdit(item)}>
           <Edit size={16} />
         </Button>
