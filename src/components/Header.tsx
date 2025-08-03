@@ -68,7 +68,7 @@ const Header = () => {
         return (
           <NavDropdown 
             title={
-              <span className="d-flex align-items-center">
+              <span className="d-inline-flex align-items-center">
                 {item.icon && <DynamicIcon name={item.icon} className="me-2 h-4 w-4" />}
                 {item.name}
               </span>
