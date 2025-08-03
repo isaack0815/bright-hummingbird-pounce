@@ -27,6 +27,7 @@ const Header = () => {
             <Nav.Link as={NavLink} to="/" end>Dashboard</Nav.Link>
             
             {hasPermission('freight_orders.manage') && <Nav.Link as={NavLink} to="/freight-orders">Frachtaufträge</Nav.Link>}
+            {hasPermission('Abrechnung Fernverkehr') && <Nav.Link as={NavLink} to="/fernverkehr">Fernverkehr</Nav.Link>}
             {hasPermission('customers.manage') && <Nav.Link as={NavLink} to="/customers">Kunden</Nav.Link>}
             {hasPermission('vehicles.manage') && <Nav.Link as={NavLink} to="/vehicles">Fahrzeuge</Nav.Link>}
 

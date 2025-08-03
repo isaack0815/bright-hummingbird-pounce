@@ -23,6 +23,7 @@ import Settings from './pages/Settings';
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AccessDenied from "./pages/AccessDenied";
+import Fernverkehr from "./pages/Fernverkehr";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,10 @@ const AppRoutes = () => {
             <Route path="freight-orders" element={<FreightOrderManagement />} />
             <Route path="freight-orders/new" element={<FreightOrderForm />} />
             <Route path="freight-orders/edit/:id" element={<FreightOrderForm />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr" />}>
+            <Route path="fernverkehr" element={<Fernverkehr />} />
           </Route>
 
           <Route path="access-denied" element={<AccessDenied />} />
