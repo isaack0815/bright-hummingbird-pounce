@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Form, Table } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Card, Button, Form, Table, Spinner } from 'react-bootstrap';
+import { PlusCircle, Trash2, Edit, RefreshCw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -42,6 +42,22 @@ const CustomerManagement = () => {
   const { data: customers, isLoading, error } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: fetchCustomers,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-lexoffice-customers');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      showSuccess(data.message || "Synchronisierung erfolgreich!");
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+    onError: (err: any) => {
+      addError(err, 'API');
+      showError(err.data?.error || "Fehler bei der Synchronisierung.");
+    },
   });
 
   const deleteMutation = useMutation({
@@ -89,10 +105,25 @@ const CustomerManagement = () => {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <h1 className="h2">Kundenverwaltung</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <PlusCircle className="me-2" size={16} />
-          Kunde hinzufügen
-        </Button>
+        <div className="d-flex gap-2">
+          <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+            {syncMutation.isPending ? (
+              <>
+                <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+                <span className="ms-2">Synchronisiere...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="me-2" size={16} />
+                Mit Lexoffice synchronisieren
+              </>
+            )}
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <PlusCircle className="me-2" size={16} />
+            Kunde hinzufügen
+          </Button>
+        </div>
       </div>
       <Card>
         <Card.Header>
