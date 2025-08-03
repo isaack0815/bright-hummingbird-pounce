@@ -62,6 +62,7 @@ serve(async (req) => {
 
     // 5. Filter for new contacts
     const newContacts = allContacts.filter(contact => !existingLexIds.has(contact.id));
+    let skippedCount = 0;
 
     if (newContacts.length === 0) {
       return new Response(JSON.stringify({ message: 'Alle Kunden sind bereits auf dem neuesten Stand.', count: 0 }), {
@@ -70,34 +71,55 @@ serve(async (req) => {
       });
     }
 
-    // 6. Map and insert new contacts
-    const customersToInsert = newContacts.map(contact => {
-      const company = contact.company || {};
-      const billingAddress = (company.addresses && company.addresses.billing && company.addresses.billing[0]) ? company.addresses.billing[0] : {};
-      const contactPerson = (company.contactPersons && company.contactPersons[0]) ? company.contactPersons[0] : {};
+    // 6. Map and insert new contacts, handling missing company names
+    const customersToInsert = newContacts
+      .map(contact => {
+        const company = contact.company || {};
+        const person = contact.person || {};
+        const billingAddress = (company.addresses && company.addresses.billing && company.addresses.billing[0]) ? company.addresses.billing[0] : {};
+        const contactPerson = (company.contactPersons && company.contactPersons[0]) ? company.contactPersons[0] : {};
 
-      return {
-        lex_id: contact.id,
-        company_name: company.name,
-        contact_first_name: contactPerson.firstName,
-        contact_last_name: contactPerson.lastName,
-        email: contactPerson.emailAddress,
-        street: billingAddress.street,
-        postal_code: billingAddress.zip,
-        city: billingAddress.city,
-        country: billingAddress.countryCode,
-        tax_number: company.vatRegistrationId,
-      };
-    });
+        // Fallback for company name: use company name, or person's name.
+        const companyName = company.name || `${person.firstName || ''} ${person.lastName || ''}`.trim();
 
-    const { error: insertError } = await supabaseAdmin
-      .from('customers')
-      .insert(customersToInsert);
+        // If no name can be determined, skip this contact.
+        if (!companyName) {
+          console.warn(`Skipping contact with Lexoffice ID ${contact.id} due to missing name.`);
+          skippedCount++;
+          return null;
+        }
 
-    if (insertError) throw insertError;
+        return {
+          lex_id: contact.id,
+          company_name: companyName,
+          contact_first_name: contactPerson.firstName || person.firstName,
+          contact_last_name: contactPerson.lastName || person.lastName,
+          email: contactPerson.emailAddress,
+          street: billingAddress.street,
+          house_number: null, // Lexoffice API doesn't seem to provide house_number separately
+          postal_code: billingAddress.zip,
+          city: billingAddress.city,
+          country: billingAddress.countryCode,
+          tax_number: company.vatRegistrationId,
+        };
+      })
+      .filter(Boolean); // Remove null (skipped) entries
+
+    if (customersToInsert.length > 0) {
+        const { error: insertError } = await supabaseAdmin
+          .from('customers')
+          .insert(customersToInsert);
+
+        if (insertError) throw insertError;
+    }
 
     // 7. Return success response
-    return new Response(JSON.stringify({ message: `${newContacts.length} neue Kunden erfolgreich importiert.`, count: newContacts.length }), {
+    let message = `${customersToInsert.length} neue Kunden erfolgreich importiert.`;
+    if (skippedCount > 0) {
+        message += ` ${skippedCount} Kontakte wurden übersprungen, da kein Name vorhanden war.`
+    }
+
+    return new Response(JSON.stringify({ message, count: customersToInsert.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
@@ -107,6 +129,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
-    });
+    })
   }
 })
