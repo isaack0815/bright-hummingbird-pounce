@@ -71,37 +71,68 @@ serve(async (req) => {
       });
     }
 
-    // 6. Map and insert new contacts, handling missing company names
+    // 6. Map and insert new contacts, handling different customer types
     const customersToInsert = newContacts
       .map(contact => {
-        const company = contact.company || {};
-        const person = contact.person || {};
-        const billingAddress = (company.addresses && company.addresses.billing && company.addresses.billing[0]) ? company.addresses.billing[0] : {};
-        const contactPerson = (company.contactPersons && company.contactPersons[0]) ? company.contactPersons[0] : {};
+        const isCompany = contact.company && contact.company.name;
+        let customerData: any = { lex_id: contact.id };
 
-        // Fallback for company name: use company name, or person's name.
-        const companyName = company.name || `${person.firstName || ''} ${person.lastName || ''}`.trim();
+        if (isCompany) {
+          // Handle as a company customer
+          const company = contact.company;
+          const billingAddress = (company.addresses?.billing?.[0]) || {};
+          const contactPerson = (company.contactPersons?.[0]) || {};
 
-        // If no name can be determined, skip this contact.
-        if (!companyName) {
-          console.warn(`Skipping contact with Lexoffice ID ${contact.id} due to missing name.`);
+          customerData = {
+            ...customerData,
+            company_name: company.name,
+            contact_first_name: contactPerson.firstName,
+            contact_last_name: contactPerson.lastName,
+            email: contactPerson.emailAddress,
+            street: billingAddress.street,
+            postal_code: billingAddress.zip,
+            city: billingAddress.city,
+            country: billingAddress.countryCode,
+            tax_number: company.vatRegistrationId,
+          };
+        } else if (contact.person && (contact.person.firstName || contact.person.lastName)) {
+          // Handle as a private customer
+          const person = contact.person;
+          const addresses = person.addresses || {};
+          const billingAddress = (addresses.business?.[0] || addresses.private?.[0]) || {};
+          const emailAddresses = contact.emailAddresses || {};
+          const email = (emailAddresses.business?.[0] || emailAddresses.private?.[0] || emailAddresses.other?.[0]);
+
+          customerData = {
+            ...customerData,
+            company_name: `${person.firstName || ''} ${person.lastName || ''}`.trim(),
+            contact_first_name: person.firstName,
+            contact_last_name: person.lastName,
+            email: email,
+            street: billingAddress.street,
+            postal_code: billingAddress.zip,
+            city: billingAddress.city,
+            country: billingAddress.countryCode,
+            tax_number: null,
+          };
+        } else {
+          // Cannot determine customer type, skip
+          console.warn(`Skipping contact with Lexoffice ID ${contact.id} due to missing company and person name.`);
           skippedCount++;
           return null;
         }
+        
+        // Final check for company_name, as it's a required field
+        if (!customerData.company_name) {
+            console.warn(`Skipping contact with Lexoffice ID ${contact.id} because a final company_name could not be determined.`);
+            skippedCount++;
+            return null;
+        }
 
-        return {
-          lex_id: contact.id,
-          company_name: companyName,
-          contact_first_name: contactPerson.firstName || person.firstName,
-          contact_last_name: contactPerson.lastName || person.lastName,
-          email: contactPerson.emailAddress,
-          street: billingAddress.street,
-          house_number: null, // Lexoffice API doesn't seem to provide house_number separately
-          postal_code: billingAddress.zip,
-          city: billingAddress.city,
-          country: billingAddress.countryCode,
-          tax_number: company.vatRegistrationId,
-        };
+        // Lexoffice doesn't provide house_number separately
+        customerData.house_number = null;
+
+        return customerData;
       })
       .filter(Boolean); // Remove null (skipped) entries
 
