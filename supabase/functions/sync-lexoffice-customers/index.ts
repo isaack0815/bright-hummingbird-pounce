@@ -10,12 +10,13 @@ const corsHeaders = {
 const mapContactToCustomer = (contact: any) => {
   const isCompany = contact.company && contact.company.name;
   let customerData: any = { lex_id: contact.id };
+  let email: string | null = null;
 
   if (isCompany) {
     const company = contact.company;
     const billingAddress = (company.addresses?.billing?.[0]) || {};
     const contactPerson = (company.contactPersons?.[0]) || {};
-    const email = contactPerson.emailAddress || (company.emailAddresses?.business?.[0]);
+    email = contactPerson.emailAddress || (company.emailAddresses?.business?.[0]);
     customerData = {
       ...customerData,
       company_name: company.name,
@@ -33,7 +34,7 @@ const mapContactToCustomer = (contact: any) => {
     const addresses = person.addresses || {};
     const billingAddress = (addresses.business?.[0] || addresses.private?.[0]) || {};
     const emailAddresses = contact.emailAddresses || {};
-    const email = (emailAddresses.business?.[0] || emailAddresses.private?.[0] || emailAddresses.other?.[0]);
+    email = (emailAddresses.business?.[0] || emailAddresses.private?.[0] || emailAddresses.other?.[0]);
     customerData = {
       ...customerData,
       company_name: `${person.firstName || ''} ${person.lastName || ''}`.trim(),
@@ -93,59 +94,58 @@ serve(async (req) => {
       }
     }
 
-    // 2. Fetch existing customers from our DB and create lookup maps
+    // 2. De-duplicate contacts from Lexoffice based on email. First one wins.
+    const uniqueContactsMap = new Map<string, any>();
+    for (const contact of allContacts) {
+        const mapped = mapContactToCustomer(contact);
+        if (!mapped) continue;
+
+        const email = mapped.email;
+        if (email && !uniqueContactsMap.has(email)) {
+            uniqueContactsMap.set(email, mapped);
+        } else if (!email) {
+            // For contacts without email, use their lex_id as a unique key
+            uniqueContactsMap.set(mapped.lex_id, mapped);
+        }
+    }
+    const uniqueLexofficeCustomers = Array.from(uniqueContactsMap.values());
+
+    // 3. Fetch existing customers from our DB and create lookup maps
     const { data: existingCustomers, error: dbError } = await supabaseAdmin.from('customers').select('id, lex_id, email');
     if (dbError) throw dbError;
 
     const lexIdToDbCustomer = new Map(existingCustomers.map(c => [c.lex_id, c]));
     const emailToDbCustomer = new Map(existingCustomers.filter(c => c.email).map(c => [c.email.toLowerCase(), c]));
 
-    // 3. Process contacts to decide whether to insert or update
+    // 4. Process the de-duplicated contacts
     const customersToUpsert = [];
-    const processedLexIds = new Set<string>();
     let updatedCount = 0;
     let insertedCount = 0;
-    let skippedCount = 0;
 
-    for (const contact of allContacts) {
-      if (processedLexIds.has(contact.id)) continue;
-
-      const mappedCustomer = mapContactToCustomer(contact);
-      if (!mappedCustomer) {
-        skippedCount++;
-        continue;
-      }
-
+    for (const mappedCustomer of uniqueLexofficeCustomers) {
       const existingByLexId = lexIdToDbCustomer.get(mappedCustomer.lex_id);
       const existingByEmail = mappedCustomer.email ? emailToDbCustomer.get(mappedCustomer.email) : null;
 
       if (existingByLexId) {
-        // Priority 1: Match by lex_id. This is a clear update.
         customersToUpsert.push({ id: existingByLexId.id, ...mappedCustomer });
         updatedCount++;
       } else if (existingByEmail) {
-        // Priority 2: Match by email. Update existing record and link lex_id.
         customersToUpsert.push({ id: existingByEmail.id, ...mappedCustomer });
         updatedCount++;
       } else {
-        // No match found. This is a new customer.
         customersToUpsert.push(mappedCustomer);
         insertedCount++;
       }
-      processedLexIds.add(contact.id);
     }
 
-    // 4. Perform the database operation
+    // 5. Perform the database operation
     if (customersToUpsert.length > 0) {
       const { error: upsertError } = await supabaseAdmin.from('customers').upsert(customersToUpsert);
       if (upsertError) throw upsertError;
     }
 
-    // 5. Return success response
-    let message = `Synchronisierung abgeschlossen: ${insertedCount} Kunden neu importiert, ${updatedCount} Kunden aktualisiert.`;
-    if (skippedCount > 0) {
-      message += ` ${skippedCount} Kontakte wurden übersprungen.`
-    }
+    // 6. Return success response
+    const message = `Synchronisierung abgeschlossen: ${insertedCount} Kunden neu importiert, ${updatedCount} Kunden aktualisiert.`;
 
     return new Response(JSON.stringify({ message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
