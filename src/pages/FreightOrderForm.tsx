@@ -11,7 +11,7 @@ import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
 import type { Setting } from '@/types/settings';
-import { ArrowLeft, PlusCircle, Trash2, Share2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Trash2, Share2, MapPin, Package, Info } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
@@ -228,44 +228,68 @@ const FreightOrderForm = () => {
           <Row className="g-4">
               <Col lg={8} className="d-flex flex-column gap-4">
                   <Card>
-                      <Card.Header>
-                          <Card.Title>Route & Stopps</Card.Title>
+                      <Card.Header className="bg-light">
+                          <Card.Title className="d-flex align-items-center">
+                              <MapPin className="me-2" size={20} />
+                              Route & Stopps
+                          </Card.Title>
                           <Card.Text className="text-muted small">Definieren Sie hier die Abhol-, Liefer- und Zwischenstopps.</Card.Text>
                       </Card.Header>
                       <Card.Body className="d-flex flex-column gap-3">
-                          {stopFields.map((field, index) => (
-                              <Card key={field.id} className="p-3 position-relative bg-light">
-                                  <Row className="g-3">
-                                      <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
-                                      <Col md={6}><Form.Group><Form.Label>Stopp-Art</Form.Label><Form.Select {...form.register(`stops.${index}.stop_type`)}><option value="Abholung">Abholung</option><option value="Teilladung">Teilladung</option><option value="Teillieferung">Teillieferung</option><option value="Lieferung">Lieferung</option></Form.Select></Form.Group></Col>
-                                      <Col md={6}><Form.Group><Form.Label>Datum</Form.Label><Form.Control type="date" {...form.register(`stops.${index}.stop_date`)} /></Form.Group></Col>
-                                      <Col md={6}><Form.Group><Form.Label>Zeitfenster (von)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_start`)} /></Form.Group></Col>
-                                      <Col md={6}><Form.Group><Form.Label>Zeitfenster (bis)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_end`)} /></Form.Group></Col>
-                                  </Row>
-                                  <Button type="button" variant="ghost" size="sm" className="position-absolute top-0 end-0 mt-2 me-2" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
-                              </Card>
-                          ))}
+                          {stopFields.map((field, index) => {
+                              const stopType = form.watch(`stops.${index}.stop_type`);
+                              let borderColorClass = 'border-secondary';
+                              if (stopType === 'Abholung') borderColorClass = 'border-primary';
+                              if (stopType === 'Lieferung') borderColorClass = 'border-success';
+                              if (stopType === 'Teilladung' || stopType === 'Teillieferung') borderColorClass = 'border-warning';
+
+                              return (
+                                  <Card key={field.id} className={`position-relative bg-white border-start border-4 ${borderColorClass}`}>
+                                      <Card.Body>
+                                          <div className="d-flex justify-content-between align-items-center mb-3">
+                                              <h6 className="mb-0 fw-bold">Stopp {index + 1}: {stopType}</h6>
+                                              <Button type="button" variant="ghost" size="sm" className="p-1" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
+                                          </div>
+                                          <Row className="g-3">
+                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
+                                              <Col md={6}><Form.Group><Form.Label>Stopp-Art</Form.Label><Form.Select {...form.register(`stops.${index}.stop_type`)}><option value="Abholung">Abholung</option><option value="Teilladung">Teilladung</option><option value="Teillieferung">Teillieferung</option><option value="Lieferung">Lieferung</option></Form.Select></Form.Group></Col>
+                                              <Col md={6}><Form.Group><Form.Label>Datum</Form.Label><Form.Control type="date" {...form.register(`stops.${index}.stop_date`)} /></Form.Group></Col>
+                                              <Col md={6}><Form.Group><Form.Label>Zeitfenster (von)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_start`)} /></Form.Group></Col>
+                                              <Col md={6}><Form.Group><Form.Label>Zeitfenster (bis)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_end`)} /></Form.Group></Col>
+                                          </Row>
+                                      </Card.Body>
+                                  </Card>
+                              )
+                          })}
                           <Button type="button" variant="outline-secondary" onClick={() => appendStop({ stop_type: 'Teillieferung', address: '', stop_date: null, time_start: null, time_end: null, position: stopFields.length })}>
                               <PlusCircle className="me-2" size={16} /> Stopp hinzufügen
                           </Button>
                       </Card.Body>
                   </Card>
                   <Card>
-                      <Card.Header>
-                          <Card.Title>Ladungsdetails</Card.Title>
+                      <Card.Header className="bg-light">
+                          <Card.Title className="d-flex align-items-center">
+                              <Package className="me-2" size={20} />
+                              Ladungsdetails
+                          </Card.Title>
                           <Card.Text className="text-muted small">Fügen Sie hier die einzelnen Ladungspositionen hinzu.</Card.Text>
                       </Card.Header>
                       <Card.Body className="d-flex flex-column gap-3">
                           {cargoFields.map((field, index) => (
-                              <Card key={field.id} className="p-3 position-relative bg-light">
-                                  <Row className="g-3">
-                                      <Col xs={6} md={2}><Form.Group><Form.Label>Anzahl</Form.Label><Form.Control type="number" {...form.register(`cargoItems.${index}.quantity`)} /></Form.Group></Col>
-                                      <Col xs={6} md={2}><Form.Group><Form.Label>Art</Form.Label><Form.Control {...form.register(`cargoItems.${index}.cargo_type`)} /></Form.Group></Col>
-                                      <Col md={4}><Form.Group><Form.Label>Bezeichnung</Form.Label><Form.Control {...form.register(`cargoItems.${index}.description`)} /></Form.Group></Col>
-                                      <Col xs={6} md={2}><Form.Group><Form.Label>Gewicht (kg)</Form.Label><Form.Control type="number" step="0.01" {...form.register(`cargoItems.${index}.weight`)} /></Form.Group></Col>
-                                      <Col xs={6} md={2}><Form.Group><Form.Label>Lademeter</Form.Label><Form.Control type="number" step="0.01" {...form.register(`cargoItems.${index}.loading_meters`)} /></Form.Group></Col>
-                                  </Row>
-                                  <Button type="button" variant="ghost" size="sm" className="position-absolute top-0 end-0 mt-2 me-2" onClick={() => removeCargo(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
+                              <Card key={field.id} className="position-relative bg-white border">
+                                  <Card.Body>
+                                      <div className="d-flex justify-content-between align-items-center mb-3">
+                                          <h6 className="mb-0 fw-bold">Ladungsposition {index + 1}</h6>
+                                          <Button type="button" variant="ghost" size="sm" className="p-1" onClick={() => removeCargo(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
+                                      </div>
+                                      <Row className="g-3">
+                                          <Col xs={6} md={2}><Form.Group><Form.Label>Anzahl</Form.Label><Form.Control type="number" {...form.register(`cargoItems.${index}.quantity`)} /></Form.Group></Col>
+                                          <Col xs={6} md={2}><Form.Group><Form.Label>Art</Form.Label><Form.Control {...form.register(`cargoItems.${index}.cargo_type`)} /></Form.Group></Col>
+                                          <Col md={4}><Form.Group><Form.Label>Bezeichnung</Form.Label><Form.Control {...form.register(`cargoItems.${index}.description`)} /></Form.Group></Col>
+                                          <Col xs={6} md={2}><Form.Group><Form.Label>Gewicht (kg)</Form.Label><Form.Control type="number" step="0.01" {...form.register(`cargoItems.${index}.weight`)} /></Form.Group></Col>
+                                          <Col xs={6} md={2}><Form.Group><Form.Label>Lademeter</Form.Label><Form.Control type="number" step="0.01" {...form.register(`cargoItems.${index}.loading_meters`)} /></Form.Group></Col>
+                                      </Row>
+                                  </Card.Body>
                               </Card>
                           ))}
                           <Button type="button" variant="outline-secondary" onClick={() => appendCargo({ quantity: 1, cargo_type: '', description: '', weight: null, loading_meters: null })}>
@@ -276,7 +300,12 @@ const FreightOrderForm = () => {
               </Col>
               <Col lg={4}>
                   <Card>
-                      <Card.Header><Card.Title>Allgemeine Informationen</Card.Title></Card.Header>
+                      <Card.Header className="bg-light">
+                          <Card.Title className="d-flex align-items-center">
+                              <Info className="me-2" size={20} />
+                              Allgemeine Informationen
+                          </Card.Title>
+                      </Card.Header>
                       <Card.Body className="d-flex flex-column gap-3">
                           <Form.Group>
                               <Form.Label>Kunde</Form.Label>
