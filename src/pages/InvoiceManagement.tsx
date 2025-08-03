@@ -12,7 +12,7 @@ type LexInvoice = {
   voucherDate: string;
   voucherStatus: 'open' | 'paid' | 'overdue' | 'voided';
   contactName: string;
-  totalPrice: {
+  totalPrice?: {
     totalNetAmount: number;
     totalGrossAmount: number;
     currency: string;
@@ -108,7 +108,12 @@ const InvoiceManagement = () => {
                     <td>{invoice.contactName}</td>
                     <td>{new Date(invoice.voucherDate).toLocaleDateString('de-DE')}</td>
                     <td><Badge bg={getStatusBadge(invoice.voucherStatus)}>{invoice.voucherStatus}</Badge></td>
-                    <td>{new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.totalPrice.currency }).format(invoice.totalPrice.totalGrossAmount)}</td>
+                    <td>
+                      {invoice.totalPrice ? 
+                        new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.totalPrice.currency }).format(invoice.totalPrice.totalGrossAmount)
+                        : '-'
+                      }
+                    </td>
                     <td className="text-end">
                       <Button variant="ghost" size="sm" onClick={() => handleDownload(invoice)} disabled={downloadingId === invoice.id}>
                         {downloadingId === invoice.id ? <Spinner size="sm" /> : <Download size={16} />}
