@@ -2,6 +2,7 @@ import { Card, Row, Col, Placeholder } from 'react-bootstrap';
 import { Users, Shield } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
 
 type DashboardStats = {
   userCount: number;
@@ -64,6 +65,11 @@ const Dashboard = () => {
             note="Anzahl der erstellten Gruppen"
             isLoading={isLoading}
           />
+        </Col>
+      </Row>
+      <Row>
+        <Col lg={6} className="mb-4">
+          <TodoWidget />
         </Col>
       </Row>
     </div>
