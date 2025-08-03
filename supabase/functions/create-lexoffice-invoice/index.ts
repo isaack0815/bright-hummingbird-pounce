@@ -57,10 +57,6 @@ serve(async (req) => {
     console.log(`STEP 7: Found ${allLineItems.length} total line items.`);
 
     const lexLineItems = allLineItems.map(item => {
-      if (!item.id) {
-        throw new Error(`Line item '${item.description}' is missing a database ID and cannot be sent to Lexoffice.`);
-      }
-      
       let discountPercentage = 0;
       if (item.discount_type === 'percentage') {
         discountPercentage = item.discount;
@@ -69,9 +65,9 @@ serve(async (req) => {
       }
 
       return {
-        id: item.id.toString(),
-        type: "service",
-        name: item.description,
+        type: "custom",
+        name: "Transportauftrag",
+        description: item.description,
         quantity: item.quantity,
         unitName: "Stück",
         unitPrice: {
@@ -87,7 +83,7 @@ serve(async (req) => {
     const isIntraCommunity = firstOrder.is_intra_community;
     const introductionText = isIntraCommunity 
       ? "Innergemeinschaftliche Lieferung. Steuerschuldnerschaft des Leistungsempfängers (Reverse-Charge-Verfahren)."
-      : "";
+      : "Ihre bestellten Positionen stellen wir Ihnen hiermit in Rechnung";
 
     const toLexDate = (date: Date) => {
         const year = date.getFullYear();
@@ -106,7 +102,11 @@ serve(async (req) => {
       taxConditions: {
         taxType: "net",
       },
-      title: "Sammelrechnung",
+      shippingConditions: {
+        shippingDate: `${toLexDate(new Date())}T00:00:00.000+01:00`,
+        shippingType: 'delivery'
+      },
+      title: "Rechnung",
       introduction: introductionText,
     };
     
