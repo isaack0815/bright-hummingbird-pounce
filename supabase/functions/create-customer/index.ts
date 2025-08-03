@@ -74,7 +74,12 @@ serve(async (req) => {
     }
 
     const lexData = await lexResponse.json();
-    const lexId = lexData.id;
+    const resourceUri = lexData.resourceUri;
+    if (!resourceUri) {
+        throw new Error("Lexoffice did not return a resourceUri for the new contact.");
+    }
+    const lexId = resourceUri.substring(resourceUri.lastIndexOf('/') + 1);
+
 
     // 3. If Lexoffice succeeds, insert the customer into local DB with the new lex_id
     const finalCustomerData = {
