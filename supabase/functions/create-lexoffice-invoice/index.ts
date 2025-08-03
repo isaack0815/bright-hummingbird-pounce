@@ -91,6 +91,9 @@ serve(async (req) => {
       introduction: introductionText,
     };
 
+    // Log the payload for debugging
+    console.log("Sending the following payload to Lexoffice:", JSON.stringify(lexofficePayload, null, 2));
+
     // 4. Send to Lexoffice
     const lexResponse = await fetch('https://api.lexoffice.io/v1/invoices', {
       method: 'POST',
