@@ -23,8 +23,11 @@ serve(async (req) => {
     const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
     if (permError) throw permError;
     
-    const hasPermission = permissions.some((p: { permission_name: string }) => p.permission_name === 'settings.manage');
-    if (!hasPermission) {
+    const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
+    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+    const hasPermission = permissionNames.includes('settings.manage');
+
+    if (!isSuperAdmin && !hasPermission) {
         return new Response(JSON.stringify({ error: 'Forbidden: You do not have permission to manage settings.' }), { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 403 
