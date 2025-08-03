@@ -11,6 +11,11 @@ const fetchVouchersByStatus = async (lexApiKey: string, statuses: string): Promi
   let hasMore = true;
 
   while (hasMore) {
+    // Add a delay before each request (except the first one) to avoid hitting the rate limit
+    if (page > 0) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+    }
+
     const url = `https://api.lexoffice.io/v1/voucherlist?voucherType=invoice&voucherStatus=${statuses}&page=${page}&size=100`;
     const response = await fetch(url, {
       headers: {
@@ -47,6 +52,9 @@ serve(async (req) => {
     // Fetch invoices with standard statuses
     const standardStatuses = 'open,paid,voided';
     const standardInvoices = await fetchVouchersByStatus(lexApiKey, standardStatuses);
+
+    // Add a delay before the next batch of requests
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Fetch invoices with overdue status
     const overdueStatus = 'overdue';
