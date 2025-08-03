@@ -18,48 +18,41 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    // Check permission
     const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
     if (permError) throw permError;
     
-    const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
-    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
-    const hasPermission = permissionNames.includes('Abrechnung Fernverkehr');
-
-    if (!isSuperAdmin && !hasPermission) {
-        return new Response(JSON.stringify({ error: 'Forbidden' }), { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 403 
-        });
+    const hasPermission = permissions.some((p: { permission_name: string }) => p.permission_name === 'Abrechnung Fernverkehr');
+    if (!hasPermission) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
     }
 
     const { orderId } = await req.json()
     if (!orderId) {
-      return new Response(JSON.stringify({ error: 'Order ID is required' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      })
+      return new Response(JSON.stringify({ error: 'Order ID is required' }), { status: 400, headers: corsHeaders });
     }
 
-    // Use the user's client to respect RLS on freight_orders
-    const { data: order, error: orderError } = await userClient
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { data: order, error: orderError } = await supabaseAdmin
       .from('freight_orders')
-      .select(`
-        *,
-        customers ( * )
-      `)
+      .select(`*, customers ( * )`)
       .eq('id', orderId)
       .single()
 
-    if (orderError) throw orderError
-    if (!order) {
-        return new Response(JSON.stringify({ error: 'Order not found' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404,
-        })
-    }
+    if (orderError) throw orderError;
 
-    return new Response(JSON.stringify({ order }), {
+    const { data: lineItems, error: lineItemsError } = await supabaseAdmin
+      .from('billing_line_items')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('id');
+
+    if (lineItemsError) throw lineItemsError;
+
+    return new Response(JSON.stringify({ order: { ...order, line_items: lineItems } }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

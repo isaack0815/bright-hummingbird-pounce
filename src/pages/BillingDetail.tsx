@@ -1,16 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, NavLink } from 'react-router-dom';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Button, ListGroup, Placeholder, Alert, Form, InputGroup, Spinner } from 'react-bootstrap';
-import { ArrowLeft, CheckCircle2, XCircle, Loader2, Save } from 'lucide-react';
+import { Card, Row, Col, Button, ListGroup, Placeholder, Alert, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
+import { ArrowLeft, Save, PlusCircle, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { FreightOrder } from '@/types/freight';
 import type { Customer } from '@/pages/CustomerManagement';
-import { useState, useEffect } from 'react';
+import type { BillingLineItem } from '@/types/billing';
+import { useEffect } from 'react';
 
 type BillingOrder = Omit<FreightOrder, 'customers'> & {
   customers: Customer | null;
+  line_items: BillingLineItem[];
 };
+
+const lineItemSchema = z.object({
+  id: z.number().optional(),
+  description: z.string().min(1, "Erforderlich"),
+  quantity: z.coerce.number().min(0),
+  unit_price: z.coerce.number().min(0),
+  discount: z.coerce.number().min(0).default(0),
+  discount_type: z.enum(['fixed', 'percentage']).default('fixed'),
+  vat_rate: z.coerce.number().min(0),
+});
+
+const billingSchema = z.object({
+  is_intra_community: z.boolean().default(false),
+  total_discount: z.coerce.number().min(0).default(0),
+  total_discount_type: z.enum(['fixed', 'percentage']).default('fixed'),
+  line_items: z.array(lineItemSchema),
+});
 
 const fetchBillingDetails = async (id: string): Promise<BillingOrder> => {
   const { data, error } = await supabase.functions.invoke('get-billing-details', {
@@ -24,35 +46,57 @@ const BillingDetail = () => {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
 
-  const [price, setPrice] = useState(0);
-  const [discount, setDiscount] = useState(0);
-  const [vatRate, setVatRate] = useState(19);
-  const [isIntraCommunity, setIsIntraCommunity] = useState(false);
-
   const { data: order, isLoading, error } = useQuery({
     queryKey: ['billingDetail', id],
     queryFn: () => fetchBillingDetails(id!),
     enabled: !!id,
   });
 
+  const form = useForm<z.infer<typeof billingSchema>>({
+    resolver: zodResolver(billingSchema),
+    defaultValues: {
+      is_intra_community: false,
+      total_discount: 0,
+      total_discount_type: 'fixed',
+      line_items: [],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "line_items",
+  });
+
   useEffect(() => {
     if (order) {
-      setPrice(order.price || 0);
-      setDiscount(order.discount_amount || 0);
-      setVatRate(order.vat_rate ?? 19);
-      setIsIntraCommunity(order.is_intra_community || false);
+      const defaultLineItem = {
+        description: `Transportauftrag ${order.order_number}`,
+        quantity: 1,
+        unit_price: order.price || 0,
+        discount: 0,
+        discount_type: 'fixed' as 'fixed' | 'percentage',
+        vat_rate: order.vat_rate ?? 19,
+      };
+      form.reset({
+        is_intra_community: order.is_intra_community || false,
+        total_discount: order.total_discount || 0,
+        total_discount_type: (order.total_discount_type as 'fixed' | 'percentage') || 'fixed',
+        line_items: order.line_items && order.line_items.length > 0 ? order.line_items : [defaultLineItem],
+      });
     }
-  }, [order]);
+  }, [order, form]);
 
   const updateBillingMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.functions.invoke('update-billing-details', {
+    mutationFn: async (values: z.infer<typeof billingSchema>) => {
+      const { error } = await supabase.functions.invoke('update-billing-with-line-items', {
         body: {
           orderId: order!.id,
-          price,
-          discount_amount: discount,
-          vat_rate: vatRate,
-          is_intra_community: isIntraCommunity,
+          orderData: {
+            is_intra_community: values.is_intra_community,
+            total_discount: values.total_discount,
+            total_discount_type: values.total_discount_type,
+          },
+          lineItems: values.line_items,
         },
       });
       if (error) throw error;
@@ -66,135 +110,138 @@ const BillingDetail = () => {
     }
   });
 
-  const toggleBilledMutation = useMutation({
-    mutationFn: async (orderId: number) => {
-      const { error } = await supabase.rpc('toggle_order_billed_status', { p_order_id: orderId });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess("Abrechnungsstatus geändert!");
-      queryClient.invalidateQueries({ queryKey: ['billingDetail', id] });
-      queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
-    },
-    onError: (err: any) => {
-      showError(err.message || "Fehler beim Ändern des Abrechnungsstatus.");
-    }
-  });
+  const watchedLineItems = form.watch('line_items');
+  const watchedTotalDiscount = form.watch('total_discount');
+  const watchedTotalDiscountType = form.watch('total_discount_type');
+  const watchedIsIntraCommunity = form.watch('is_intra_community');
 
-  const handleIntraCommunityToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = e.target.checked;
-    setIsIntraCommunity(checked);
-    if (checked) {
-      setVatRate(0);
+  const totals = watchedLineItems.reduce((acc, item) => {
+    const lineTotal = item.quantity * item.unit_price;
+    let lineDiscount = 0;
+    if (item.discount_type === 'fixed') {
+      lineDiscount = item.discount;
     } else {
-      setVatRate(19); // Reset to default
+      lineDiscount = lineTotal * (item.discount / 100);
     }
-  };
+    const netLineTotal = lineTotal - lineDiscount;
+    const vatAmount = netLineTotal * (item.vat_rate / 100);
+    
+    acc.subtotal += lineTotal;
+    acc.totalNet += netLineTotal;
+    
+    if (!acc.vatTotals[item.vat_rate]) {
+      acc.vatTotals[item.vat_rate] = 0;
+    }
+    acc.vatTotals[item.vat_rate] += vatAmount;
+    
+    return acc;
+  }, { subtotal: 0, totalNet: 0, vatTotals: {} as Record<number, number> });
 
-  const customer = order?.customers;
-  const netAfterDiscount = price - discount;
-  const vatAmount = netAfterDiscount * (vatRate / 100);
-  const grossPrice = netAfterDiscount + vatAmount;
-
-  if (isLoading) {
-    return (
-      <div>
-        <Placeholder as="h1" animation="glow"><Placeholder xs={6} /></Placeholder>
-        <Row className="g-4 mt-2">
-          <Col md={6}><Placeholder as={Card} animation="glow"><Card.Body><Placeholder xs={12} style={{height: '150px'}} /></Card.Body></Placeholder></Col>
-          <Col md={6}><Placeholder as={Card} animation="glow"><Card.Body><Placeholder xs={12} style={{height: '150px'}} /></Card.Body></Placeholder></Col>
-        </Row>
-      </div>
-    );
+  let overallDiscountAmount = 0;
+  if (watchedTotalDiscountType === 'fixed') {
+    overallDiscountAmount = watchedTotalDiscount;
+  } else {
+    overallDiscountAmount = totals.totalNet * (watchedTotalDiscount / 100);
   }
+  const finalNet = totals.totalNet - overallDiscountAmount;
+  const totalVat = Object.values(totals.vatTotals).reduce((sum, v) => sum + v, 0);
+  const finalGross = finalNet + totalVat;
 
-  if (error) {
-    return <Alert variant="danger">Fehler beim Laden der Auftragsdetails: {error.message}</Alert>;
-  }
-
-  if (!order) {
-    return <Alert variant="warning">Auftrag nicht gefunden.</Alert>;
-  }
+  if (isLoading) return <p>Lade Abrechnungsdetails...</p>;
+  if (error) return <Alert variant="danger">Fehler: {error.message}</Alert>;
+  if (!order) return <Alert variant="warning">Auftrag nicht gefunden.</Alert>;
 
   return (
-    <div>
+    <Form onSubmit={form.handleSubmit((v) => updateBillingMutation.mutate(v))}>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div className='d-flex align-items-center gap-3'>
-          <NavLink to="/fernverkehr" className="btn btn-outline-secondary btn-sm p-2 lh-1">
-            <ArrowLeft size={16} />
-          </NavLink>
-          <h1 className="h2 mb-0">
-            Abrechnung für Auftrag {order.order_number}
-          </h1>
+          <NavLink to="/fernverkehr" className="btn btn-outline-secondary btn-sm p-2 lh-1"><ArrowLeft size={16} /></NavLink>
+          <h1 className="h2 mb-0">Abrechnung für Auftrag {order.order_number}</h1>
         </div>
+        <Button type="submit" disabled={updateBillingMutation.isPending}>
+          {updateBillingMutation.isPending ? <Spinner size="sm" /> : <Save size={16} />} Änderungen speichern
+        </Button>
       </div>
 
       <Row className="g-4">
-        <Col lg={6}>
+        <Col lg={8}>
           <Card>
-            <Card.Header><Card.Title>Rechnungsanschrift</Card.Title></Card.Header>
+            <Card.Header><Card.Title>Rechnungspositionen</Card.Title></Card.Header>
             <Card.Body>
-              {customer ? (
-                <ListGroup variant="flush">
-                  <ListGroup.Item><strong>Firma:</strong> {customer.company_name}</ListGroup.Item>
-                  <ListGroup.Item><strong>Anschrift:</strong><br/>{customer.street} {customer.house_number}<br/>{customer.postal_code} {customer.city}<br/>{customer.country}</ListGroup.Item>
-                  <ListGroup.Item><strong>E-Mail:</strong> {customer.email || '-'}</ListGroup.Item>
-                  <ListGroup.Item><strong>Steuernummer:</strong> {customer.tax_number || '-'}</ListGroup.Item>
-                </ListGroup>
-              ) : (
-                <p className="text-muted">Keine Kundendaten vorhanden.</p>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col lg={6}>
-          <Card>
-            <Card.Header><Card.Title>Preisübersicht & Bearbeitung</Card.Title></Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>Frachtpreis (Netto)</Form.Label>
-                <InputGroup><Form.Control type="number" step="0.01" value={price} onChange={e => setPrice(parseFloat(e.target.value) || 0)} /><InputGroup.Text>€</InputGroup.Text></InputGroup>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Rabatt</Form.Label>
-                <InputGroup><Form.Control type="number" step="0.01" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)} /><InputGroup.Text>€</InputGroup.Text></InputGroup>
-              </Form.Group>
-              <hr />
-              <ListGroup variant="flush" className="mb-3">
-                <ListGroup.Item className="d-flex justify-content-between"><span>Summe (Netto)</span> <strong>{netAfterDiscount.toFixed(2)} €</strong></ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between">
-                  <Form.Check type="switch" id="intra-community-switch" label="Innergemeinschaftliche Leistung" checked={isIntraCommunity} onChange={handleIntraCommunityToggle} />
-                  <Form.Select size="sm" style={{width: '100px'}} value={vatRate} onChange={e => setVatRate(parseInt(e.target.value))} disabled={isIntraCommunity}>
-                    <option value="19">19%</option><option value="7">7%</option><option value="0">0%</option>
-                  </Form.Select>
-                </ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between"><span>MwSt. ({vatRate}%)</span> <span>{vatAmount.toFixed(2)} €</span></ListGroup.Item>
-                <ListGroup.Item className="d-flex justify-content-between fw-bold h5 mb-0"><span>Gesamt (Brutto)</span> <span>{grossPrice.toFixed(2)} €</span></ListGroup.Item>
-              </ListGroup>
-              <Button variant="primary" className="w-100" onClick={() => updateBillingMutation.mutate()} disabled={updateBillingMutation.isPending}>
-                {updateBillingMutation.isPending ? <Spinner size="sm" /> : <Save size={16} />} Änderungen speichern
+              <Table responsive>
+                <thead><tr><th>Beschreibung</th><th>Menge</th><th>Einzelpreis</th><th>Rabatt</th><th>MwSt.</th><th></th></tr></thead>
+                <tbody>
+                  {fields.map((field, index) => (
+                    <tr key={field.id}>
+                      <td><Form.Control {...form.register(`line_items.${index}.description`)} /></td>
+                      <td><Form.Control type="number" {...form.register(`line_items.${index}.quantity`)} /></td>
+                      <td><InputGroup><Form.Control type="number" step="0.01" {...form.register(`line_items.${index}.unit_price`)} /><InputGroup.Text>€</InputGroup.Text></InputGroup></td>
+                      <td>
+                        <InputGroup>
+                          <Form.Control type="number" step="0.01" {...form.register(`line_items.${index}.discount`)} />
+                          <Form.Select {...form.register(`line_items.${index}.discount_type`)} style={{width: '60px'}}><option value="fixed">€</option><option value="percentage">%</option></Form.Select>
+                        </InputGroup>
+                      </td>
+                      <td>
+                        <Controller
+                          control={form.control}
+                          name={`line_items.${index}.vat_rate`}
+                          render={({ field }) => (
+                            <Form.Select {...field} disabled={watchedIsIntraCommunity}>
+                              <option value="19">19%</option><option value="7">7%</option><option value="0">0%</option>
+                            </Form.Select>
+                          )}
+                        />
+                      </td>
+                      <td><Button variant="ghost" size="sm" onClick={() => remove(index)}><Trash2 className="text-danger" size={16} /></Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+              <Button variant="outline-secondary" onClick={() => append({ description: '', quantity: 1, unit_price: 0, discount: 0, discount_type: 'fixed', vat_rate: 19 })}>
+                <PlusCircle size={16} className="me-2" />Position hinzufügen
               </Button>
             </Card.Body>
           </Card>
-          <Card className="mt-4">
-            <Card.Header><Card.Title>Abrechnungsstatus</Card.Title></Card.Header>
+        </Col>
+        <Col lg={4}>
+          <Card className="mb-4">
+            <Card.Header><Card.Title>Rechnungsanschrift</Card.Title></Card.Header>
             <Card.Body>
-              <div className="d-flex align-items-center justify-content-between">
-                <span>Status: {order.is_billed ? 'Abgerechnet' : 'Offen'}</span>
-                <Button 
-                  variant={order.is_billed ? 'outline-danger' : 'outline-success'}
-                  onClick={() => toggleBilledMutation.mutate(order.id)}
-                  disabled={toggleBilledMutation.isPending}
-                >
-                  {toggleBilledMutation.isPending ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : (order.is_billed ? <XCircle className="me-2 h-4 w-4" /> : <CheckCircle2 className="me-2 h-4 w-4" />)}
-                  {order.is_billed ? 'Als nicht abgerechnet markieren' : 'Als abgerechnet markieren'}
-                </Button>
-              </div>
+              <p className="mb-1"><strong>{order.customers?.company_name}</strong></p>
+              <p className="text-muted small">{order.customers?.street} {order.customers?.house_number}<br/>{order.customers?.postal_code} {order.customers?.city}</p>
+            </Card.Body>
+          </Card>
+          <Card>
+            <Card.Header><Card.Title>Zusammenfassung</Card.Title></Card.Header>
+            <Card.Body>
+              <ListGroup variant="flush">
+                <ListGroup.Item className="d-flex justify-content-between"><span>Zwischensumme</span> <span>{totals.subtotal.toFixed(2)} €</span></ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between"><span>Gesamtrabatt</span>
+                  <InputGroup size="sm" style={{maxWidth: '150px'}}>
+                    <Form.Control type="number" step="0.01" {...form.register('total_discount')} />
+                    <Form.Select {...form.register('total_discount_type')} style={{width: '60px'}}><option value="fixed">€</option><option value="percentage">%</option></Form.Select>
+                  </InputGroup>
+                </ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between"><strong>Summe Netto</strong> <strong>{finalNet.toFixed(2)} €</strong></ListGroup.Item>
+                {Object.entries(totals.vatTotals).map(([rate, amount]) => (
+                  <ListGroup.Item key={rate} className="d-flex justify-content-between"><span>+ MwSt. ({rate}%)</span> <span>{amount.toFixed(2)} €</span></ListGroup.Item>
+                ))}
+                <ListGroup.Item className="d-flex justify-content-between fw-bold h5 mb-0"><span>Gesamt Brutto</span> <span>{finalGross.toFixed(2)} €</span></ListGroup.Item>
+              </ListGroup>
+              <hr/>
+              <Form.Check type="switch" id="intra-community-switch" label="Innergemeinschaftliche Leistung" {...form.register('is_intra_community')} onChange={(e) => {
+                  form.setValue('is_intra_community', e.target.checked);
+                  const newVatRate = e.target.checked ? 0 : 19;
+                  watchedLineItems.forEach((_, index) => {
+                      form.setValue(`line_items.${index}.vat_rate`, newVatRate);
+                  });
+              }}/>
             </Card.Body>
           </Card>
         </Col>
       </Row>
-    </div>
+    </Form>
   );
 };
 
