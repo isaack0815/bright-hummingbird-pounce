@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,7 +50,31 @@ serve(async (req) => {
     const lexApiKey = Deno.env.get('LEX_API_KEY');
     if (!lexApiKey) throw new Error('LEX_API_KEY secret is not set in Supabase project.');
 
-    // Fetch invoices with standard statuses
+    // Step 1: Fetch our internal invoice IDs from the freight_orders table
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: localInvoices, error: dbError } = await supabaseAdmin
+      .from('freight_orders')
+      .select('lex_invoice_id')
+      .not('lex_invoice_id', 'is', null);
+
+    if (dbError) {
+      throw new Error(`Database error fetching invoice IDs: ${dbError.message}`);
+    }
+
+    const localInvoiceIds = new Set(localInvoices.map(inv => inv.lex_invoice_id));
+    if (localInvoiceIds.size === 0) {
+        // No invoices created by our system, so return an empty array.
+        return new Response(JSON.stringify({ invoices: [] }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
+
+    // Step 2: Fetch all invoices from Lexoffice
     const standardStatuses = 'open,paid,voided';
     const standardInvoices = await fetchVouchersByStatus(lexApiKey, standardStatuses);
 
@@ -61,9 +86,12 @@ serve(async (req) => {
     const overdueInvoices = await fetchVouchersByStatus(lexApiKey, overdueStatus);
     
     // Combine the results
-    const allInvoices = [...standardInvoices, ...overdueInvoices];
+    const allLexofficeInvoices = [...standardInvoices, ...overdueInvoices];
 
-    return new Response(JSON.stringify({ invoices: allInvoices }), {
+    // Step 3: Filter Lexoffice invoices based on our internal IDs
+    const filteredInvoices = allLexofficeInvoices.filter(invoice => localInvoiceIds.has(invoice.id));
+
+    return new Response(JSON.stringify({ invoices: filteredInvoices }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
