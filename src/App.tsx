@@ -25,6 +25,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AccessDenied from "./pages/AccessDenied";
 import Fernverkehr from "./pages/Fernverkehr";
 import BillingDetail from "./pages/BillingDetail";
+import InvoiceManagement from "./pages/InvoiceManagement";
 
 const queryClient = new QueryClient();
 
@@ -83,6 +84,7 @@ const AppRoutes = () => {
           <Route element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr" />}>
             <Route path="fernverkehr" element={<Fernverkehr />} />
             <Route path="billing/:id" element={<BillingDetail />} />
+            <Route path="invoices" element={<InvoiceManagement />} />
           </Route>
 
           <Route path="access-denied" element={<AccessDenied />} />
