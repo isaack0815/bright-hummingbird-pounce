@@ -12,20 +12,23 @@ serve(async (req) => {
   }
 
   try {
-    console.log("create-lexoffice-invoice function invoked."); // Zusätzliches Logging
+    console.log("STEP 1: Function invoked.");
 
     const lexApiKey = Deno.env.get('LEX_API_KEY');
     if (!lexApiKey) throw new Error('LEX_API_KEY secret is not set in Supabase project.');
+    console.log("STEP 2: LEX_API_KEY found.");
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
+    console.log("STEP 3: Supabase admin client created.");
 
     const { orderIds, customerId } = await req.json();
     if (!orderIds || orderIds.length === 0 || !customerId) {
       throw new Error("Order IDs and Customer ID are required.");
     }
+    console.log(`STEP 4: Received orderIds: ${orderIds.join(', ')} and customerId: ${customerId}`);
 
     // 1. Fetch customer details to get the lex_id
     const { data: customer, error: customerError } = await supabaseAdmin
@@ -33,9 +36,9 @@ serve(async (req) => {
       .select('lex_id')
       .eq('id', customerId)
       .single();
-    if (customerError || !customer || !customer.lex_id) {
-      throw new Error("Customer not found or missing Lexoffice ID.");
-    }
+    if (customerError) throw new Error(`Customer fetch error: ${customerError.message}`);
+    if (!customer || !customer.lex_id) throw new Error("Customer not found or missing Lexoffice ID.");
+    console.log(`STEP 5: Customer found with lex_id: ${customer.lex_id}`);
 
     // 2. Fetch selected orders and their line items
     const { data: orders, error: ordersError } = await supabaseAdmin
@@ -44,12 +47,14 @@ serve(async (req) => {
       .in('id', orderIds);
     if (ordersError) throw ordersError;
     if (!orders || orders.length === 0) throw new Error("Selected orders not found.");
+    console.log(`STEP 6: Fetched ${orders.length} orders.`);
 
     // 3. Construct Lexoffice invoice payload
     const allLineItems = orders.flatMap(order => order.billing_line_items || []);
     if (allLineItems.length === 0) {
       throw new Error("Die ausgewählten Aufträge haben keine abrechenbaren Positionen. Bitte fügen Sie zuerst Positionen in den Abrechnungsdetails hinzu.");
     }
+    console.log(`STEP 7: Found ${allLineItems.length} total line items.`);
 
     const lexLineItems = allLineItems.map(item => {
       let discountPercentage = 0;
@@ -92,9 +97,9 @@ serve(async (req) => {
       title: "Sammelrechnung",
       introduction: introductionText,
     };
-
-    // Log the payload for debugging
-    console.log("Payload construction complete. Sending the following payload to Lexoffice:", JSON.stringify(lexofficePayload, null, 2));
+    
+    console.log("STEP 8: Payload construction complete.");
+    console.log("FINAL PAYLOAD TO BE SENT:", JSON.stringify(lexofficePayload, null, 2));
 
     // 4. Send to Lexoffice
     const lexResponse = await fetch('https://api.lexoffice.io/v1/invoices', {
@@ -106,14 +111,17 @@ serve(async (req) => {
       },
       body: JSON.stringify(lexofficePayload),
     });
+    console.log(`STEP 9: Lexoffice API response status: ${lexResponse.status}`);
 
     if (!lexResponse.ok) {
       const errorBody = await lexResponse.text();
+      console.error("Lexoffice error response body:", errorBody);
       throw new Error(`Lexoffice API Error: ${lexResponse.status} - ${errorBody}`);
     }
 
     const lexData = await lexResponse.json();
     const newInvoiceId = lexData.id;
+    console.log(`STEP 10: Lexoffice invoice created with ID: ${newInvoiceId}`);
 
     // 5. Update local orders with the new invoice ID and set as billed
     const { error: updateError } = await supabaseAdmin
@@ -122,9 +130,10 @@ serve(async (req) => {
       .in('id', orderIds);
 
     if (updateError) {
-      console.error(`CRITICAL: Invoice created in Lexoffice (ID: ${newInvoiceId}) but failed to update local orders. Error: ${updateError.message}`);
-      throw new Error(`Invoice created in Lexoffice, but failed to update local orders. Please check logs.`);
+      console.error(`CRITICAL: Failed to update local orders. Error: ${updateError.message}`);
+      throw new Error(`Invoice created in Lexoffice, but failed to update local orders.`);
     }
+    console.log("STEP 11: Local orders updated successfully.");
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -136,7 +145,7 @@ serve(async (req) => {
     });
 
   } catch (e) {
-    console.error("Error in create-lexoffice-invoice:", e);
+    console.error("!!! FUNCTION CRASHED !!!", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
