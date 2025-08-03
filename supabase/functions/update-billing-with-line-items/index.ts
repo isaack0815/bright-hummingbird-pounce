@@ -21,8 +21,11 @@ serve(async (req) => {
     const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
     if (permError) throw permError;
     
-    const hasPermission = permissions.some((p: { permission_name: string }) => p.permission_name === 'Abrechnung Fernverkehr');
-    if (!hasPermission) {
+    const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
+    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+    const hasBillingPermission = permissionNames.includes('Abrechnung Fernverkehr');
+
+    if (!isSuperAdmin && !hasBillingPermission) {
         return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
     }
 
