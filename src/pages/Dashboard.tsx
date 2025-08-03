@@ -1,77 +1,49 @@
-import { Card, Row, Col, Placeholder } from 'react-bootstrap';
-import { Users, Shield } from 'lucide-react';
+import { Row, Col } from 'react-bootstrap';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
+import { StatsWidget } from '@/components/dashboard/StatsWidget';
+import type { DashboardLayout } from '@/types/dashboard';
 
-type DashboardStats = {
-  userCount: number;
-  roleCount: number;
+const fetchLayout = async (): Promise<DashboardLayout> => {
+  const { data, error } = await supabase.functions.invoke('get-dashboard-layout');
+  if (error) throw new Error(error.message);
+  return data.layout;
 };
 
-const fetchDashboardStats = async (): Promise<DashboardStats> => {
-  const { data, error } = await supabase.functions.invoke('get-dashboard-stats');
-  if (error) throw new Error(error.message);
-  return data;
+const componentMap: { [key: string]: React.ComponentType } = {
+  todos: TodoWidget,
+  stats: StatsWidget,
 };
 
 const Dashboard = () => {
-  const { data, isLoading } = useQuery<DashboardStats>({
-    queryKey: ['dashboardStats'],
-    queryFn: fetchDashboardStats,
+  const { data: layout, isLoading } = useQuery<DashboardLayout>({
+    queryKey: ['dashboardLayout'],
+    queryFn: fetchLayout,
   });
 
-  const StatCard = ({ title, value, icon, note, isLoading }: { title: string, value?: number, icon: React.ReactNode, note: string, isLoading: boolean }) => (
-    <Card className="shadow-sm">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start">
-          <div>
-            <h6 className="card-subtitle mb-2 text-muted">{title}</h6>
-            {isLoading ? (
-              <Placeholder as="p" animation="glow" className="mt-2">
-                <Placeholder xs={6} size="lg" />
-              </Placeholder>
-            ) : (
-              <div className="h2 fw-bold">{value}</div>
-            )}
-          </div>
-          {icon}
-        </div>
-        <Card.Text className="text-muted small mt-1">
-          {note}
-        </Card.Text>
-      </Card.Body>
-    </Card>
-  );
+  const sortedEnabledWidgets = layout
+    ?.filter(widget => widget.enabled)
+    .sort((a, b) => a.row - b.row || a.col - b.col) || [];
 
   return (
     <div>
       <h1 className="mb-4">Dashboard</h1>
-      <Row>
-        <Col md={6} lg={3} className="mb-4">
-          <StatCard
-            title="Aktive Nutzer"
-            value={data?.userCount}
-            icon={<Users className="text-muted" size={24} />}
-            note="Anzahl der registrierten Benutzer"
-            isLoading={isLoading}
-          />
-        </Col>
-        <Col md={6} lg={3} className="mb-4">
-          <StatCard
-            title="Benutzergruppen"
-            value={data?.roleCount}
-            icon={<Shield className="text-muted" size={24} />}
-            note="Anzahl der erstellten Gruppen"
-            isLoading={isLoading}
-          />
-        </Col>
-      </Row>
-      <Row>
-        <Col lg={6} className="mb-4">
-          <TodoWidget />
-        </Col>
-      </Row>
+      {isLoading ? (
+        <p>Lade Dashboard...</p>
+      ) : (
+        <Row>
+          {sortedEnabledWidgets.map(widget => {
+            const Component = componentMap[widget.id];
+            if (!Component) return null;
+            return (
+              <Col lg={widget.width} key={widget.id} className="mb-4">
+                <Component />
+              </Col>
+            );
+          })}
+        </Row>
+      )}
     </div>
   );
 };

@@ -26,6 +26,7 @@ import AccessDenied from "./pages/AccessDenied";
 import Fernverkehr from "./pages/Fernverkehr";
 import BillingDetail from "./pages/BillingDetail";
 import InvoiceManagement from "./pages/InvoiceManagement";
+import DashboardSettings from "./pages/DashboardSettings";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const AppRoutes = () => {
         <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />} >
           <Route index element={<Dashboard />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="profile/dashboard-settings" element={<DashboardSettings />} />
           
           <Route element={<ProtectedRoute requiredPermission="users.manage" />}>
             <Route path="users" element={<UserManagement />} />
