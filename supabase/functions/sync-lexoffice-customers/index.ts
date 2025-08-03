@@ -7,9 +7,9 @@ const corsHeaders = {
 }
 
 // Helper function to map Lexoffice contact to our customer schema
-const mapContactToCustomer = (contact: any) => {
+const mapContactToCustomer = (contact: any, uuid: string) => {
   const isCompany = contact.company && contact.company.name;
-  let customerData: any = { lex_id: contact.id };
+  let customerData: any = { lex_id: uuid };
   let email: string | null = null;
 
   if (isCompany) {
@@ -74,8 +74,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Fetch all contacts from Lexoffice
-    const allContacts = [];
+    // 1. Fetch all contact summaries from Lexoffice
+    const allContactSummaries = [];
     let page = 0;
     let hasMore = true;
     while (hasMore) {
@@ -86,7 +86,7 @@ serve(async (req) => {
       
       const pageData = await response.json();
       if (pageData.content && pageData.content.length > 0) {
-        allContacts.push(...pageData.content);
+        allContactSummaries.push(...pageData.content);
         page++;
         hasMore = !pageData.last;
       } else {
@@ -94,49 +94,57 @@ serve(async (req) => {
       }
     }
 
-    // 2. Fetch existing customers from our DB and create a lookup map based on lex_id
-    const { data: existingCustomers, error: dbError } = await supabaseAdmin.from('customers').select('id, lex_id');
-    if (dbError) throw dbError;
-
-    const lexIdToDbId = new Map(existingCustomers.map(c => [c.lex_id, c.id]));
-
-    // 3. Process contacts to decide whether to insert or update
+    // 2. Fetch full details for each contact to get the correct UUID
     const customersToUpsert = [];
-    let updatedCount = 0;
-    let insertedCount = 0;
     let skippedCount = 0;
+    let apiErrorCount = 0;
 
-    for (const contact of allContacts) {
-      const mappedCustomer = mapContactToCustomer(contact);
-      if (!mappedCustomer) {
-        skippedCount++;
-        continue;
-      }
+    for (const summary of allContactSummaries) {
+      try {
+        const detailResponse = await fetch(`https://api.lexoffice.io/v1/contacts/${summary.id}`, {
+          headers: { 'Authorization': `Bearer ${lexApiKey}`, 'Accept': 'application/json' },
+        });
 
-      const existingDbId = lexIdToDbId.get(mappedCustomer.lex_id);
+        if (!detailResponse.ok) {
+          console.error(`Failed to fetch details for contact ${summary.id}: ${detailResponse.status}`);
+          apiErrorCount++;
+          continue;
+        }
 
-      if (existingDbId) {
-        // Match by lex_id. This is an update.
-        customersToUpsert.push({ id: existingDbId, ...mappedCustomer });
-        updatedCount++;
-      } else {
-        // No match by lex_id. This is a new customer.
-        customersToUpsert.push(mappedCustomer);
-        insertedCount++;
+        const contactDetail = await detailResponse.json();
+        const resourceUri = contactDetail.resourceUri;
+        if (!resourceUri) {
+          console.error(`No resourceUri for contact ${summary.id}`);
+          skippedCount++;
+          continue;
+        }
+        
+        const uuid = resourceUri.substring(resourceUri.lastIndexOf('/') + 1);
+        
+        const mappedCustomer = mapContactToCustomer(contactDetail, uuid);
+        if (mappedCustomer) {
+          customersToUpsert.push(mappedCustomer);
+        } else {
+          skippedCount++;
+        }
+      } catch (e) {
+        console.error(`Error processing contact ${summary.id}:`, e.message);
+        apiErrorCount++;
       }
     }
 
-    // 4. Perform the database operation
+    // 3. Perform a bulk upsert operation on the database
     if (customersToUpsert.length > 0) {
-      const { error: upsertError } = await supabaseAdmin.from('customers').upsert(customersToUpsert);
+      const { error: upsertError } = await supabaseAdmin
+        .from('customers')
+        .upsert(customersToUpsert, { onConflict: 'lex_id' });
       if (upsertError) throw upsertError;
     }
 
-    // 5. Return success response
-    let message = `Synchronisierung abgeschlossen: ${insertedCount} Kunden neu importiert, ${updatedCount} Kunden aktualisiert.`;
-    if (skippedCount > 0) {
-      message += ` ${skippedCount} Kontakte wurden übersprungen.`
-    }
+    // 4. Return success response
+    let message = `Synchronisierung abgeschlossen: ${customersToUpsert.length} Kunden erfolgreich verarbeitet.`;
+    if (skippedCount > 0) message += ` ${skippedCount} Kontakte wurden übersprungen.`;
+    if (apiErrorCount > 0) message += ` ${apiErrorCount} Kontakte konnten nicht abgerufen werden.`;
 
     return new Response(JSON.stringify({ message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
