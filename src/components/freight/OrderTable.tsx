@@ -1,5 +1,5 @@
-import { Table, Dropdown, Button, Badge } from "react-bootstrap";
-import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Table, Button, Badge } from "react-bootstrap";
+import { Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { FreightOrder } from "@/types/freight";
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -63,24 +63,14 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
             <td>{order.destination_address}</td>
             <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString() : '-'}</td>
             <td className="text-end">
-              <Dropdown renderOnMount align="end">
-                <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-order-${order.id}`}>
-                  <MoreHorizontal size={16} />
-                </Dropdown.Toggle>
-                <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
-                  <Dropdown.Item onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
-                    <Edit className="me-2" size={16} />
-                    Bearbeiten
-                  </Dropdown.Item>
-                  <Dropdown.Item
-                    className="text-danger"
-                    onClick={() => onDelete(order.id)}
-                  >
-                    <Trash2 className="me-2" size={16} />
-                    Löschen
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
+              <div className="d-flex justify-content-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
+                  <Edit size={16} />
+                </Button>
+                <Button variant="ghost" size="sm" className="text-danger" onClick={() => onDelete(order.id)}>
+                  <Trash2 size={16} />
+                </Button>
+              </div>
             </td>
           </tr>
         ))}

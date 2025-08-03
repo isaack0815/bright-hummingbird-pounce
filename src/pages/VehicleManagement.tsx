@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Form, Table, Dropdown, Badge } from 'react-bootstrap';
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { Card, Button, Form, Table, Badge } from 'react-bootstrap';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -133,16 +133,14 @@ const VehicleManagement = () => {
                       </Badge>
                     </td>
                     <td className="text-end">
-                      <Dropdown renderOnMount align="end">
-                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-vehicle-${vehicle.id}`}>
-                          <MoreHorizontal size={16} />
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
-                          <Dropdown.Header>Aktionen</Dropdown.Header>
-                          <Dropdown.Item onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}><Edit className="me-2" size={16} />Bearbeiten</Dropdown.Item>
-                          <Dropdown.Item className="text-danger" onClick={() => deleteMutation.mutate(vehicle.id)}><Trash2 className="me-2" size={16} />Löschen</Dropdown.Item>
-                        </Dropdown.Menu>
-                      </Dropdown>
+                      <div className="d-flex justify-content-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}>
+                          <Edit size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(vehicle.id)}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Card, Button, Table, Dropdown, Badge } from 'react-bootstrap';
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { Card, Button, Table, Badge } from 'react-bootstrap';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -108,19 +108,14 @@ const RoleManagement = () => {
                       </div>
                     </td>
                     <td className="text-end">
-                      <Dropdown renderOnMount align="end">
-                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-role-${role.id}`} disabled={role.name === 'Admin'}>
-                          <MoreHorizontal size={16} />
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
-                          <Dropdown.Item onClick={() => handleEditClick(role)}>
-                            <Edit className="me-2" size={16} /> Bearbeiten
-                          </Dropdown.Item>
-                          <Dropdown.Item className="text-danger" onClick={() => deleteRoleMutation.mutate(role.id)}>
-                            <Trash2 className="me-2" size={16} /> Löschen
-                          </Dropdown.Item>
-                        </Dropdown.Menu>
-                      </Dropdown>
+                      <div className="d-flex justify-content-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditClick(role)} disabled={role.name === 'Admin'}>
+                          <Edit size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteRoleMutation.mutate(role.id)} disabled={role.name === 'Admin'}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

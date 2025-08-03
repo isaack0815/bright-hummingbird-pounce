@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Card, Button, Table, Dropdown, Badge } from 'react-bootstrap';
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { Card, Button, Table, Badge } from 'react-bootstrap';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -114,22 +114,14 @@ const UserManagement = () => {
                     </td>
                     <td>{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="text-end">
-                      <Dropdown renderOnMount align="end">
-                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-user-${user.id}`}>
-                          <MoreHorizontal size={16} />
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
-                          <Dropdown.Item onClick={() => handleEditClick(user)}>
-                            <Edit className="me-2" size={16} /> Bearbeiten
-                          </Dropdown.Item>
-                          <Dropdown.Item
-                            className="text-danger"
-                            onClick={() => handleDeleteClick(user.id)}
-                          >
-                            <Trash2 className="me-2" size={16} /> Löschen
-                          </Dropdown.Item>
-                        </Dropdown.Menu>
-                      </Dropdown>
+                      <div className="d-flex justify-content-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>
+                          <Edit size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDeleteClick(user.id)}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

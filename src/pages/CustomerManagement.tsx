@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Form, Table, Dropdown } from 'react-bootstrap';
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { Card, Button, Form, Table } from 'react-bootstrap';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -127,20 +127,14 @@ const CustomerManagement = () => {
                     <td>{`${customer.contact_first_name || ''} ${customer.contact_last_name || ''}`.trim()}</td>
                     <td>{`${customer.postal_code || ''} ${customer.city || ''}`.trim()}</td>
                     <td className="text-end">
-                      <Dropdown renderOnMount align="end">
-                        <Dropdown.Toggle as={Button} variant="ghost" size="sm" id={`dropdown-customer-${customer.id}`}>
-                          <MoreHorizontal size={16} />
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu popperConfig={{ strategy: 'fixed' }}>
-                          <Dropdown.Header>Aktionen</Dropdown.Header>
-                          <Dropdown.Item onClick={() => handleEditClick(customer)}>
-                            <Edit className="me-2" size={16} /> Bearbeiten
-                          </Dropdown.Item>
-                          <Dropdown.Item className="text-danger" onClick={() => handleDeleteClick(customer.id)}>
-                            <Trash2 className="me-2" size={16} /> Löschen
-                          </Dropdown.Item>
-                        </Dropdown.Menu>
-                      </Dropdown>
+                      <div className="d-flex justify-content-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditClick(customer)}>
+                          <Edit size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDeleteClick(customer.id)}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
