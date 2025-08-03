@@ -112,14 +112,12 @@ serve(async (req) => {
         }
 
         const contactDetail = await detailResponse.json();
-        const resourceUri = contactDetail.resourceUri;
-        if (!resourceUri) {
-          console.error(`No resourceUri for contact ${summary.id}`);
+        const uuid = contactDetail.id; // Use the ID directly
+        if (!uuid) {
+          console.error(`No id for contact ${summary.id}`);
           skippedCount++;
           continue;
         }
-        
-        const uuid = resourceUri.substring(resourceUri.lastIndexOf('/') + 1);
         
         const mappedCustomer = mapContactToCustomer(contactDetail, uuid);
         if (mappedCustomer) {
