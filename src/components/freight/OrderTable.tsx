@@ -1,4 +1,4 @@
-import { Table, Button, Badge } from "react-bootstrap";
+import { Table, Button, Badge, Form } from "react-bootstrap";
 import { Edit, Trash2, XCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { FreightOrder } from "@/types/freight";
@@ -12,9 +12,11 @@ type OrderTableProps = {
   onDelete: (id: number) => void;
   showBillingColumn: boolean;
   isBillingContext?: boolean;
+  selectedIds?: number[];
+  onSelectionChange?: (id: number) => void;
 };
 
-export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingContext = false }: OrderTableProps) => {
+export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingContext = false, selectedIds = [], onSelectionChange }: OrderTableProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -61,6 +63,22 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
     navigate(path);
   };
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      orders.forEach(order => {
+        if (!selectedIds.includes(order.id) && order.customer_id && order.price) {
+          onSelectionChange?.(order.id);
+        }
+      });
+    } else {
+      orders.forEach(order => {
+        if (selectedIds.includes(order.id)) {
+          onSelectionChange?.(order.id);
+        }
+      });
+    }
+  };
+
   if (orders.length === 0) {
     return <p className="text-muted text-center py-5">Keine Aufträge in dieser Ansicht gefunden.</p>;
   }
@@ -69,6 +87,15 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
     <Table responsive hover>
       <thead>
         <tr>
+          {isBillingContext && (
+            <th className="text-center align-middle">
+              <Form.Check 
+                type="checkbox"
+                onChange={handleSelectAll}
+                checked={orders.length > 0 && orders.every(o => selectedIds.includes(o.id) || !o.customer_id || !o.price)}
+              />
+            </th>
+          )}
           <th>Ladeort</th>
           <th>Entladeort</th>
           <th>Auftragsnr.</th>
@@ -84,6 +111,16 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
       <tbody>
         {orders.map((order) => (
           <tr key={order.id} className={getRowClass(order)}>
+            {isBillingContext && (
+              <td className="text-center align-middle">
+                <Form.Check 
+                  type="checkbox"
+                  checked={selectedIds.includes(order.id)}
+                  onChange={() => onSelectionChange?.(order.id)}
+                  disabled={!order.customer_id || !order.price}
+                />
+              </td>
+            )}
             <td>{order.origin_address}</td>
             <td>{order.destination_address}</td>
             <td className="fw-medium">{order.order_number}</td>

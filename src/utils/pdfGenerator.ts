@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { FreightOrder } from '@/types/freight';
+import type { Customer } from '@/pages/CustomerManagement';
 
 const hinweisText = `
 KEIN PALETTENTAUSCH / NO PALLETS CHANGE
@@ -14,7 +15,7 @@ Klarheit der Dokumentation
    3. Vollständig ausgefüllt sein.
 Erforderliche Angaben
 1. Die Dokumente müssen folgende Informationen enthalten:
-   1. Be- und Entladedatum,
+   1. Be- und Entladatum,
    2. Warenmenge und Gewicht,
    3. Bestätigung der Beladung und Entladung.
 Bei fehlerhafter Dokumentation wird eine Bearbeitungsgebühr von 50€ erhoben.
@@ -115,6 +116,90 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Bl
     doc.setFontSize(8);
     doc.text(`Seite ${i} von ${pageCount}`, doc.internal.pageSize.width - 30, pageHeight - 10);
   }
+
+  return doc.output('blob');
+};
+
+export const generateCollectiveInvoicePDF = (orders: FreightOrder[], customer: Customer, settings: any): Blob => {
+  const doc = new jsPDF();
+  const margin = 14;
+  const today = new Date();
+  const invoiceNumber = `SR-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${customer.id}`;
+  const paymentTermDays = settings.payment_term_default || 45;
+
+  // Header
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sammelrechnung', margin, 22);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${settings.company_name || ''} • ${settings.company_address || ''} • ${settings.company_city_zip || ''}`, margin, 30);
+
+  // Customer Address & Invoice Details
+  const customerAddress = `${customer.company_name}\n${customer.street || ''} ${customer.house_number || ''}\n${customer.postal_code || ''} ${customer.city || ''}`;
+  autoTable(doc, {
+    startY: 40,
+    body: [
+      [
+        { content: customerAddress, styles: { halign: 'left' } },
+        { content: `Rechnungsnummer: ${invoiceNumber}\nDatum: ${today.toLocaleDateString('de-DE')}\nKundennummer: ${customer.id}`, styles: { halign: 'right' } },
+      ],
+    ],
+    theme: 'plain',
+    styles: { fontSize: 10, cellPadding: 1 },
+  });
+
+  let lastY = (doc as any).lastAutoTable.finalY + 10;
+
+  // Invoice Items Table
+  const tableBody = orders.map(order => [
+    order.order_number,
+    order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-',
+    order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-',
+    `${order.origin_address || ''} -> ${order.destination_address || ''}`,
+    `${order.price?.toFixed(2) || '0.00'} €`,
+  ]);
+
+  autoTable(doc, {
+    startY: lastY,
+    head: [['Auftragsnr.', 'Abholdatum', 'Lieferdatum', 'Strecke', 'Preis (Netto)']],
+    body: tableBody,
+    theme: 'striped',
+    headStyles: { fillColor: [41, 128, 185] },
+  });
+
+  lastY = (doc as any).lastAutoTable.finalY;
+
+  // Totals
+  const netTotal = orders.reduce((sum, order) => sum + (order.price || 0), 0);
+  const vatAmount = netTotal * 0.19;
+  const grossTotal = netTotal + vatAmount;
+
+  autoTable(doc, {
+    startY: lastY + 5,
+    body: [
+      ['Summe (Netto)', `${netTotal.toFixed(2)} €`],
+      ['MwSt. (19%)', `${vatAmount.toFixed(2)} €`],
+      [{ content: 'Gesamtbetrag (Brutto)', styles: { fontStyle: 'bold' } }, { content: `${grossTotal.toFixed(2)} €`, styles: { fontStyle: 'bold' } }],
+    ],
+    theme: 'plain',
+    styles: { fontSize: 10, cellPadding: 2 },
+    columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' } },
+    tableWidth: 'wrap',
+    margin: { left: doc.internal.pageSize.width - 80 },
+  });
+
+  lastY = (doc as any).lastAutoTable.finalY + 15;
+
+  // Payment Terms
+  doc.setFontSize(10);
+  doc.text(`Zahlungsbedingungen: ${paymentTermDays} Tage netto.`, margin, lastY);
+  doc.text(`Bitte überweisen Sie den Gesamtbetrag auf das unten angegebene Konto.`, margin, lastY + 5);
+
+  // Bank Details
+  doc.setFontSize(8);
+  doc.text(`Bankverbindung: ${settings.bank_name || ''} | IBAN: ${settings.bank_iban || ''} | BIC: ${settings.bank_bic || ''}`, margin, doc.internal.pageSize.height - 20);
+  doc.text(`Steuernummer: ${settings.company_tax_id || ''} | USt-IdNr.: ${settings.company_vat_id || ''}`, margin, doc.internal.pageSize.height - 15);
 
   return doc.output('blob');
 };
