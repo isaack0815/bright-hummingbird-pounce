@@ -1,5 +1,5 @@
-import { Table, Button, Badge, Form } from "react-bootstrap";
-import { Edit, Trash2 } from "lucide-react";
+import { Table, Button, Badge } from "react-bootstrap";
+import { Edit, Trash2, XCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { FreightOrder } from "@/types/freight";
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -70,7 +70,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn }: OrderTablePr
           <th>Status</th>
           <th>Abholdatum</th>
           <th>Lieferdatum</th>
-          {showBillingColumn && <th>Abgerechnet</th>}
+          {showBillingColumn && <th className="text-center">Abgerechnet</th>}
           <th>Bearbeiter</th>
           <th className="text-end">Aktionen</th>
         </tr>
@@ -86,14 +86,22 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn }: OrderTablePr
             <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
             <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
             {showBillingColumn && (
-              <td>
-                <Form.Check
-                  type="checkbox"
-                  id={`billed-check-${order.id}`}
-                  checked={!!order.is_billed}
-                  onChange={() => toggleBilledMutation.mutate(order.id)}
-                  disabled={toggleBilledMutation.isPending}
-                />
+              <td className="text-center align-middle">
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => toggleBilledMutation.mutate(order.id)}
+                  disabled={toggleBilledMutation.isPending && toggleBilledMutation.variables === order.id}
+                  className="p-0 text-decoration-none"
+                >
+                  {toggleBilledMutation.isPending && toggleBilledMutation.variables === order.id ? (
+                    <Loader2 size={20} />
+                  ) : order.is_billed ? (
+                    <CheckCircle2 size={20} className="text-success" />
+                  ) : (
+                    <XCircle size={20} className="text-danger" />
+                  )}
+                </Button>
               </td>
             )}
             <td>{order.creator ? `${order.creator.first_name || ''} ${order.creator.last_name || ''}`.trim() : 'N/A'}</td>
