@@ -55,4 +55,9 @@ export type FreightOrder = {
   customers: Pick<Customer, 'id' | 'company_name'> | null;
   freight_order_stops: Stop[];
   cargo_items: CargoItem[];
+  creator: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
 };

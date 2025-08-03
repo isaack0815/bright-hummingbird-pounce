@@ -44,24 +44,28 @@ export const OrderTable = ({ orders, onDelete }: OrderTableProps) => {
     <Table responsive hover>
       <thead>
         <tr>
+          <th>Ladeort</th>
+          <th>Entladeort</th>
           <th>Auftragsnr.</th>
-          <th>Kunde</th>
+          <th>Auftraggeber</th>
           <th>Status</th>
-          <th>Von</th>
-          <th>Nach</th>
           <th>Abholdatum</th>
+          <th>Lieferdatum</th>
+          <th>Bearbeiter</th>
           <th className="text-end">Aktionen</th>
         </tr>
       </thead>
       <tbody>
         {orders.map((order) => (
           <tr key={order.id} className={getRowClass(order)}>
+            <td>{order.origin_address}</td>
+            <td>{order.destination_address}</td>
             <td className="fw-medium">{order.order_number}</td>
             <td>{order.customers?.company_name || 'N/A'}</td>
             <td><Badge bg="secondary">{order.status}</Badge></td>
-            <td>{order.origin_address}</td>
-            <td>{order.destination_address}</td>
-            <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString() : '-'}</td>
+            <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
+            <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
+            <td>{order.creator ? `${order.creator.first_name || ''} ${order.creator.last_name || ''}`.trim() : 'N/A'}</td>
             <td className="text-end">
               <div className="d-flex justify-content-end gap-2">
                 <Button variant="ghost" size="sm" onClick={() => navigate(`/freight-orders/edit/${order.id}`)}>
