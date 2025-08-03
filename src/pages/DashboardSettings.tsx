@@ -77,7 +77,6 @@ const DashboardSettings = () => {
 
       const widget = { ...newLayout[widgetIndex], enabled: isEnabled };
       
-      // If we just enabled a widget, place it at the bottom.
       if (isEnabled) {
           const enabledWidgets = newLayout.filter(w => w.enabled && w.i !== widgetId);
           const maxY = Math.max(0, ...enabledWidgets.map(w => w.y + w.h));
@@ -90,7 +89,7 @@ const DashboardSettings = () => {
     });
   };
 
-  const onSubmit = () => {
+  const handleSave = () => {
     mutation.mutate(currentLayout);
   };
 
@@ -101,13 +100,13 @@ const DashboardSettings = () => {
   const enabledWidgets = currentLayout.filter(w => w.enabled);
 
   return (
-    <Form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+    <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div className="d-flex align-items-center gap-3">
           <NavLink to="/profile" className="btn btn-outline-secondary btn-sm p-2 lh-1"><ArrowLeft size={16} /></NavLink>
           <h1 className="h2 mb-0">Dashboard anpassen</h1>
         </div>
-        <Button type="submit" disabled={mutation.isPending}>
+        <Button onClick={handleSave} disabled={mutation.isPending}>
           {mutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
           Layout speichern
         </Button>
@@ -165,7 +164,7 @@ const DashboardSettings = () => {
           </Card>
         </Col>
       </Row>
-    </Form>
+    </div>
   );
 };
 
