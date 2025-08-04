@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button, Card, Form, Spinner, Placeholder, Alert, Modal, Tabs, Tab } from "react-bootstrap";
+import { Button, Card, Form, Spinner, Placeholder, Alert, Modal, Tabs, Tab, Row, Col } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -179,13 +179,13 @@ const Settings = () => {
                 </Card.Header>
                 <Card.Body>
                   {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '200px'}} /></Placeholder> : (
-                    <>
-                      <Form.Group className="mb-3"><Form.Label>Firmenname</Form.Label><Form.Control {...form.register("company_name")} /></Form.Group>
-                      <Form.Group className="mb-3"><Form.Label>Straße & Hausnummer</Form.Label><Form.Control {...form.register("company_address")} /></Form.Group>
-                      <Form.Group className="mb-3"><Form.Label>PLZ & Ort</Form.Label><Form.Control {...form.register("company_city_zip")} /></Form.Group>
-                      <Form.Group className="mb-3"><Form.Label>Land</Form.Label><Form.Control {...form.register("company_country")} /></Form.Group>
-                      <Form.Group><Form.Label>Umsatzsteuer-ID</Form.Label><Form.Control {...form.register("company_tax_id")} /></Form.Group>
-                    </>
+                    <Row className="g-3">
+                      <Col md={12}><Form.Group><Form.Label>Firmenname</Form.Label><Form.Control {...form.register("company_name")} /></Form.Group></Col>
+                      <Col md={6}><Form.Group><Form.Label>Straße & Hausnummer</Form.Label><Form.Control {...form.register("company_address")} /></Form.Group></Col>
+                      <Col md={6}><Form.Group><Form.Label>PLZ & Ort</Form.Label><Form.Control {...form.register("company_city_zip")} /></Form.Group></Col>
+                      <Col md={6}><Form.Group><Form.Label>Land</Form.Label><Form.Control {...form.register("company_country")} /></Form.Group></Col>
+                      <Col md={6}><Form.Group><Form.Label>Umsatzsteuer-ID</Form.Label><Form.Control {...form.register("company_tax_id")} /></Form.Group></Col>
+                    </Row>
                   )}
                 </Card.Body>
               </Card>
@@ -198,7 +198,11 @@ const Settings = () => {
                 </Card.Header>
                 <Card.Body>
                   {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
-                    <Form.Group><Form.Label>Standard-Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_default")} /></Form.Group>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group><Form.Label>Standard-Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_default")} /></Form.Group>
+                      </Col>
+                    </Row>
                   )}
                 </Card.Body>
               </Card>
@@ -209,15 +213,19 @@ const Settings = () => {
                 </Card.Header>
                 <Card.Body>
                   {isLoading || isLoadingVehicleGroups ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
-                    <Form.Group>
-                      <Form.Label>Standard-Fahrzeuggruppe für Touren</Form.Label>
-                      <Form.Select {...form.register("tour_planning_vehicle_group_id")}>
-                        <option value="">Alle Fahrzeuge</option>
-                        {vehicleGroups?.map(group => (
-                          <option key={group.id} value={group.id}>{group.name}</option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group>
+                          <Form.Label>Standard-Fahrzeuggruppe für Touren</Form.Label>
+                          <Form.Select {...form.register("tour_planning_vehicle_group_id")}>
+                            <option value="">Alle Fahrzeuge</option>
+                            {vehicleGroups?.map(group => (
+                              <option key={group.id} value={group.id}>{group.name}</option>
+                            ))}
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                    </Row>
                   )}
                 </Card.Body>
               </Card>
@@ -290,7 +298,11 @@ const Settings = () => {
                   </div>
                   {isLoading ? <div className="mt-4"><Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder></div> : (
                     <div className="mt-4">
-                      <Form.Group className="mb-3"><Form.Label>BCC-Empfänger</Form.Label><Form.Control type="email" placeholder="bcc@example.com" {...form.register("email_bcc")} /></Form.Group>
+                      <Row>
+                        <Col md={6}>
+                          <Form.Group className="mb-3"><Form.Label>BCC-Empfänger</Form.Label><Form.Control type="email" placeholder="bcc@example.com" {...form.register("email_bcc")} /></Form.Group>
+                        </Col>
+                      </Row>
                       <Form.Group><Form.Label>Standard-Signatur (HTML)</Form.Label><Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen</p>" className="font-monospace" {...form.register("email_signature")} /></Form.Group>
                     </div>
                   )}
