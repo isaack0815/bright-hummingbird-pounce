@@ -10,6 +10,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TourMap } from '@/components/tour/TourMap';
+import { AddTourDialog } from '@/components/tour/AddTourDialog';
 
 // API Functions
 const fetchTours = async (): Promise<Tour[]> => {
@@ -53,6 +54,7 @@ const SortableStopItem = ({ stop, onRemove }: { stop: TourStop, onRemove: () => 
 
 const TourManagement = () => {
   const [selectedTourId, setSelectedTourId] = useState<number | null>(null);
+  const [isAddTourDialogOpen, setIsAddTourDialogOpen] = useState(false);
   const [tourName, setTourName] = useState('');
   const [tourDescription, setTourDescription] = useState('');
   const [tourStops, setTourStops] = useState<TourStop[]>([]);
@@ -104,13 +106,6 @@ const TourManagement = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern der Tour."),
   });
 
-  const handleNewTour = () => {
-    setSelectedTourId(null);
-    setTourName('');
-    setTourDescription('');
-    setTourStops([]);
-  };
-
   const handleSelectTour = (id: number) => {
     setSelectedTourId(id);
   };
@@ -125,7 +120,6 @@ const TourManagement = () => {
   };
 
   const handleCreateStop = (inputValue: string) => {
-    // Simple split, assuming "Name - Address" format
     const parts = inputValue.split(' - ');
     const name = parts[0];
     const address = parts.length > 1 ? parts.slice(1).join(' - ') : 'Bitte Adresse eintragen';
@@ -146,85 +140,105 @@ const TourManagement = () => {
   const stopOptions = allStops?.map(s => ({ value: s.id, label: `${s.name} - ${s.address}` })) || [];
 
   return (
-    <Container fluid>
-      <h1 className="h2 mb-4">Tourenverwaltung</h1>
-      <Row>
-        <Col md={4}>
-          <Card>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              Touren
-              <Button variant="primary" size="sm" onClick={handleNewTour}>
-                <PlusCircle size={16} className="me-1" /> Neu
-              </Button>
-            </Card.Header>
-            {isLoadingTours ? <Card.Body><Spinner size="sm" /></Card.Body> : (
-              <ListGroup variant="flush">
-                {tours?.map(tour => (
-                  <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} onClick={() => handleSelectTour(tour.id)}>
-                    {tour.name}
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-            )}
-          </Card>
-        </Col>
-        <Col md={8}>
-          <Card className="mb-4">
-            <Card.Header>
-              <Card.Title>{selectedTourId ? 'Tour bearbeiten' : 'Neue Tour erstellen'}</Card.Title>
-            </Card.Header>
-            <Card.Body>
-              {isLoadingDetails && selectedTourId ? <Spinner size="sm" /> : (
-                <>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Tourname</Form.Label>
-                    <Form.Control value={tourName} onChange={e => setTourName(e.target.value)} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Beschreibung</Form.Label>
-                    <Form.Control as="textarea" value={tourDescription} onChange={e => setTourDescription(e.target.value)} />
-                  </Form.Group>
-                  <hr />
-                  <h6>Stopps</h6>
-                  <CreatableSelect
-                    isClearable
-                    options={stopOptions}
-                    isLoading={isLoadingStops || createStopMutation.isPending}
-                    onChange={handleAddStop}
-                    onCreateOption={handleCreateStop}
-                    placeholder="Stopp suchen oder neu anlegen..."
-                    formatCreateLabel={inputValue => `"${inputValue}" anlegen`}
-                    className="mb-3"
-                  />
-                  <ListGroup>
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <SortableContext items={tourStops.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                        {tourStops.map(stop => (
-                          <SortableStopItem key={stop.id} stop={stop} onRemove={() => setTourStops(prev => prev.filter(s => s.id !== stop.id))} />
-                        ))}
-                      </SortableContext>
-                    </DndContext>
-                  </ListGroup>
-                </>
+    <>
+      <Container fluid>
+        <h1 className="h2 mb-4">Tourenverwaltung</h1>
+        <Row>
+          <Col md={4}>
+            <Card>
+              <Card.Header className="d-flex justify-content-between align-items-center">
+                Touren
+                <Button variant="primary" size="sm" onClick={() => setIsAddTourDialogOpen(true)}>
+                  <PlusCircle size={16} className="me-1" /> Neu
+                </Button>
+              </Card.Header>
+              {isLoadingTours ? <Card.Body><Spinner size="sm" /></Card.Body> : (
+                <ListGroup variant="flush">
+                  {tours?.map(tour => (
+                    <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} onClick={() => handleSelectTour(tour.id)}>
+                      {tour.name}
+                    </ListGroup.Item>
+                  ))}
+                </ListGroup>
               )}
-            </Card.Body>
-            <Card.Footer className="text-end">
-              <Button onClick={() => saveTourMutation.mutate()} disabled={!tourName || saveTourMutation.isPending}>
-                <Save size={16} className="me-1" /> {saveTourMutation.isPending ? 'Wird gespeichert...' : 'Tour speichern'}
-              </Button>
-            </Card.Footer>
+            </Card>
+          </Col>
+          <Col md={8}>
+            <Card className="mb-4">
+              <Card.Header>
+                <Card.Title>{selectedTourId ? 'Tour bearbeiten' : 'Bitte eine Tour auswählen'}</Card.Title>
+              </Card.Header>
+              <Card.Body>
+                {selectedTourId === null ? (
+                  <div className="text-center text-muted p-5">
+                    <p>Bitte wählen Sie eine Tour aus der Liste aus oder erstellen Sie eine neue Tour.</p>
+                  </div>
+                ) : isLoadingDetails ? (
+                  <div className="text-center p-5"><Spinner size="sm" /></div>
+                ) : (
+                  <>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Tourname</Form.Label>
+                      <Form.Control value={tourName} onChange={e => setTourName(e.target.value)} />
+                    </Form.Group>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Beschreibung</Form.Label>
+                      <Form.Control as="textarea" value={tourDescription} onChange={e => setTourDescription(e.target.value)} />
+                    </Form.Group>
+                    <hr />
+                    <h6>Stopps</h6>
+                    <CreatableSelect
+                      isClearable
+                      options={stopOptions}
+                      isLoading={isLoadingStops || createStopMutation.isPending}
+                      onChange={handleAddStop}
+                      onCreateOption={handleCreateStop}
+                      placeholder="Stopp suchen oder neu anlegen..."
+                      formatCreateLabel={inputValue => `"${inputValue}" anlegen`}
+                      className="mb-3"
+                    />
+                    <ListGroup>
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={tourStops.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                          {tourStops.map(stop => (
+                            <SortableStopItem key={stop.id} stop={stop} onRemove={() => setTourStops(prev => prev.filter(s => s.id !== stop.id))} />
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                    </ListGroup>
+                  </>
+                )}
+              </Card.Body>
+              {selectedTourId !== null && (
+                <Card.Footer className="text-end">
+                  <Button onClick={() => saveTourMutation.mutate()} disabled={!tourName || saveTourMutation.isPending}>
+                    <Save size={16} className="me-1" /> {saveTourMutation.isPending ? 'Wird gespeichert...' : 'Tour speichern'}
+                  </Button>
+                </Card.Footer>
+              )}
+            </Card>
           </Card>
-          <Card>
-            <Card.Header>
-              <Card.Title>Kartenansicht</Card.Title>
-            </Card.Header>
-            <Card.Body className="p-0">
-              <TourMap stops={tourStops} />
-            </Card.Body>
-          </Card>
+          {selectedTourId !== null && (
+            <Card>
+              <Card.Header>
+                <Card.Title>Kartenansicht</Card.Title>
+              </Card.Header>
+              <Card.Body className="p-0">
+                <TourMap stops={tourStops} />
+              </Card.Body>
+            </Card>
+          )}
         </Col>
-      </Row>
-    </Container>
+        </Row>
+      </Container>
+      <AddTourDialog
+        show={isAddTourDialogOpen}
+        onHide={() => setIsAddTourDialogOpen(false)}
+        onTourCreated={(tourId) => {
+          setSelectedTourId(tourId);
+        }}
+      />
+    </>
   );
 };
 
