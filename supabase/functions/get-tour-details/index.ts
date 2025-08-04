@@ -45,8 +45,9 @@ serve(async (req) => {
         ...rp.tour_stops, 
         position: rp.position, 
         route_point_id: rp.id,
-        weekday: rp.weekday,
-        arrival_time: rp.arrival_time
+        weekdays: rp.weekdays,
+        arrival_time: rp.arrival_time,
+        remarks: rp.remarks
       })) 
     };
 

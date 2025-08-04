@@ -13,8 +13,9 @@ export type Tour = {
 export type RoutePoint = TourStop & { 
   position: number; 
   route_point_id: number;
-  weekday: number | null;
+  weekdays: number[] | null;
   arrival_time: string | null;
+  remarks: string | null;
 };
 
 export type TourDetails = {

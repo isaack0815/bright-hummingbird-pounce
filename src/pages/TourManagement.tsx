@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Container, Row, Col, Card, ListGroup, Button, Form, Spinner } from 'react-bootstrap';
-import { PlusCircle, Save, Trash2, GripVertical } from 'lucide-react';
+import { Container, Row, Col, Card, ListGroup, Button, Form, Spinner, Badge } from 'react-bootstrap';
+import { PlusCircle, Save, Trash2, GripVertical, Edit } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Tour, TourStop, TourDetails, RoutePoint } from '@/types/tour';
 import type { Vehicle } from '@/types/vehicle';
@@ -13,6 +13,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import { TourMap } from '@/components/tour/TourMap';
 import { AddTourDialog } from '@/components/tour/AddTourDialog';
+import { EditTourStopDialog } from '@/components/tour/EditTourStopDialog';
 
 // API Functions
 const fetchTours = async (): Promise<Tour[]> => {
@@ -45,12 +46,14 @@ const fetchVehiclesByGroup = async (groupId: number | null): Promise<Vehicle[]> 
   return data.vehicles;
 };
 
-const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const weekdaysShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 // Sortable Item Component
-const SortableStopItem = ({ stop, onRemove, onUpdate }: { stop: RoutePoint, onRemove: () => void, onUpdate: (field: 'weekday' | 'arrival_time', value: any) => void }) => {
+const SortableStopItem = ({ stop, onRemove, onEdit }: { stop: RoutePoint, onRemove: () => void, onEdit: () => void }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stop.route_point_id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+
+  const displayWeekdays = stop.weekdays?.sort().map(d => weekdaysShort[d]).join(', ') || 'Keine Tage';
 
   return (
     <ListGroup.Item ref={setNodeRef} style={style}>
@@ -64,19 +67,13 @@ const SortableStopItem = ({ stop, onRemove, onUpdate }: { stop: RoutePoint, onRe
           <p className="fw-bold mb-0">{stop.name}</p>
           <p className="small text-muted mb-0">{stop.address}</p>
         </Col>
-        <Col md={3}>
-          <Form.Select size="sm" value={stop.weekday ?? ''} onChange={e => onUpdate('weekday', e.target.value === '' ? null : Number(e.target.value))}>
-            <option value="">- Tag -</option>
-            {weekdays.map((day, index) => <option key={index} value={index}>{day}</option>)}
-          </Form.Select>
-        </Col>
-        <Col md={2}>
-          <Form.Control size="sm" type="time" value={stop.arrival_time ?? ''} onChange={e => onUpdate('arrival_time', e.target.value || null)} />
+        <Col md={4} className="text-md-end">
+          <Badge bg="light" text="dark" className="me-2">{displayWeekdays}</Badge>
+          <Badge bg="secondary">{stop.arrival_time || 'Keine Zeit'}</Badge>
         </Col>
         <Col xs="auto">
-          <Button variant="ghost" size="sm" className="text-danger" onClick={onRemove}>
-            <Trash2 size={16} />
-          </Button>
+          <Button variant="ghost" size="sm" onClick={onEdit}><Edit size={16} /></Button>
+          <Button variant="ghost" size="sm" className="text-danger" onClick={onRemove}><Trash2 size={16} /></Button>
         </Col>
       </Row>
     </ListGroup.Item>
@@ -86,6 +83,8 @@ const SortableStopItem = ({ stop, onRemove, onUpdate }: { stop: RoutePoint, onRe
 const TourManagement = () => {
   const [selectedTourId, setSelectedTourId] = useState<number | null>(null);
   const [isAddTourDialogOpen, setIsAddTourDialogOpen] = useState(false);
+  const [isEditStopDialogOpen, setIsEditStopDialogOpen] = useState(false);
+  const [currentStop, setCurrentStop] = useState<RoutePoint | null>(null);
   const [tourName, setTourName] = useState('');
   const [tourStops, setTourStops] = useState<RoutePoint[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
@@ -128,14 +127,27 @@ const TourManagement = () => {
       const newRoutePoint: RoutePoint = {
         ...newStop,
         position: tourStops.length,
-        route_point_id: Date.now(), // Temporary unique ID for DND
-        weekday: 1, // Default to Monday
+        route_point_id: Date.now(),
+        weekdays: [1],
         arrival_time: '08:00',
+        remarks: null,
       };
       setTourStops(prev => [...prev, newRoutePoint]);
       showSuccess("Neuer Stopp erstellt und zur Tour hinzugefügt.");
     },
     onError: (err: any) => showError(err.message || "Fehler beim Erstellen des Stopps."),
+  });
+
+  const updateStopMutation = useMutation({
+    mutationFn: async (stop: { id: number, name: string, address: string }) => {
+      const { error } = await supabase.functions.invoke('update-tour-stop', { body: stop });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Stopp-Stammdaten aktualisiert.");
+      queryClient.invalidateQueries({ queryKey: ['tourStops'] });
+    },
+    onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren des Stopps."),
   });
 
   const saveTourMutation = useMutation({
@@ -153,33 +165,22 @@ const TourManagement = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern der Tour."),
   });
 
-  const handleSelectTour = (id: number) => {
-    setSelectedTourId(id);
-  };
-
+  const handleSelectTour = (id: number) => setSelectedTourId(id);
   const handleAddStop = (selected: any) => {
     if (selected) {
       const stopToAdd = allStops?.find(s => s.id === selected.value);
       if (stopToAdd) {
-        const newRoutePoint: RoutePoint = {
-          ...stopToAdd,
-          position: tourStops.length,
-          route_point_id: Date.now(), // Temporary unique ID for DND
-          weekday: 1, // Default to Monday
-          arrival_time: '08:00',
-        };
+        const newRoutePoint: RoutePoint = { ...stopToAdd, position: tourStops.length, route_point_id: Date.now(), weekdays: [1], arrival_time: '08:00', remarks: null };
         setTourStops(prev => [...prev, newRoutePoint]);
       }
     }
   };
-
   const handleCreateStop = (inputValue: string) => {
     const parts = inputValue.split(' - ');
     const name = parts[0];
     const address = parts.length > 1 ? parts.slice(1).join(' - ') : 'Bitte Adresse eintragen';
     createStopMutation.mutate({ name, address });
   };
-
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
     if (active.id !== over.id) {
@@ -190,11 +191,16 @@ const TourManagement = () => {
       });
     }
   };
-
-  const handleUpdateStop = (index: number, field: 'weekday' | 'arrival_time', value: any) => {
-    const newStops = [...tourStops];
-    newStops[index] = { ...newStops[index], [field]: value };
-    setTourStops(newStops);
+  const handleEditStop = (stop: RoutePoint) => {
+    setCurrentStop(stop);
+    setIsEditStopDialogOpen(true);
+  };
+  const handleSaveStop = (updatedStop: RoutePoint) => {
+    const originalStop = allStops?.find(s => s.id === updatedStop.id);
+    if (originalStop && (originalStop.name !== updatedStop.name || originalStop.address !== updatedStop.address)) {
+      updateStopMutation.mutate({ id: updatedStop.id, name: updatedStop.name, address: updatedStop.address });
+    }
+    setTourStops(prev => prev.map(s => s.route_point_id === updatedStop.route_point_id ? updatedStop : s));
   };
 
   const stopOptions = allStops?.map(s => ({ value: s.id, label: `${s.name} - ${s.address}` })) || [];
@@ -209,16 +215,12 @@ const TourManagement = () => {
             <Card>
               <Card.Header className="d-flex justify-content-between align-items-center">
                 Touren
-                <Button variant="primary" size="sm" onClick={() => setIsAddTourDialogOpen(true)}>
-                  <PlusCircle size={16} className="me-1" /> Neu
-                </Button>
+                <Button variant="primary" size="sm" onClick={() => setIsAddTourDialogOpen(true)}><PlusCircle size={16} className="me-1" /> Neu</Button>
               </Card.Header>
               {isLoadingTours ? <Card.Body><Spinner size="sm" /></Card.Body> : (
                 <ListGroup variant="flush">
                   {tours?.map(tour => (
-                    <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} onClick={() => handleSelectTour(tour.id)}>
-                      {tour.name}
-                    </ListGroup.Item>
+                    <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} onClick={() => handleSelectTour(tour.id)}>{tour.name}</ListGroup.Item>
                   ))}
                 </ListGroup>
               )}
@@ -226,57 +228,26 @@ const TourManagement = () => {
           </Col>
           <Col md={8}>
             <Card className="mb-4">
-              <Card.Header>
-                <Card.Title>{selectedTourId ? 'Tour bearbeiten' : 'Bitte eine Tour auswählen'}</Card.Title>
-              </Card.Header>
+              <Card.Header><Card.Title>{selectedTourId ? 'Tour bearbeiten' : 'Bitte eine Tour auswählen'}</Card.Title></Card.Header>
               <Card.Body>
                 {selectedTourId === null ? (
-                  <div className="text-center text-muted p-5">
-                    <p>Bitte wählen Sie eine Tour aus der Liste aus oder erstellen Sie eine neue Tour.</p>
-                  </div>
+                  <div className="text-center text-muted p-5"><p>Bitte wählen Sie eine Tour aus der Liste aus oder erstellen Sie eine neue Tour.</p></div>
                 ) : isLoadingDetails ? (
                   <div className="text-center p-5"><Spinner size="sm" /></div>
                 ) : (
                   <>
                     <Row>
-                      <Col md={8}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Tourname</Form.Label>
-                          <Form.Control value={tourName} onChange={e => setTourName(e.target.value)} />
-                        </Form.Group>
-                      </Col>
-                      <Col md={4}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Fahrzeug</Form.Label>
-                          <Form.Select value={selectedVehicleId ?? ''} onChange={e => setSelectedVehicleId(Number(e.target.value) || null)} disabled={isLoadingVehicles}>
-                            <option value="">- Kein Fahrzeug -</option>
-                            {vehicleOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
+                      <Col md={8}><Form.Group className="mb-3"><Form.Label>Tourname</Form.Label><Form.Control value={tourName} onChange={e => setTourName(e.target.value)} /></Form.Group></Col>
+                      <Col md={4}><Form.Group className="mb-3"><Form.Label>Fahrzeug</Form.Label><Form.Select value={selectedVehicleId ?? ''} onChange={e => setSelectedVehicleId(Number(e.target.value) || null)} disabled={isLoadingVehicles}><option value="">- Kein Fahrzeug -</option>{vehicleOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</Form.Select></Form.Group></Col>
                     </Row>
                     <hr />
                     <h6>Stopps</h6>
-                    <CreatableSelect
-                      isClearable
-                      options={stopOptions}
-                      isLoading={isLoadingStops || createStopMutation.isPending}
-                      onChange={handleAddStop}
-                      onCreateOption={handleCreateStop}
-                      placeholder="Stopp suchen oder neu anlegen..."
-                      formatCreateLabel={inputValue => `"${inputValue}" anlegen`}
-                      className="mb-3"
-                    />
+                    <CreatableSelect isClearable options={stopOptions} isLoading={isLoadingStops || createStopMutation.isPending} onChange={handleAddStop} onCreateOption={handleCreateStop} placeholder="Stopp suchen oder neu anlegen..." formatCreateLabel={inputValue => `"${inputValue}" anlegen`} className="mb-3" />
                     <ListGroup>
                       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={tourStops.map(s => s.route_point_id)} strategy={verticalListSortingStrategy}>
-                          {tourStops.map((stop, index) => (
-                            <SortableStopItem 
-                              key={stop.route_point_id} 
-                              stop={stop} 
-                              onRemove={() => setTourStops(prev => prev.filter((_, i) => i !== index))}
-                              onUpdate={(field, value) => handleUpdateStop(index, field, value)}
-                            />
+                          {tourStops.map((stop) => (
+                            <SortableStopItem key={stop.route_point_id} stop={stop} onRemove={() => setTourStops(prev => prev.filter(s => s.route_point_id !== stop.route_point_id))} onEdit={() => handleEditStop(stop)} />
                           ))}
                         </SortableContext>
                       </DndContext>
@@ -286,32 +257,21 @@ const TourManagement = () => {
               </Card.Body>
               {selectedTourId !== null && (
                 <Card.Footer className="text-end">
-                  <Button onClick={() => saveTourMutation.mutate()} disabled={!tourName || saveTourMutation.isPending}>
-                    <Save size={16} className="me-1" /> {saveTourMutation.isPending ? 'Wird gespeichert...' : 'Tour speichern'}
-                  </Button>
+                  <Button onClick={() => saveTourMutation.mutate()} disabled={!tourName || saveTourMutation.isPending}><Save size={16} className="me-1" /> {saveTourMutation.isPending ? 'Wird gespeichert...' : 'Tour speichern'}</Button>
                 </Card.Footer>
               )}
             </Card>
             {selectedTourId !== null && (
               <Card>
-                <Card.Header>
-                  <Card.Title>Kartenansicht</Card.Title>
-                </Card.Header>
-                <Card.Body className="p-0">
-                  <TourMap stops={tourStops} />
-                </Card.Body>
+                <Card.Header><Card.Title>Kartenansicht</Card.Title></Card.Header>
+                <Card.Body className="p-0"><TourMap stops={tourStops} /></Card.Body>
               </Card>
             )}
           </Col>
         </Row>
       </Container>
-      <AddTourDialog
-        show={isAddTourDialogOpen}
-        onHide={() => setIsAddTourDialogOpen(false)}
-        onTourCreated={(tourId) => {
-          setSelectedTourId(tourId);
-        }}
-      />
+      <AddTourDialog show={isAddTourDialogOpen} onHide={() => setIsAddTourDialogOpen(false)} onTourCreated={(tourId) => { setSelectedTourId(tourId); }} />
+      <EditTourStopDialog show={isEditStopDialogOpen} onHide={() => setIsEditStopDialogOpen(false)} stop={currentStop} onSave={handleSaveStop} />
     </>
   );
 };
