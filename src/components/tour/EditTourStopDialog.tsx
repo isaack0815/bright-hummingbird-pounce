@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button, Modal, Form, Row, Col } from 'react-bootstrap';
@@ -77,18 +77,31 @@ export function EditTourStopDialog({ stop, show, onHide, onSave }: EditTourStopD
             <Col md={12}>
               <Form.Group>
                 <Form.Label>Wochentage</Form.Label>
-                <div className="d-flex flex-wrap gap-3">
-                  {weekdays.map((day, index) => (
-                    <Form.Check 
-                      key={index}
-                      type="checkbox"
-                      id={`weekday-${index}`}
-                      label={day}
-                      value={index}
-                      {...form.register("weekdays")}
-                    />
-                  ))}
-                </div>
+                <Controller
+                  name="weekdays"
+                  control={form.control}
+                  render={({ field }) => (
+                    <div className="d-flex flex-wrap gap-3">
+                      {weekdays.map((day, index) => (
+                        <Form.Check
+                          key={index}
+                          type="checkbox"
+                          id={`weekday-${index}`}
+                          label={day}
+                          value={index}
+                          checked={field.value?.includes(index)}
+                          onChange={(e) => {
+                            const valueAsNumber = parseInt(e.target.value, 10);
+                            const newValues = e.target.checked
+                              ? [...(field.value || []), valueAsNumber]
+                              : (field.value || []).filter((v) => v !== valueAsNumber);
+                            field.onChange(newValues.sort((a, b) => a - b));
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                />
               </Form.Group>
             </Col>
             <Col md={6}>
