@@ -43,13 +43,13 @@ serve(async (req) => {
 
     // 3. Insert new route points
     if (stops.length > 0) {
-        const routePointsToInsert = stops.map((stop: { id: number, weekdays: number[] | null, arrival_time: string | null, remarks: string | null }, index: number) => ({
+        const routePointsToInsert = stops.map((stop: any, index: number) => ({
             tour_id: tourId,
             stop_id: stop.id,
             position: index,
-            weekdays: stop.weekdays,
-            arrival_time: stop.arrival_time,
-            remarks: stop.remarks,
+            weekdays: stop.weekdays ?? null,
+            arrival_time: stop.arrival_time ?? null,
+            remarks: stop.remarks ?? null,
         }));
         const { error: insertError } = await supabase.from('tour_route_points').insert(routePointsToInsert);
         if (insertError) throw insertError;
