@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Truck,
   Settings,
+  Map,
   type LucideProps,
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ const iconMap = {
   Package,
   Truck,
   Settings,
+  Map,
 };
 
 type IconName = keyof typeof iconMap;

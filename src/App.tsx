@@ -27,6 +27,7 @@ import Fernverkehr from "./pages/Fernverkehr";
 import BillingDetail from "./pages/BillingDetail";
 import InvoiceManagement from "./pages/InvoiceManagement";
 import DashboardSettings from "./pages/DashboardSettings";
+import TourManagement from "./pages/TourManagement";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,10 @@ const AppRoutes = () => {
             <Route path="freight-orders" element={<FreightOrderManagement />} />
             <Route path="freight-orders/new" element={<FreightOrderForm />} />
             <Route path="freight-orders/edit/:id" element={<FreightOrderForm />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="tours.manage" />}>
+            <Route path="tours" element={<TourManagement />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr" />}>
