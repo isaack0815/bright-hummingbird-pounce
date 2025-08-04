@@ -9,6 +9,7 @@ import CreatableSelect from 'react-select/creatable';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { TourMap } from '@/components/tour/TourMap';
 
 // API Functions
 const fetchTours = async (): Promise<Tour[]> => {
@@ -168,12 +169,12 @@ const TourManagement = () => {
           </Card>
         </Col>
         <Col md={8}>
-          <Card>
+          <Card className="mb-4">
             <Card.Header>
               <Card.Title>{selectedTourId ? 'Tour bearbeiten' : 'Neue Tour erstellen'}</Card.Title>
             </Card.Header>
             <Card.Body>
-              {isLoadingDetails ? <Spinner size="sm" /> : (
+              {isLoadingDetails && selectedTourId ? <Spinner size="sm" /> : (
                 <>
                   <Form.Group className="mb-3">
                     <Form.Label>Tourname</Form.Label>
@@ -212,6 +213,14 @@ const TourManagement = () => {
                 <Save size={16} className="me-1" /> {saveTourMutation.isPending ? 'Wird gespeichert...' : 'Tour speichern'}
               </Button>
             </Card.Footer>
+          </Card>
+          <Card>
+            <Card.Header>
+              <Card.Title>Kartenansicht</Card.Title>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <TourMap stops={tourStops} />
+            </Card.Body>
           </Card>
         </Col>
       </Row>
