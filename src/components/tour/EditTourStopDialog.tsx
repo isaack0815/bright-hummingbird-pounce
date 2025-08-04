@@ -10,7 +10,7 @@ const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Fr
 const formSchema = z.object({
   name: z.string().min(1, "Name ist erforderlich."),
   address: z.string().min(1, "Adresse ist erforderlich."),
-  weekdays: z.array(z.number()).default([]),
+  weekdays: z.array(z.coerce.number()).default([]),
   arrival_time: z.string().nullable(),
   remarks: z.string().nullable(),
 });

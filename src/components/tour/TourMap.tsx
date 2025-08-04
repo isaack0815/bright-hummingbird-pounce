@@ -37,6 +37,27 @@ const geocodeAddress = async (address: string): Promise<LatLngTuple | null> => {
   }
 };
 
+const fetchRoute = async (coordinates: LatLngTuple[]): Promise<LatLngTuple[] | null> => {
+  if (coordinates.length < 2) return null;
+  
+  const coordsString = coordinates.map(c => `${c[1]},${c[0]}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.routes && data.routes.length > 0) {
+      const routeCoords = data.routes[0].geometry.coordinates;
+      return routeCoords.map((c: [number, number]) => [c[1], c[0]] as LatLngTuple);
+    }
+    return null;
+  } catch (error) {
+    console.error("Routing error:", error);
+    return null;
+  }
+};
+
 const FitBounds = ({ coordinates }: { coordinates: LatLngTuple[] }) => {
   const map = useMap();
   useEffect(() => {
@@ -48,37 +69,47 @@ const FitBounds = ({ coordinates }: { coordinates: LatLngTuple[] }) => {
 };
 
 export const TourMap = ({ stops }: MapProps) => {
-  const [coordinates, setCoordinates] = useState<LatLngTuple[]>([]);
+  const [markerCoordinates, setMarkerCoordinates] = useState<LatLngTuple[]>([]);
+  const [routeCoordinates, setRouteCoordinates] = useState<LatLngTuple[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const fetchCoordinates = async () => {
+    const fetchCoordinatesAndRoute = async () => {
       if (stops.length === 0) {
-        setCoordinates([]);
+        setMarkerCoordinates([]);
+        setRouteCoordinates([]);
         return;
       }
       setIsLoading(true);
+      
       const coords: LatLngTuple[] = [];
       for (const stop of stops) {
         const coord = await geocodeAddress(stop.address);
         if (coord) {
           coords.push(coord);
         }
-        // To respect Nominatim's usage policy (max 1 req/sec)
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      setCoordinates(coords);
+      setMarkerCoordinates(coords);
+
+      if (coords.length > 1) {
+        const route = await fetchRoute(coords);
+        setRouteCoordinates(route || coords);
+      } else {
+        setRouteCoordinates([]);
+      }
+      
       setIsLoading(false);
     };
 
-    fetchCoordinates();
+    fetchCoordinatesAndRoute();
   }, [stops]);
 
   if (isLoading) {
     return <div className="d-flex justify-content-center align-items-center h-100 p-4">Lade Kartendaten...</div>;
   }
 
-  if (stops.length > 0 && coordinates.length === 0 && !isLoading) {
+  if (stops.length > 0 && markerCoordinates.length === 0 && !isLoading) {
     return <div className="d-flex justify-content-center align-items-center h-100 p-4">Keine Koordinaten für die angegebenen Adressen gefunden.</div>;
   }
 
@@ -88,7 +119,7 @@ export const TourMap = ({ stops }: MapProps) => {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      {coordinates.map((coord, index) => (
+      {markerCoordinates.map((coord, index) => (
         <Marker key={index} position={coord}>
           <Popup>
             <strong>{stops[index].name}</strong><br />
@@ -96,10 +127,10 @@ export const TourMap = ({ stops }: MapProps) => {
           </Popup>
         </Marker>
       ))}
-      {coordinates.length > 1 && (
-        <Polyline positions={coordinates} color="blue" />
+      {routeCoordinates.length > 1 && (
+        <Polyline positions={routeCoordinates} color="blue" />
       )}
-      <FitBounds coordinates={coordinates} />
+      <FitBounds coordinates={markerCoordinates} />
     </MapContainer>
   );
 };
