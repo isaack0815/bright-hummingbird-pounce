@@ -14,28 +14,18 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
     const { data, error } = await supabase
-      .from('vehicles')
-      .select(`
-        *,
-        profiles (
-          id,
-          first_name,
-          last_name
-        ),
-        vehicle_groups (
-          id,
-          name
-        )
-      `)
-      .order('brand')
+      .from('vehicle_groups')
+      .select('*')
+      .order('name');
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ vehicles: data }), {
+    return new Response(JSON.stringify({ groups: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

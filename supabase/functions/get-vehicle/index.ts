@@ -34,6 +34,10 @@ serve(async (req) => {
           id,
           first_name,
           last_name
+        ),
+        vehicle_groups (
+          id,
+          name
         )
       `)
       .eq('id', id)

@@ -17,27 +17,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    const { name, description } = await req.json()
+
+    if (!name) {
+      return new Response(JSON.stringify({ error: 'Group name is required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
     const { data, error } = await supabase
-      .from('vehicles')
-      .select(`
-        *,
-        profiles (
-          id,
-          first_name,
-          last_name
-        ),
-        vehicle_groups (
-          id,
-          name
-        )
-      `)
-      .order('brand')
+      .from('vehicle_groups')
+      .insert([{ name, description }])
+      .select()
+      .single()
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ vehicles: data }), {
+    return new Response(JSON.stringify({ group: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 201,
     })
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), {

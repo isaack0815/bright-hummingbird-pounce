@@ -1,3 +1,9 @@
+export type VehicleGroup = {
+  id: number;
+  name: string;
+  description: string | null;
+};
+
 export type VehicleNoteCategory = {
   id: number;
   name: string;
@@ -31,9 +37,14 @@ export type Vehicle = {
   next_service_date: string | null;
   gas_inspection_due_date: string | null;
   driver_id: string | null;
+  group_id: number | null;
   profiles: {
     id: string;
     first_name: string | null;
     last_name: string | null;
+  } | null;
+  vehicle_groups: {
+    id: number;
+    name: string;
   } | null;
 };

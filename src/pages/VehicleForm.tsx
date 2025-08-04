@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useError } from '@/contexts/ErrorContext';
 import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import type { Vehicle } from '@/types/vehicle';
+import type { Vehicle, VehicleGroup } from '@/types/vehicle';
 import type { ChatUser } from '@/types/chat';
 import VehicleNotesTab from '@/components/vehicle/VehicleNotesTab';
 
@@ -27,6 +27,7 @@ const formSchema = z.object({
   next_service_date: z.string().optional(),
   gas_inspection_due_date: z.string().optional(),
   driver_id: z.string().uuid().nullable().optional(),
+  group_id: z.coerce.number().nullable().optional(),
 });
 
 const fetchUsers = async (): Promise<ChatUser[]> => {
@@ -44,6 +45,12 @@ const fetchVehicle = async (id: string): Promise<Vehicle> => {
   return data.vehicle;
 }
 
+const fetchVehicleGroups = async (): Promise<VehicleGroup[]> => {
+    const { data, error } = await supabase.functions.invoke('get-vehicle-groups');
+    if (error) throw new Error(error.message);
+    return data.groups;
+};
+
 const VehicleForm = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -54,6 +61,11 @@ const VehicleForm = () => {
   const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
     queryKey: ['chatUsers'],
     queryFn: fetchUsers,
+  });
+
+  const { data: vehicleGroups, isLoading: isLoadingGroups } = useQuery<VehicleGroup[]>({
+    queryKey: ['vehicleGroups'],
+    queryFn: fetchVehicleGroups,
   });
 
   const { data: existingVehicle, isLoading: isLoadingVehicle } = useQuery<Vehicle>({
@@ -73,6 +85,7 @@ const VehicleForm = () => {
       status: "Verfügbar",
       notes: "",
       driver_id: null,
+      group_id: null,
     },
   });
 
@@ -92,13 +105,14 @@ const VehicleForm = () => {
         next_service_date: existingVehicle.next_service_date || "",
         gas_inspection_due_date: existingVehicle.gas_inspection_due_date || "",
         driver_id: existingVehicle.driver_id || null,
+        group_id: existingVehicle.group_id || null,
       });
     }
   }, [existingVehicle, isEditMode, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>): Promise<Vehicle> => {
-      const payload = { ...values, driver_id: values.driver_id || null };
+      const payload = { ...values, driver_id: values.driver_id || null, group_id: values.group_id || null };
       
       if (isEditMode) {
         const { data, error } = await supabase.functions.invoke('update-vehicle', {
@@ -129,7 +143,7 @@ const VehicleForm = () => {
     },
   });
 
-  if (isLoadingUsers || isLoadingVehicle) {
+  if (isLoadingUsers || isLoadingVehicle || isLoadingGroups) {
       return <p>Lade Formulardaten...</p>
   }
 
@@ -164,6 +178,19 @@ const VehicleForm = () => {
                         {users?.map((user) => (
                           <option key={user.id} value={user.id}>
                             {`${user.first_name || ''} ${user.last_name || ''}`.trim()}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Fahrzeuggruppe</Form.Label>
+                      <Form.Select {...form.register("group_id")} value={form.watch("group_id") ?? "none"} disabled={isLoadingGroups}>
+                        <option value="none">- Keine Gruppe -</option>
+                        {vehicleGroups?.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
                           </option>
                         ))}
                       </Form.Select>

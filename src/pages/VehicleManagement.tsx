@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Card, Button, Form, Table, Badge } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -49,6 +49,7 @@ const VehicleManagement = () => {
       (vehicle.brand && vehicle.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (vehicle.model && vehicle.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (vehicle.vin && vehicle.vin.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (vehicle.vehicle_groups && vehicle.vehicle_groups.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (vehicle.profiles && `${vehicle.profiles.first_name} ${vehicle.profiles.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [vehicles, searchTerm]);
@@ -75,10 +76,16 @@ const VehicleManagement = () => {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <h1 className="h2">Fahrzeugverwaltung</h1>
-        <Button onClick={() => navigate('/vehicles/new')}>
-          <PlusCircle className="me-2" size={16} />
-          Fahrzeug hinzufügen
-        </Button>
+        <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => navigate('/vehicle-groups')}>
+                <Users className="me-2" size={16} />
+                Gruppen verwalten
+            </Button>
+            <Button onClick={() => navigate('/vehicles/new')}>
+                <PlusCircle className="me-2" size={16} />
+                Fahrzeug hinzufügen
+            </Button>
+        </div>
       </div>
       <Card>
         <Card.Header>
@@ -102,6 +109,7 @@ const VehicleManagement = () => {
                 <tr>
                   <th>Kennzeichen</th>
                   <th>Marke & Modell</th>
+                  <th>Gruppe</th>
                   <th>Fahrer</th>
                   <th>Status</th>
                   <th>Nächste HU</th>
@@ -115,6 +123,7 @@ const VehicleManagement = () => {
                   <tr key={vehicle.id}>
                     <td className="fw-medium">{vehicle.license_plate}</td>
                     <td>{`${vehicle.brand || ''} ${vehicle.model || ''}`.trim()}</td>
+                    <td>{vehicle.vehicle_groups?.name || '-'}</td>
                     <td>{vehicle.profiles ? `${vehicle.profiles.first_name || ''} ${vehicle.profiles.last_name || ''}`.trim() : '-'}</td>
                     <td><Badge bg={vehicle.status === 'Verfügbar' ? 'success' : 'secondary'}>{vehicle.status}</Badge></td>
                     <td>

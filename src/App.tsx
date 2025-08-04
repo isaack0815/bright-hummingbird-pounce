@@ -28,6 +28,7 @@ import BillingDetail from "./pages/BillingDetail";
 import InvoiceManagement from "./pages/InvoiceManagement";
 import DashboardSettings from "./pages/DashboardSettings";
 import TourManagement from "./pages/TourManagement";
+import VehicleGroupManagement from "./pages/VehicleGroupManagement";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ const AppRoutes = () => {
             <Route path="vehicles" element={<VehicleManagement />} />
             <Route path="vehicles/new" element={<VehicleForm />} />
             <Route path="vehicles/edit/:id" element={<VehicleForm />} />
+            <Route path="vehicle-groups" element={<VehicleGroupManagement />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredPermission="freight_orders.manage" />}>

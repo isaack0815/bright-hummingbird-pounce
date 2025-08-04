@@ -17,27 +17,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { data, error } = await supabase
-      .from('vehicles')
-      .select(`
-        *,
-        profiles (
-          id,
-          first_name,
-          last_name
-        ),
-        vehicle_groups (
-          id,
-          name
-        )
-      `)
-      .order('brand')
+    const { id } = await req.json()
+
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Group ID is required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
+    const { error } = await supabase.from('vehicle_groups').delete().eq('id', id)
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ vehicles: data }), {
+    return new Response(null, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 204,
     })
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), {
