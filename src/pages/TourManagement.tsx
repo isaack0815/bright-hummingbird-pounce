@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Container, Row, Col, Card, ListGroup, Button, Form, Spinner } from 'react-bootstrap';
 import { PlusCircle, Save, Trash2, GripVertical } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
-import type { Tour, TourStop, TourDetails } from '@/types/tour';
+import type { Tour, TourStop, TourDetails, RoutePoint } from '@/types/tour';
 import type { Vehicle } from '@/types/vehicle';
 import type { Setting } from '@/types/settings';
 import CreatableSelect from 'react-select/creatable';
@@ -45,23 +45,40 @@ const fetchVehiclesByGroup = async (groupId: number | null): Promise<Vehicle[]> 
   return data.vehicles;
 };
 
+const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+
 // Sortable Item Component
-const SortableStopItem = ({ stop, onRemove }: { stop: TourStop, onRemove: () => void }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stop.id });
+const SortableStopItem = ({ stop, onRemove, onUpdate }: { stop: RoutePoint, onRemove: () => void, onUpdate: (field: 'weekday' | 'arrival_time', value: any) => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stop.route_point_id });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
-    <ListGroup.Item ref={setNodeRef} style={style} className="d-flex align-items-center">
-      <Button variant="ghost" size="sm" {...attributes} {...listeners} className="cursor-grab me-2">
-        <GripVertical />
-      </Button>
-      <div className="flex-grow-1">
-        <p className="fw-bold mb-0">{stop.name}</p>
-        <p className="small text-muted mb-0">{stop.address}</p>
-      </div>
-      <Button variant="ghost" size="sm" className="text-danger" onClick={onRemove}>
-        <Trash2 size={16} />
-      </Button>
+    <ListGroup.Item ref={setNodeRef} style={style}>
+      <Row className="align-items-center">
+        <Col xs="auto">
+          <Button variant="ghost" size="sm" {...attributes} {...listeners} className="cursor-grab">
+            <GripVertical />
+          </Button>
+        </Col>
+        <Col>
+          <p className="fw-bold mb-0">{stop.name}</p>
+          <p className="small text-muted mb-0">{stop.address}</p>
+        </Col>
+        <Col md={3}>
+          <Form.Select size="sm" value={stop.weekday ?? ''} onChange={e => onUpdate('weekday', e.target.value === '' ? null : Number(e.target.value))}>
+            <option value="">- Tag -</option>
+            {weekdays.map((day, index) => <option key={index} value={index}>{day}</option>)}
+          </Form.Select>
+        </Col>
+        <Col md={2}>
+          <Form.Control size="sm" type="time" value={stop.arrival_time ?? ''} onChange={e => onUpdate('arrival_time', e.target.value || null)} />
+        </Col>
+        <Col xs="auto">
+          <Button variant="ghost" size="sm" className="text-danger" onClick={onRemove}>
+            <Trash2 size={16} />
+          </Button>
+        </Col>
+      </Row>
     </ListGroup.Item>
   );
 };
@@ -70,8 +87,7 @@ const TourManagement = () => {
   const [selectedTourId, setSelectedTourId] = useState<number | null>(null);
   const [isAddTourDialogOpen, setIsAddTourDialogOpen] = useState(false);
   const [tourName, setTourName] = useState('');
-  const [tourDescription, setTourDescription] = useState('');
-  const [tourStops, setTourStops] = useState<TourStop[]>([]);
+  const [tourStops, setTourStops] = useState<RoutePoint[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor));
@@ -96,7 +112,6 @@ const TourManagement = () => {
   useEffect(() => {
     if (tourDetails) {
       setTourName(tourDetails.name);
-      setTourDescription(tourDetails.description || '');
       setTourStops(tourDetails.stops);
       setSelectedVehicleId(tourDetails.vehicle_id);
     }
@@ -110,7 +125,14 @@ const TourManagement = () => {
     },
     onSuccess: (newStop) => {
       queryClient.invalidateQueries({ queryKey: ['tourStops'] });
-      setTourStops(prev => [...prev, newStop]);
+      const newRoutePoint: RoutePoint = {
+        ...newStop,
+        position: tourStops.length,
+        route_point_id: Date.now(), // Temporary unique ID for DND
+        weekday: 1, // Default to Monday
+        arrival_time: '08:00',
+      };
+      setTourStops(prev => [...prev, newRoutePoint]);
       showSuccess("Neuer Stopp erstellt und zur Tour hinzugefügt.");
     },
     onError: (err: any) => showError(err.message || "Fehler beim Erstellen des Stopps."),
@@ -119,7 +141,7 @@ const TourManagement = () => {
   const saveTourMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke('update-tour', {
-        body: { id: selectedTourId, name: tourName, description: tourDescription, stops: tourStops, vehicle_id: selectedVehicleId },
+        body: { id: selectedTourId, name: tourName, description: "", stops: tourStops, vehicle_id: selectedVehicleId },
       });
       if (error) throw error;
     },
@@ -136,10 +158,17 @@ const TourManagement = () => {
   };
 
   const handleAddStop = (selected: any) => {
-    if (selected && !tourStops.some(s => s.id === selected.value)) {
+    if (selected) {
       const stopToAdd = allStops?.find(s => s.id === selected.value);
       if (stopToAdd) {
-        setTourStops(prev => [...prev, stopToAdd]);
+        const newRoutePoint: RoutePoint = {
+          ...stopToAdd,
+          position: tourStops.length,
+          route_point_id: Date.now(), // Temporary unique ID for DND
+          weekday: 1, // Default to Monday
+          arrival_time: '08:00',
+        };
+        setTourStops(prev => [...prev, newRoutePoint]);
       }
     }
   };
@@ -155,11 +184,17 @@ const TourManagement = () => {
     const { active, over } = event;
     if (active.id !== over.id) {
       setTourStops((items) => {
-        const oldIndex = items.findIndex(item => item.id === active.id);
-        const newIndex = items.findIndex(item => item.id === over.id);
+        const oldIndex = items.findIndex(item => item.route_point_id === active.id);
+        const newIndex = items.findIndex(item => item.route_point_id === over.id);
         return arrayMove(items, oldIndex, newIndex);
       });
     }
+  };
+
+  const handleUpdateStop = (index: number, field: 'weekday' | 'arrival_time', value: any) => {
+    const newStops = [...tourStops];
+    newStops[index] = { ...newStops[index], [field]: value };
+    setTourStops(newStops);
   };
 
   const stopOptions = allStops?.map(s => ({ value: s.id, label: `${s.name} - ${s.address}` })) || [];
@@ -220,10 +255,6 @@ const TourManagement = () => {
                         </Form.Group>
                       </Col>
                     </Row>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Beschreibung</Form.Label>
-                      <Form.Control as="textarea" value={tourDescription} onChange={e => setTourDescription(e.target.value)} />
-                    </Form.Group>
                     <hr />
                     <h6>Stopps</h6>
                     <CreatableSelect
@@ -238,9 +269,14 @@ const TourManagement = () => {
                     />
                     <ListGroup>
                       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext items={tourStops.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                          {tourStops.map(stop => (
-                            <SortableStopItem key={stop.id} stop={stop} onRemove={() => setTourStops(prev => prev.filter(s => s.id !== stop.id))} />
+                        <SortableContext items={tourStops.map(s => s.route_point_id)} strategy={verticalListSortingStrategy}>
+                          {tourStops.map((stop, index) => (
+                            <SortableStopItem 
+                              key={stop.route_point_id} 
+                              stop={stop} 
+                              onRemove={() => setTourStops(prev => prev.filter((_, i) => i !== index))}
+                              onUpdate={(field, value) => handleUpdateStop(index, field, value)}
+                            />
                           ))}
                         </SortableContext>
                       </DndContext>

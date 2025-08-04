@@ -39,7 +39,16 @@ serve(async (req) => {
 
     if (pointsError) throw pointsError;
 
-    const tourDetails = { ...tour, stops: routePoints.map(rp => ({ ...rp.tour_stops, position: rp.position, route_point_id: rp.id })) };
+    const tourDetails = { 
+      ...tour, 
+      stops: routePoints.map(rp => ({ 
+        ...rp.tour_stops, 
+        position: rp.position, 
+        route_point_id: rp.id,
+        weekday: rp.weekday,
+        arrival_time: rp.arrival_time
+      })) 
+    };
 
     return new Response(JSON.stringify({ tour: tourDetails }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

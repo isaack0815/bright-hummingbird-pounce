@@ -10,7 +10,6 @@ import type { Setting } from "@/types/settings";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Tourname ist erforderlich." }),
-  description: z.string().optional(),
   vehicle_id: z.coerce.number().nullable().optional(),
 });
 
@@ -36,7 +35,7 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
   const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "", description: "", vehicle_id: null },
+    defaultValues: { name: "", vehicle_id: null },
   });
 
   const { data: settings } = useQuery({ 
@@ -57,7 +56,7 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
       const { data, error } = await supabase.functions.invoke('update-tour', {
         body: {
           name: values.name,
-          description: values.description,
+          description: "",
           vehicle_id: values.vehicle_id,
           stops: [], // Create with no stops initially
         },
@@ -88,10 +87,6 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
             <Form.Label>Tourname</Form.Label>
             <Form.Control {...form.register("name")} isInvalid={!!form.formState.errors.name} />
             <Form.Control.Feedback type="invalid">{form.formState.errors.name?.message}</Form.Control.Feedback>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Beschreibung</Form.Label>
-            <Form.Control as="textarea" rows={3} {...form.register("description")} />
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Fahrzeug</Form.Label>
