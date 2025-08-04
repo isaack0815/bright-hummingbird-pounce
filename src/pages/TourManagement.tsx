@@ -66,6 +66,7 @@ const SortableStopItem = ({ stop, onRemove, onEdit }: { stop: RoutePoint, onRemo
         <Col>
           <p className="fw-bold mb-0">{stop.name}</p>
           <p className="small text-muted mb-0">{stop.address}</p>
+          {stop.remarks && <p className="small text-info mt-1 mb-0 fst-italic">"{stop.remarks}"</p>}
         </Col>
         <Col md={4} className="text-md-end">
           <Badge bg="light" text="dark" className="me-2">{displayWeekdays}</Badge>
