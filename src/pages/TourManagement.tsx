@@ -217,18 +217,17 @@ const TourManagement = () => {
                 </Card.Footer>
               )}
             </Card>
-          </Card>
-          {selectedTourId !== null && (
-            <Card>
-              <Card.Header>
-                <Card.Title>Kartenansicht</Card.Title>
-              </Card.Header>
-              <Card.Body className="p-0">
-                <TourMap stops={tourStops} />
-              </Card.Body>
-            </Card>
-          )}
-        </Col>
+            {selectedTourId !== null && (
+              <Card>
+                <Card.Header>
+                  <Card.Title>Kartenansicht</Card.Title>
+                </Card.Header>
+                <Card.Body className="p-0">
+                  <TourMap stops={tourStops} />
+                </Card.Body>
+              </Card>
+            )}
+          </Col>
         </Row>
       </Container>
       <AddTourDialog
