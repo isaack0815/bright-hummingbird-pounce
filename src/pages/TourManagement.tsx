@@ -140,12 +140,23 @@ const TourManagement = () => {
   });
 
   const updateStopMutation = useMutation({
-    mutationFn: async (stop: { id: number, name: string, address: string }) => {
-      const { error } = await supabase.functions.invoke('update-tour-stop', { body: stop });
+    mutationFn: async (stop: RoutePoint) => {
+      const { error } = await supabase.functions.invoke('update-tour-stop', { 
+        body: {
+          id: stop.id,
+          route_point_id: stop.route_point_id,
+          name: stop.name,
+          address: stop.address,
+          weekdays: stop.weekdays,
+          arrival_time: stop.arrival_time,
+          remarks: stop.remarks,
+        } 
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      showSuccess("Stopp-Stammdaten aktualisiert.");
+      showSuccess("Stopp-Details aktualisiert.");
+      queryClient.invalidateQueries({ queryKey: ['tourDetails', selectedTourId] });
       queryClient.invalidateQueries({ queryKey: ['tourStops'] });
     },
     onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren des Stopps."),
@@ -197,11 +208,8 @@ const TourManagement = () => {
     setIsEditStopDialogOpen(true);
   };
   const handleSaveStop = (updatedStop: RoutePoint) => {
-    const originalStop = allStops?.find(s => s.id === updatedStop.id);
-    if (originalStop && (originalStop.name !== updatedStop.name || originalStop.address !== updatedStop.address)) {
-      updateStopMutation.mutate({ id: updatedStop.id, name: updatedStop.name, address: updatedStop.address });
-    }
     setTourStops(prev => prev.map(s => s.route_point_id === updatedStop.route_point_id ? updatedStop : s));
+    updateStopMutation.mutate(updatedStop);
   };
 
   const stopOptions = allStops?.map(s => ({ value: s.id, label: `${s.name} - ${s.address}` })) || [];
