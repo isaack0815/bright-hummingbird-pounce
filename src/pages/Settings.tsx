@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button, Card, Form, Spinner, Placeholder, Alert, Modal } from "react-bootstrap";
+import { Button, Card, Form, Spinner, Placeholder, Alert, Modal, Tabs, Tab } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -170,132 +170,134 @@ const Settings = () => {
         </div>
 
         <Form id="settings-form" onSubmit={form.handleSubmit(onSubmit)}>
-          <Card className="mb-4">
-            <Card.Header>
-              <Card.Title>Firmendaten</Card.Title>
-              <Card.Text className="text-muted">Diese Daten werden für den PDF-Export verwendet.</Card.Text>
-            </Card.Header>
-            <Card.Body>
-              {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '200px'}} /></Placeholder> : (
-                <>
-                  <Form.Group className="mb-3"><Form.Label>Firmenname</Form.Label><Form.Control {...form.register("company_name")} /></Form.Group>
-                  <Form.Group className="mb-3"><Form.Label>Straße & Hausnummer</Form.Label><Form.Control {...form.register("company_address")} /></Form.Group>
-                  <Form.Group className="mb-3"><Form.Label>PLZ & Ort</Form.Label><Form.Control {...form.register("company_city_zip")} /></Form.Group>
-                  <Form.Group className="mb-3"><Form.Label>Land</Form.Label><Form.Control {...form.register("company_country")} /></Form.Group>
-                  <Form.Group><Form.Label>Umsatzsteuer-ID</Form.Label><Form.Control {...form.register("company_tax_id")} /></Form.Group>
-                </>
-              )}
-            </Card.Body>
-          </Card>
-
-          <Card className="mb-4">
-            <Card.Header>
-              <Card.Title>Globale Auftragseinstellungen</Card.Title>
-              <Card.Text className="text-muted">Systemweite Standardwerte und Konfigurationen.</Card.Text>
-            </Card.Header>
-            <Card.Body>
-              {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
-                <Form.Group><Form.Label>Standard-Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_default")} /></Form.Group>
-              )}
-            </Card.Body>
-          </Card>
-
-          <Card className="mb-4">
-            <Card.Header>
-              <Card.Title>Tourenplanung</Card.Title>
-              <Card.Text className="text-muted">Einstellungen für die Tourenverwaltung.</Card.Text>
-            </Card.Header>
-            <Card.Body>
-              {isLoading || isLoadingVehicleGroups ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
-                <Form.Group>
-                  <Form.Label>Standard-Fahrzeuggruppe für Touren</Form.Label>
-                  <Form.Select {...form.register("tour_planning_vehicle_group_id")}>
-                    <option value="">Alle Fahrzeuge</option>
-                    {vehicleGroups?.map(group => (
-                      <option key={group.id} value={group.id}>{group.name}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              )}
-            </Card.Body>
-          </Card>
-
-          <Card className="mb-4">
-            <Card.Header>
-              <Card.Title>AGB für PDF-Export</Card.Title>
-              <Card.Text className="text-muted">Dieser Text wird auf den generierten Transportaufträgen als AGB gedruckt.</Card.Text>
-            </Card.Header>
-            <Card.Body>
-              {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '200px'}} /></Placeholder> : (
-                <Form.Group>
-                  <Form.Label>AGB Text</Form.Label>
-                  <Form.Control as="textarea" rows={10} className="font-monospace small" {...form.register("agb_text")} />
-                </Form.Group>
-              )}
-            </Card.Body>
-          </Card>
-
-          <Card>
-            <Card.Header>
-              <Card.Title>E-Mail Konfiguration</Card.Title>
-              <Card.Text className="text-muted">Allgemeine Einstellungen für den E-Mail-Versand.</Card.Text>
-            </Card.Header>
-            <Card.Body>
-              <Alert variant="info">
-                <div className="d-flex align-items-start">
-                  <Terminal className="me-3 mt-1" size={20} />
-                  <div>
-                    <Alert.Heading as="h5">Wichtiger Hinweis!</Alert.Heading>
-                    <p className="mb-0">
-                      Die SMTP-Zugangsdaten müssen als Secrets direkt in Ihrem Supabase-Projekt hinterlegt werden. Fügen Sie auch `SMTP_SECURE` mit dem Wert `tls`, `ssl` oder `none` hinzu.
-                    </p>
+          <Tabs defaultActiveKey="general" id="settings-tabs" className="mb-3 nav-fill">
+            <Tab eventKey="general" title="Allgemein">
+              <Card className="mb-4">
+                <Card.Header>
+                  <Card.Title>Firmendaten</Card.Title>
+                  <Card.Text className="text-muted">Diese Daten werden für den PDF-Export verwendet.</Card.Text>
+                </Card.Header>
+                <Card.Body>
+                  {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '200px'}} /></Placeholder> : (
+                    <>
+                      <Form.Group className="mb-3"><Form.Label>Firmenname</Form.Label><Form.Control {...form.register("company_name")} /></Form.Group>
+                      <Form.Group className="mb-3"><Form.Label>Straße & Hausnummer</Form.Label><Form.Control {...form.register("company_address")} /></Form.Group>
+                      <Form.Group className="mb-3"><Form.Label>PLZ & Ort</Form.Label><Form.Control {...form.register("company_city_zip")} /></Form.Group>
+                      <Form.Group className="mb-3"><Form.Label>Land</Form.Label><Form.Control {...form.register("company_country")} /></Form.Group>
+                      <Form.Group><Form.Label>Umsatzsteuer-ID</Form.Label><Form.Control {...form.register("company_tax_id")} /></Form.Group>
+                    </>
+                  )}
+                </Card.Body>
+              </Card>
+            </Tab>
+            <Tab eventKey="orders" title="Aufträge & Touren">
+              <Card className="mb-4">
+                <Card.Header>
+                  <Card.Title>Globale Auftragseinstellungen</Card.Title>
+                  <Card.Text className="text-muted">Systemweite Standardwerte und Konfigurationen.</Card.Text>
+                </Card.Header>
+                <Card.Body>
+                  {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
+                    <Form.Group><Form.Label>Standard-Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_default")} /></Form.Group>
+                  )}
+                </Card.Body>
+              </Card>
+              <Card className="mb-4">
+                <Card.Header>
+                  <Card.Title>Tourenplanung</Card.Title>
+                  <Card.Text className="text-muted">Einstellungen für die Tourenverwaltung.</Card.Text>
+                </Card.Header>
+                <Card.Body>
+                  {isLoading || isLoadingVehicleGroups ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
+                    <Form.Group>
+                      <Form.Label>Standard-Fahrzeuggruppe für Touren</Form.Label>
+                      <Form.Select {...form.register("tour_planning_vehicle_group_id")}>
+                        <option value="">Alle Fahrzeuge</option>
+                        {vehicleGroups?.map(group => (
+                          <option key={group.id} value={group.id}>{group.name}</option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  )}
+                </Card.Body>
+              </Card>
+            </Tab>
+            <Tab eventKey="documents" title="Dokumente & E-Mail">
+              <Card className="mb-4">
+                <Card.Header>
+                  <Card.Title>AGB für PDF-Export</Card.Title>
+                  <Card.Text className="text-muted">Dieser Text wird auf den generierten Transportaufträgen als AGB gedruckt.</Card.Text>
+                </Card.Header>
+                <Card.Body>
+                  {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '200px'}} /></Placeholder> : (
+                    <Form.Group>
+                      <Form.Label>AGB Text</Form.Label>
+                      <Form.Control as="textarea" rows={10} className="font-monospace small" {...form.register("agb_text")} />
+                    </Form.Group>
+                  )}
+                </Card.Body>
+              </Card>
+              <Card>
+                <Card.Header>
+                  <Card.Title>E-Mail Konfiguration</Card.Title>
+                  <Card.Text className="text-muted">Allgemeine Einstellungen für den E-Mail-Versand.</Card.Text>
+                </Card.Header>
+                <Card.Body>
+                  <Alert variant="info">
+                    <div className="d-flex align-items-start">
+                      <Terminal className="me-3 mt-1" size={20} />
+                      <div>
+                        <Alert.Heading as="h5">Wichtiger Hinweis!</Alert.Heading>
+                        <p className="mb-0">
+                          Die SMTP-Zugangsdaten müssen als Secrets direkt in Ihrem Supabase-Projekt hinterlegt werden. Fügen Sie auch `SMTP_SECURE` mit dem Wert `tls`, `ssl` oder `none` hinzu.
+                        </p>
+                      </div>
+                    </div>
+                  </Alert>
+                  <div className="row g-4 mt-3">
+                    <div className="col-md-6">
+                      <div className="border p-3 rounded h-100">
+                        <h4 className="h6">Status der SMTP-Secrets</h4>
+                        {isLoadingSmtpStatus ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder> : (
+                          <ul className="list-unstyled mb-0">
+                            <SecretStatusItem name="SMTP_HOST" isSet={smtpStatus?.SMTP_HOST} />
+                            <SecretStatusItem name="SMTP_PORT" isSet={smtpStatus?.SMTP_PORT} />
+                            <SecretStatusItem name="SMTP_USER" isSet={smtpStatus?.SMTP_USER} />
+                            <SecretStatusItem name="SMTP_PASS" isSet={smtpStatus?.SMTP_PASS} />
+                            <SecretStatusItem name="SMTP_FROM_EMAIL" isSet={smtpStatus?.SMTP_FROM_EMAIL} />
+                            <SecretStatusItem name="SMTP_SECURE" isSet={smtpStatus?.SMTP_SECURE} />
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <div className="border p-3 rounded h-100">
+                        <h4 className="h6">SMTP-Verbindung testen</h4>
+                        <p className="small text-muted">
+                          Prüfen Sie, ob die in den Secrets hinterlegten Daten korrekt sind.
+                        </p>
+                        <Button 
+                          type="button" 
+                          variant="outline-secondary" 
+                          onClick={() => testSmtpMutation.mutate()}
+                          disabled={testSmtpMutation.isPending}
+                        >
+                          <Wifi className="me-2" size={16} />
+                          {testSmtpMutation.isPending ? 'Teste Verbindung...' : 'Verbindung testen'}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </Alert>
-
-              <div className="row g-4 mt-3">
-                <div className="col-md-6">
-                  <div className="border p-3 rounded h-100">
-                    <h4 className="h6">Status der SMTP-Secrets</h4>
-                    {isLoadingSmtpStatus ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder> : (
-                      <ul className="list-unstyled mb-0">
-                        <SecretStatusItem name="SMTP_HOST" isSet={smtpStatus?.SMTP_HOST} />
-                        <SecretStatusItem name="SMTP_PORT" isSet={smtpStatus?.SMTP_PORT} />
-                        <SecretStatusItem name="SMTP_USER" isSet={smtpStatus?.SMTP_USER} />
-                        <SecretStatusItem name="SMTP_PASS" isSet={smtpStatus?.SMTP_PASS} />
-                        <SecretStatusItem name="SMTP_FROM_EMAIL" isSet={smtpStatus?.SMTP_FROM_EMAIL} />
-                        <SecretStatusItem name="SMTP_SECURE" isSet={smtpStatus?.SMTP_SECURE} />
-                      </ul>
-                    )}
-                  </div>
-                </div>
-                <div className="col-md-6">
-                  <div className="border p-3 rounded h-100">
-                    <h4 className="h6">SMTP-Verbindung testen</h4>
-                    <p className="small text-muted">
-                      Prüfen Sie, ob die in den Secrets hinterlegten Daten korrekt sind.
-                    </p>
-                    <Button 
-                      type="button" 
-                      variant="outline-secondary" 
-                      onClick={() => testSmtpMutation.mutate()}
-                      disabled={testSmtpMutation.isPending}
-                    >
-                      <Wifi className="me-2" size={16} />
-                      {testSmtpMutation.isPending ? 'Teste Verbindung...' : 'Verbindung testen'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {isLoading ? <div className="mt-4"><Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder></div> : (
-                <div className="mt-4">
-                  <Form.Group className="mb-3"><Form.Label>BCC-Empfänger</Form.Label><Form.Control type="email" placeholder="bcc@example.com" {...form.register("email_bcc")} /></Form.Group>
-                  <Form.Group><Form.Label>Standard-Signatur (HTML)</Form.Label><Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen</p>" className="font-monospace" {...form.register("email_signature")} /></Form.Group>
-                </div>
-              )}
-            </Card.Body>
-          </Card>
+                  {isLoading ? <div className="mt-4"><Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder></div> : (
+                    <div className="mt-4">
+                      <Form.Group className="mb-3"><Form.Label>BCC-Empfänger</Form.Label><Form.Control type="email" placeholder="bcc@example.com" {...form.register("email_bcc")} /></Form.Group>
+                      <Form.Group><Form.Label>Standard-Signatur (HTML)</Form.Label><Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen</p>" className="font-monospace" {...form.register("email_signature")} /></Form.Group>
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </Tab>
+          </Tabs>
         </Form>
       </div>
 
