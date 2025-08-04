@@ -17,21 +17,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' // Use service role for transaction-like behavior
     )
 
-    const { id, name, description, stops } = await req.json();
+    const { id, name, description, stops, vehicle_id } = await req.json();
     if (!name || !stops) {
         return new Response(JSON.stringify({ error: 'Name and stops are required' }), { status: 400 });
     }
 
     let tourId = id;
+    const tourData = { name, description, vehicle_id: vehicle_id || null };
 
     // 1. Upsert the tour itself
     if (tourId) {
       // Update existing tour
-      const { error } = await supabase.from('tours').update({ name, description }).eq('id', tourId);
+      const { error } = await supabase.from('tours').update(tourData).eq('id', tourId);
       if (error) throw error;
     } else {
       // Create new tour
-      const { data, error } = await supabase.from('tours').insert({ name, description }).select('id').single();
+      const { data, error } = await supabase.from('tours').insert(tourData).select('id').single();
       if (error) throw error;
       tourId = data.id;
     }

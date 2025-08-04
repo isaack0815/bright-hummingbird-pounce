@@ -5,6 +5,8 @@ import { Container, Row, Col, Card, ListGroup, Button, Form, Spinner } from 'rea
 import { PlusCircle, Save, Trash2, GripVertical } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Tour, TourStop, TourDetails } from '@/types/tour';
+import type { Vehicle } from '@/types/vehicle';
+import type { Setting } from '@/types/settings';
 import CreatableSelect from 'react-select/creatable';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -29,6 +31,18 @@ const fetchTourStops = async (): Promise<TourStop[]> => {
   const { data, error } = await supabase.functions.invoke('get-tour-stops');
   if (error) throw error;
   return data.stops;
+};
+
+const fetchSettings = async (): Promise<Setting[]> => {
+  const { data, error } = await supabase.functions.invoke('get-settings');
+  if (error) throw new Error(error.message);
+  return data.settings;
+};
+
+const fetchVehiclesByGroup = async (groupId: number | null): Promise<Vehicle[]> => {
+  const { data, error } = await supabase.functions.invoke('get-vehicles-by-group', { body: { groupId } });
+  if (error) throw new Error(error.message);
+  return data.vehicles;
 };
 
 // Sortable Item Component
@@ -58,6 +72,7 @@ const TourManagement = () => {
   const [tourName, setTourName] = useState('');
   const [tourDescription, setTourDescription] = useState('');
   const [tourStops, setTourStops] = useState<TourStop[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -68,12 +83,22 @@ const TourManagement = () => {
     enabled: !!selectedTourId,
   });
   const { data: allStops, isLoading: isLoadingStops } = useQuery({ queryKey: ['tourStops'], queryFn: fetchTourStops });
+  
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: fetchSettings });
+  const tourVehicleGroupId = settings?.find(s => s.key === 'tour_planning_vehicle_group_id')?.value;
+
+  const { data: availableVehicles, isLoading: isLoadingVehicles } = useQuery({
+    queryKey: ['vehiclesByGroup', tourVehicleGroupId],
+    queryFn: () => fetchVehiclesByGroup(tourVehicleGroupId ? Number(tourVehicleGroupId) : null),
+    enabled: !!settings,
+  });
 
   useEffect(() => {
     if (tourDetails) {
       setTourName(tourDetails.name);
       setTourDescription(tourDetails.description || '');
       setTourStops(tourDetails.stops);
+      setSelectedVehicleId(tourDetails.vehicle_id);
     }
   }, [tourDetails]);
 
@@ -94,7 +119,7 @@ const TourManagement = () => {
   const saveTourMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke('update-tour', {
-        body: { id: selectedTourId, name: tourName, description: tourDescription, stops: tourStops },
+        body: { id: selectedTourId, name: tourName, description: tourDescription, stops: tourStops, vehicle_id: selectedVehicleId },
       });
       if (error) throw error;
     },
@@ -138,6 +163,7 @@ const TourManagement = () => {
   };
 
   const stopOptions = allStops?.map(s => ({ value: s.id, label: `${s.name} - ${s.address}` })) || [];
+  const vehicleOptions = availableVehicles?.map(v => ({ value: v.id, label: `${v.license_plate} (${v.brand} ${v.model})` })) || [];
 
   return (
     <>
@@ -177,10 +203,23 @@ const TourManagement = () => {
                   <div className="text-center p-5"><Spinner size="sm" /></div>
                 ) : (
                   <>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Tourname</Form.Label>
-                      <Form.Control value={tourName} onChange={e => setTourName(e.target.value)} />
-                    </Form.Group>
+                    <Row>
+                      <Col md={8}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Tourname</Form.Label>
+                          <Form.Control value={tourName} onChange={e => setTourName(e.target.value)} />
+                        </Form.Group>
+                      </Col>
+                      <Col md={4}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Fahrzeug</Form.Label>
+                          <Form.Select value={selectedVehicleId ?? ''} onChange={e => setSelectedVehicleId(Number(e.target.value) || null)} disabled={isLoadingVehicles}>
+                            <option value="">- Kein Fahrzeug -</option>
+                            {vehicleOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                    </Row>
                     <Form.Group className="mb-3">
                       <Form.Label>Beschreibung</Form.Label>
                       <Form.Control as="textarea" value={tourDescription} onChange={e => setTourDescription(e.target.value)} />

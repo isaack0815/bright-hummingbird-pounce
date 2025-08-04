@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Terminal, Wifi, CheckCircle2, XCircle } from "lucide-react";
 import type { Setting } from "@/types/settings";
+import type { VehicleGroup } from "@/types/vehicle";
 
 const settingsSchema = z.object({
   company_name: z.string().optional(),
@@ -19,6 +20,7 @@ const settingsSchema = z.object({
   email_bcc: z.string().email({ message: "Ungültige E-Mail-Adresse." }).optional().or(z.literal('')),
   payment_term_default: z.coerce.number().optional(),
   agb_text: z.string().optional(),
+  tour_planning_vehicle_group_id: z.coerce.number().optional(),
 });
 
 const fetchSettings = async (): Promise<Setting[]> => {
@@ -31,6 +33,12 @@ const fetchSmtpStatus = async (): Promise<Record<string, boolean>> => {
   const { data, error } = await supabase.functions.invoke('get-smtp-secrets-status');
   if (error) throw error;
   return data.status;
+};
+
+const fetchVehicleGroups = async (): Promise<VehicleGroup[]> => {
+    const { data, error } = await supabase.functions.invoke('get-vehicle-groups');
+    if (error) throw new Error(error.message);
+    return data.groups;
 };
 
 const Settings = () => {
@@ -47,6 +55,11 @@ const Settings = () => {
     queryFn: fetchSmtpStatus,
   });
 
+  const { data: vehicleGroups, isLoading: isLoadingVehicleGroups } = useQuery<VehicleGroup[]>({
+    queryKey: ['vehicleGroups'],
+    queryFn: fetchVehicleGroups,
+  });
+
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
@@ -59,6 +72,7 @@ const Settings = () => {
       email_bcc: "",
       payment_term_default: 45,
       agb_text: "",
+      tour_planning_vehicle_group_id: undefined,
     },
   });
 
@@ -75,6 +89,7 @@ const Settings = () => {
         email_bcc: settingsMap.get('email_bcc') || "",
         payment_term_default: Number(settingsMap.get('payment_term_default')) || 45,
         agb_text: settingsMap.get('agb_text') || "",
+        tour_planning_vehicle_group_id: Number(settingsMap.get('tour_planning_vehicle_group_id')) || undefined,
       });
     }
   }, [settings, form]);
@@ -181,6 +196,26 @@ const Settings = () => {
             <Card.Body>
               {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
                 <Form.Group><Form.Label>Standard-Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_default")} /></Form.Group>
+              )}
+            </Card.Body>
+          </Card>
+
+          <Card className="mb-4">
+            <Card.Header>
+              <Card.Title>Tourenplanung</Card.Title>
+              <Card.Text className="text-muted">Einstellungen für die Tourenverwaltung.</Card.Text>
+            </Card.Header>
+            <Card.Body>
+              {isLoading || isLoadingVehicleGroups ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
+                <Form.Group>
+                  <Form.Label>Standard-Fahrzeuggruppe für Touren</Form.Label>
+                  <Form.Select {...form.register("tour_planning_vehicle_group_id")}>
+                    <option value="">Alle Fahrzeuge</option>
+                    {vehicleGroups?.map(group => (
+                      <option key={group.id} value={group.id}>{group.name}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
               )}
             </Card.Body>
           </Card>

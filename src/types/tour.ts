@@ -15,5 +15,6 @@ export type TourDetails = {
   name: string;
   description: string | null;
   created_at: string;
+  vehicle_id: number | null;
   stops: (TourStop & { position: number; route_point_id: number })[];
 };
