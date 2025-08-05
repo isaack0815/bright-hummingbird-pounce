@@ -27,7 +27,7 @@ serve(async (req) => {
     // Fetch events the user is part of
     const { data: events, error: eventsError } = await supabase
       .from('calendar_events')
-      .select('*, profiles:created_by(first_name, last_name), attendees:calendar_event_attendees(profiles(id, first_name, last_name))')
+      .select('*, profiles:profiles!created_by(first_name, last_name), attendees:calendar_event_attendees!event_id(profiles:profiles!user_id(id, first_name, last_name))')
       .gte('start_time', startDate)
       .lt('start_time', endDate);
     if (eventsError) throw eventsError;
@@ -40,7 +40,7 @@ serve(async (req) => {
     if (profilesError) throw profilesError;
 
     const birthdays = profiles
-      .filter(p => new Date(p.birth_date!).getMonth() === month)
+      .filter(p => p.birth_date && new Date(p.birth_date).getMonth() === month)
       .map(p => ({
         name: `${p.first_name} ${p.last_name}`,
         day: new Date(p.birth_date!).getDate(),
