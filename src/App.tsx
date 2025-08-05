@@ -57,6 +57,9 @@ const AppRoutes = () => {
           
           <Route element={<ProtectedRoute requiredPermission="users.manage" />}>
             <Route path="users" element={<UserManagement />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="personnel_files.manage" />}>
             <Route path="users/:id/personnel-file" element={<PersonnelFile />} />
           </Route>
           

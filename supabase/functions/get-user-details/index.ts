@@ -12,6 +12,25 @@ serve(async (req) => {
   }
 
   try {
+    // Create a client with the user's auth token to check permissions
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
+
+    const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
+    if (permError) throw permError;
+    
+    const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
+    if (!permissionNames.includes('personnel_files.manage')) {
+        return new Response(JSON.stringify({ error: 'Forbidden: You do not have permission to access personnel files.' }), { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403 
+        });
+    }
+
+    // If permission check passes, proceed with admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -29,7 +48,7 @@ serve(async (req) => {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .maybeSingle(); // Use maybeSingle() to handle cases where a profile might not exist
+      .maybeSingle();
     if (profileError) throw profileError;
 
     const { data: roles, error: rolesError } = await supabaseAdmin

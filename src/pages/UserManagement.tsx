@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import TablePlaceholder from '@/components/TablePlaceholder';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 type User = {
   id: string;
@@ -32,6 +33,7 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
 
   const { data: users, isLoading, error } = useQuery<User[]>({
     queryKey: ['users'],
@@ -120,9 +122,11 @@ const UserManagement = () => {
                     <td>{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => navigate(`/users/${user.id}/personnel-file`)}>
-                          <FileText size={16} />
-                        </Button>
+                        {hasPermission('personnel_files.manage') && (
+                          <Button variant="ghost" size="sm" onClick={() => navigate(`/users/${user.id}/personnel-file`)}>
+                            <FileText size={16} />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>
                           <Edit size={16} />
                         </Button>
