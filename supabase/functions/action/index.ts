@@ -13,41 +13,72 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client with the anon key
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
-
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
     
     switch (action) {
       case 'login': {
-        const user = url.searchParams.get('user'); // Assuming this is the email
+        const username = url.searchParams.get('user');
         const pass = url.searchParams.get('pass');
 
-        if (!user || !pass) {
-          return new Response(JSON.stringify({ error: 'Benutzer und Passwort sind erforderlich' }), {
+        if (!username || !pass) {
+          return new Response(JSON.stringify({ error: 'Benutzername und Passwort sind erforderlich' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
           });
         }
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: user,
-          password: pass,
-        });
+        // Use service role key to find user email from username
+        const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
 
-        if (error) {
-          return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: error.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 401, // Unauthorized
-          });
+        // 1. Find profile by username
+        const { data: profile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('username', username)
+            .single();
+
+        if (profileError || !profile) {
+            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: 'Benutzer nicht gefunden' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 401,
+            });
         }
 
-        // On success, return the session which includes the access token
-        return new Response(JSON.stringify({ session: data.session }), {
+        // 2. Get user email from auth schema using the ID
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+
+        if (userError || !user || !user.email) {
+            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: 'Fehler beim Abrufen der Benutzerdaten' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 401,
+            });
+        }
+
+        // 3. Attempt to sign in with the found email and provided password
+        // Use the public client for this, as signInWithPassword is a client-side method
+        const supabase = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        );
+
+        const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: user.email,
+            password: pass,
+        });
+
+        if (signInError) {
+            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: signInError.message }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 401,
+            });
+        }
+
+        // On success, return the session
+        return new Response(JSON.stringify({ session: sessionData.session }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
