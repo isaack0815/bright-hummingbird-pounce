@@ -12,6 +12,7 @@ import { LayoutDashboard } from "lucide-react";
 const profileSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
   lastName: z.string().min(1, "Nachname ist erforderlich."),
+  username: z.string().min(3, "Benutzername muss mind. 3 Zeichen haben.").regex(/^[a-zA-Z0-9_]+$/, "Nur Buchstaben, Zahlen und Unterstriche."),
   email: z.string().email(),
 });
 
@@ -22,7 +23,7 @@ const fetchUserProfile = async () => {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('first_name, last_name')
+    .select('first_name, last_name, username')
     .eq('id', user.id)
     .maybeSingle();
   
@@ -32,6 +33,7 @@ const fetchUserProfile = async () => {
     email: user.email,
     firstName: profile?.first_name,
     lastName: profile?.last_name,
+    username: profile?.username,
   };
 };
 
@@ -47,6 +49,7 @@ const Profile = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
+      username: "",
       email: "",
     },
   });
@@ -56,6 +59,7 @@ const Profile = () => {
       form.reset({
         firstName: userProfile.firstName || "",
         lastName: userProfile.lastName || "",
+        username: userProfile.username || "",
         email: userProfile.email || "",
       });
     }
@@ -67,6 +71,7 @@ const Profile = () => {
         body: {
           firstName: values.firstName,
           lastName: values.lastName,
+          username: values.username,
         },
       });
       if (error) throw error;
@@ -117,6 +122,11 @@ const Profile = () => {
                     <Form.Label>Nachname</Form.Label>
                     <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
                     <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
+                  </Form.Group>
+                  <Form.Group className="mb-3" controlId="profileUsername">
+                    <Form.Label>Benutzername</Form.Label>
+                    <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
+                    <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
                   </Form.Group>
                   <Button type="submit" disabled={updateProfileMutation.isPending}>
                     {updateProfileMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}

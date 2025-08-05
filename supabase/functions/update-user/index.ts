@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { userId, firstName, lastName, roleIds } = await req.json()
+    const { userId, firstName, lastName, roleIds, username } = await req.json()
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -29,12 +29,12 @@ serve(async (req) => {
     // 1. Update user metadata in auth.users and profiles table
     await supabaseAdmin.auth.admin.updateUserById(
       userId,
-      { user_metadata: { first_name: firstName, last_name: lastName } }
+      { user_metadata: { first_name: firstName, last_name: lastName, username } }
     )
     
     await supabaseAdmin
       .from('profiles')
-      .update({ first_name: firstName, last_name: lastName })
+      .update({ first_name: firstName, last_name: lastName, username })
       .eq('id', userId)
 
     // 2. Update user roles

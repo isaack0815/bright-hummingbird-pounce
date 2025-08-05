@@ -14,6 +14,7 @@ type User = {
   created_at: string;
   first_name?: string | null;
   last_name?: string | null;
+  username?: string | null;
   roles: { id: number; name: string }[];
 };
 
@@ -84,12 +85,13 @@ const UserManagement = () => {
         </Card.Header>
         <Card.Body>
           {isLoading ? (
-            <TablePlaceholder cols={5} />
+            <TablePlaceholder cols={6} />
           ) : users && users.length > 0 ? (
             <Table responsive hover>
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Benutzername</th>
                   <th>Email</th>
                   <th>Gruppen</th>
                   <th>Erstellt am</th>
@@ -102,6 +104,7 @@ const UserManagement = () => {
                     <td className="fw-medium">
                       {user.first_name || user.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'N/A'}
                     </td>
+                    <td>{user.username}</td>
                     <td>{user.email}</td>
                     <td>
                       <div className="d-flex gap-1 flex-wrap">

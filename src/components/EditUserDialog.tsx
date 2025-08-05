@@ -17,12 +17,14 @@ type User = {
   email?: string;
   first_name?: string | null;
   last_name?: string | null;
+  username?: string | null;
   roles: Role[];
 };
 
 const formSchema = z.object({
   firstName: z.string().min(1, { message: "Vorname ist erforderlich." }),
   lastName: z.string().min(1, { message: "Nachname ist erforderlich." }),
+  username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
   roleIds: z.array(z.number()).optional(),
 });
 
@@ -53,6 +55,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
     defaultValues: {
       firstName: "",
       lastName: "",
+      username: "",
       roleIds: [],
     },
   });
@@ -62,6 +65,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
       form.reset({
         firstName: user.first_name || "",
         lastName: user.last_name || "",
+        username: user.username || "",
         roleIds: user.roles.map(role => role.id),
       });
     }
@@ -76,6 +80,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
           userId: user.id,
           firstName: values.firstName,
           lastName: values.lastName,
+          username: values.username,
           roleIds: values.roleIds,
         },
       });
@@ -114,6 +119,11 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
             <Form.Label>Nachname</Form.Label>
             <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
             <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3" controlId="editUsername">
+            <Form.Label>Benutzername</Form.Label>
+            <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
+            <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
           </Form.Group>
           
           <Form.Group>

@@ -24,10 +24,10 @@ serve(async (req) => {
     if (userError) throw userError
     if (!user) throw new Error("User not found")
 
-    const { firstName, lastName } = await req.json()
+    const { firstName, lastName, username } = await req.json()
 
-    if (!firstName || !lastName) {
-      return new Response(JSON.stringify({ error: 'First and last name are required' }), {
+    if (!firstName || !lastName || !username) {
+      return new Response(JSON.stringify({ error: 'First name, last name, and username are required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
@@ -35,14 +35,14 @@ serve(async (req) => {
 
     // Update user metadata in auth.users
     const { data: updatedUser, error: updateUserError } = await supabase.auth.updateUser({
-      data: { first_name: firstName, last_name: lastName }
+      data: { first_name: firstName, last_name: lastName, username }
     })
     if (updateUserError) throw updateUserError
 
     // Upsert the public.profiles table to create a profile if it doesn't exist
     const { error: profileError } = await supabase
       .from('profiles')
-      .upsert({ id: user.id, first_name: firstName, last_name: lastName })
+      .upsert({ id: user.id, first_name: firstName, last_name: lastName, username })
     if (profileError) throw profileError
 
     return new Response(JSON.stringify({ user: updatedUser.user }), {
