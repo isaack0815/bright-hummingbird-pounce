@@ -14,6 +14,7 @@ import UserManagement from './pages/UserManagement';
 import RoleManagement from './pages/RoleManagement';
 import MenuManagement from './pages/MenuManagement';
 import CustomerManagement from './pages/CustomerManagement';
+import CustomerDetail from './pages/CustomerDetail';
 import FreightOrderManagement from './pages/FreightOrderManagement';
 import FreightOrderForm from './pages/FreightOrderForm';
 import VehicleManagement from './pages/VehicleManagement';
@@ -71,6 +72,7 @@ const AppRoutes = () => {
 
           <Route element={<ProtectedRoute requiredPermission="customers.manage" />}>
             <Route path="customers" element={<CustomerManagement />} />
+            <Route path="customers/:id" element={<CustomerDetail />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredPermission="vehicles.manage" />}>

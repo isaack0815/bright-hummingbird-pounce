@@ -8,6 +8,8 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { EditCustomerDialog } from '@/components/EditCustomerDialog';
 import { useError } from '@/contexts/ErrorContext';
 import TablePlaceholder from '@/components/TablePlaceholder';
+import { NavLink } from 'react-router-dom';
+import type { Customer } from "@/types/customer";
 
 export type Customer = {
   id: number;
@@ -154,7 +156,9 @@ const CustomerManagement = () => {
               <tbody>
                 {filteredCustomers.map((customer) => (
                   <tr key={customer.id}>
-                    <td className="fw-medium">{customer.company_name}</td>
+                    <td className="fw-medium">
+                      <NavLink to={`/customers/${customer.id}`}>{customer.company_name}</NavLink>
+                    </td>
                     <td>{`${customer.contact_first_name || ''} ${customer.contact_last_name || ''}`.trim()}</td>
                     <td>{`${customer.postal_code || ''} ${customer.city || ''}`.trim()}</td>
                     <td className="text-end">
