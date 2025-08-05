@@ -24,29 +24,67 @@ serve(async (req) => {
     const startDate = new Date(year, month, 1).toISOString();
     const endDate = new Date(year, month + 1, 1).toISOString();
 
-    // Fetch events the user is part of
+    // Fetch events the user is part of, along with attendee user IDs
     const { data: events, error: eventsError } = await supabase
       .from('calendar_events')
-      .select('*, profiles:profiles!created_by(first_name, last_name), attendees:calendar_event_attendees!event_id(profiles:profiles!user_id(id, first_name, last_name))')
+      .select('*, calendar_event_attendees(user_id)')
       .gte('start_time', startDate)
       .lt('start_time', endDate);
     if (eventsError) throw eventsError;
 
-    // Fetch birthdays
-    const { data: profiles, error: profilesError } = await supabase
+    // Collect all unique user IDs from events and attendees
+    const userIds = new Set<string>();
+    if (events) {
+      events.forEach(event => {
+        userIds.add(event.created_by);
+        (event.calendar_event_attendees as any[]).forEach(attendee => {
+          userIds.add(attendee.user_id);
+        });
+      });
+    }
+
+    let combinedEvents: any[] = [];
+    if (userIds.size > 0 && events) {
+      // Fetch all required profiles in one go
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', Array.from(userIds));
+      if (profilesError) throw profilesError;
+
+      const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+      // Manually join the profiles to the events data
+      combinedEvents = events.map(event => {
+        const attendees = (event.calendar_event_attendees as any[]).map(attendee => ({
+          profiles: profilesMap.get(attendee.user_id) || null
+        }));
+        
+        const { calendar_event_attendees, ...restOfEvent } = event;
+
+        return {
+          ...restOfEvent,
+          profiles: profilesMap.get(event.created_by) || null,
+          attendees: attendees,
+        };
+      });
+    }
+
+    // Fetch all profiles for birthdays
+    const { data: allProfiles, error: profilesError } = await supabase
       .from('profiles')
       .select('first_name, last_name, birth_date')
       .not('birth_date', 'is', null);
     if (profilesError) throw profilesError;
 
-    const birthdays = profiles
+    const birthdays = allProfiles
       .filter(p => p.birth_date && new Date(p.birth_date).getMonth() === month)
       .map(p => ({
         name: `${p.first_name} ${p.last_name}`,
         day: new Date(p.birth_date!).getDate(),
       }));
 
-    return new Response(JSON.stringify({ events, birthdays }), {
+    return new Response(JSON.stringify({ events: combinedEvents, birthdays }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
