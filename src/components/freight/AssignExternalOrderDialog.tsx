@@ -152,8 +152,9 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     },
     onSuccess: (updatedOrder) => {
       showSuccess("Auftrag erfolgreich extern vergeben!");
+      queryClient.setQueryData(['freightOrder', order?.id], updatedOrder);
+      queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
       pdfMutation.mutate(updatedOrder as FreightOrder);
-      queryClient.invalidateQueries({ queryKey: ['freightOrder', order?.id] });
       onOpenChange(false);
     },
     onError: (err: any) => {
@@ -164,16 +165,16 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
-      if (!order) return;
+      if (!order) throw new Error("Order not found");
       const { data, error } = await supabase.functions.invoke('cancel-external-assignment', {
         body: { orderId: order.id },
       });
       if (error) throw error;
-      return data;
+      return data.order as FreightOrder;
     },
-    onSuccess: () => {
+    onSuccess: (updatedOrder) => {
       showSuccess("Externe Vergabe storniert.");
-      queryClient.invalidateQueries({ queryKey: ['freightOrder', order?.id] });
+      queryClient.setQueryData(['freightOrder', order?.id], updatedOrder);
       queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
       onOpenChange(false);
     },
