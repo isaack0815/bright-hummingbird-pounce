@@ -5,13 +5,15 @@ import * as z from 'zod';
 import { Button, Modal, Form } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useError } from '@/contexts/ErrorContext';
 import type { FreightOrder } from '@/types/freight';
+import type { Carrier } from '@/types/carrier';
 import { generateExternalOrderPDF } from '@/utils/pdfGenerator';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { Mail, Loader2 } from 'lucide-react';
+import CreatableSelect from 'react-select/creatable';
 
 const formSchema = z.object({
   external_company_address: z.string().min(1, "Anschrift ist erforderlich."),
@@ -30,11 +32,24 @@ type AssignExternalOrderDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+const fetchCarriers = async (): Promise<Carrier[]> => {
+  const { data, error } = await supabase.functions.invoke('get-carriers');
+  if (error) throw new Error(error.message);
+  return data.carriers;
+};
+
 export function AssignExternalOrderDialog({ order, settings, open, onOpenChange }: AssignExternalOrderDialogProps) {
   const queryClient = useQueryClient();
   const { addError } = useError();
   const { user } = useAuth();
   const [sendEmail, setSendEmail] = useState(true);
+  const [selectedCarrierOption, setSelectedCarrierOption] = useState<any>(null);
+
+  const { data: carriers, isLoading: isLoadingCarriers } = useQuery<Carrier[]>({
+    queryKey: ['carriers'],
+    queryFn: fetchCarriers,
+    enabled: open,
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,7 +124,24 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
 
   const assignMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      if (!order) return;
+      if (!order) throw new Error("Order not found");
+
+      if (selectedCarrierOption && selectedCarrierOption.__isNew__) {
+        const newCarrierData = {
+          name: selectedCarrierOption.label,
+          company_address: values.external_company_address,
+          email: values.external_email,
+          driver_name: values.external_driver_name,
+          driver_phone: values.external_driver_phone,
+          license_plate: values.external_license_plate,
+          transporter_dimensions: values.external_transporter_dimensions,
+          payment_term_days: values.payment_term_days,
+        };
+        const { error: createError } = await supabase.functions.invoke('create-carrier', { body: newCarrierData });
+        if (createError) throw createError;
+        queryClient.invalidateQueries({ queryKey: ['carriers'] });
+      }
+
       const { data, error } = await supabase.from('freight_orders')
         .update({ ...values, is_external: true })
         .eq('id', order.id)
@@ -151,9 +183,38 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     },
   });
 
+  const handleCarrierSelect = (option: any) => {
+    setSelectedCarrierOption(option);
+    if (option && !option.__isNew__) {
+      const carrier = carriers?.find(c => c.id === option.value);
+      if (carrier) {
+        form.reset({
+          external_company_address: carrier.company_address || '',
+          external_email: carrier.email || '',
+          external_driver_name: carrier.driver_name || '',
+          external_driver_phone: carrier.driver_phone || '',
+          external_license_plate: carrier.license_plate || '',
+          external_transporter_dimensions: carrier.transporter_dimensions || '',
+          payment_term_days: carrier.payment_term_days || Number(settings?.payment_term_default) || 45,
+        });
+      }
+    } else if (!option) {
+      form.reset({
+        external_company_address: order?.external_company_address || '',
+        external_email: order?.external_email || '',
+        external_driver_name: order?.external_driver_name || '',
+        external_driver_phone: order?.external_driver_phone || '',
+        external_license_plate: order?.external_license_plate || '',
+        external_transporter_dimensions: order?.external_transporter_dimensions || '',
+        payment_term_days: order?.payment_term_days || Number(settings?.payment_term_default) || 45,
+      });
+    }
+  };
+
   if (!order) return null;
 
   const isAssigned = order.is_external;
+  const carrierOptions = carriers?.map(c => ({ value: c.id, label: c.name })) || [];
 
   return (
     <Modal show={open} onHide={() => onOpenChange(false)} size="lg">
@@ -182,7 +243,19 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
           </div>
         ) : (
           <Form id="assign-external-form" onSubmit={form.handleSubmit((v) => assignMutation.mutate(v))}>
-            <p className="text-muted">Füllen Sie die Daten des externen Dienstleisters aus.</p>
+            <p className="text-muted">Wählen Sie einen vorhandenen Transporteur aus oder geben Sie einen neuen Namen ein, um eine Vorlage zu erstellen.</p>
+            <Form.Group className="mb-3">
+              <Form.Label>Transporteur</Form.Label>
+              <CreatableSelect
+                isClearable
+                options={carrierOptions}
+                isLoading={isLoadingCarriers}
+                onChange={handleCarrierSelect}
+                placeholder="Transporteur auswählen oder neu anlegen..."
+                formatCreateLabel={inputValue => `"${inputValue}" als neuen Transporteur anlegen`}
+              />
+            </Form.Group>
+            <hr/>
             <Form.Group className="mb-3"><Form.Label>Anschrift der Firma</Form.Label><Form.Control as="textarea" {...form.register("external_company_address")} /></Form.Group>
             <Form.Group className="mb-3"><Form.Label>E-Mail-Adresse</Form.Label><Form.Control type="email" {...form.register("external_email")} /></Form.Group>
             <Form.Group className="mb-3"><Form.Label>Fahrername</Form.Label><Form.Control {...form.register("external_driver_name")} /></Form.Group>
