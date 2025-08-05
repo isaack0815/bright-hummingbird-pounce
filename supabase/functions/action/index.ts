@@ -13,14 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    const { action, user: username, pass } = await req.json();
     
     switch (action) {
       case 'login': {
-        const username = url.searchParams.get('user');
-        const pass = url.searchParams.get('pass');
-
         if (!username || !pass) {
           return new Response(JSON.stringify({ error: 'Benutzername und Passwort sind erforderlich' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -42,9 +38,9 @@ serve(async (req) => {
             .single();
 
         if (profileError || !profile) {
-            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: 'Benutzer nicht gefunden' }), {
+            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 401,
+                status: 200, // Return 200 so client can parse the specific error message
             });
         }
 
@@ -52,14 +48,13 @@ serve(async (req) => {
         const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
 
         if (userError || !user || !user.email) {
-            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: 'Fehler beim Abrufen der Benutzerdaten' }), {
+            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 401,
+                status: 200,
             });
         }
 
         // 3. Attempt to sign in with the found email and provided password
-        // Use the public client for this, as signInWithPassword is a client-side method
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -71,9 +66,9 @@ serve(async (req) => {
         });
 
         if (signInError) {
-            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten', details: signInError.message }), {
+            return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 401,
+                status: 200,
             });
         }
 
@@ -84,9 +79,6 @@ serve(async (req) => {
         });
       }
       
-      // Hier können in Zukunft weitere Aktionen hinzugefügt werden
-      // case 'get_orders': { ... }
-
       default:
         return new Response(JSON.stringify({ error: 'Ungültige Aktion' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
