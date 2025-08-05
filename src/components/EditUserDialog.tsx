@@ -19,9 +19,6 @@ type User = {
   last_name?: string | null;
   username?: string | null;
   roles: Role[];
-  vacation_days_per_year?: number | null;
-  commute_km?: number | null;
-  hours_per_week?: number | null;
 };
 
 const formSchema = z.object({
@@ -29,9 +26,6 @@ const formSchema = z.object({
   lastName: z.string().min(1, { message: "Nachname ist erforderlich." }),
   username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
   roleIds: z.array(z.number()).optional(),
-  vacationDays: z.coerce.number().optional(),
-  commuteKm: z.coerce.number().optional(),
-  hoursPerWeek: z.coerce.number().optional(),
 });
 
 type EditUserDialogProps = {
@@ -67,9 +61,6 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
         lastName: user.last_name || "",
         username: user.username || "",
         roleIds: user.roles.map(role => role.id),
-        vacationDays: user.vacation_days_per_year || undefined,
-        commuteKm: user.commute_km || undefined,
-        hoursPerWeek: user.hours_per_week || undefined,
       });
     }
   }, [user, form, show]);
@@ -107,34 +98,21 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
       </Modal.Header>
       <Form onSubmit={form.handleSubmit(onSubmit)}>
         <Modal.Body>
-          <Tabs defaultActiveKey="general" className="mb-3">
-            <Tab eventKey="general" title="Allgemein">
-              <Row className="g-3 pt-3">
-                <Col md={6}><Form.Group><Form.Label>Vorname</Form.Label><Form.Control {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} /></Form.Group></Col>
-                <Col md={6}><Form.Group><Form.Label>Nachname</Form.Label><Form.Control {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} /></Form.Group></Col>
-                <Col md={6}><Form.Group><Form.Label>Benutzername</Form.Label><Form.Control {...form.register("username")} isInvalid={!!form.formState.errors.username} /></Form.Group></Col>
-                <Col md={6}><Form.Group><Form.Label>Email</Form.Label><Form.Control type="email" value={user.email} disabled /></Form.Group></Col>
-              </Row>
-            </Tab>
-            <Tab eventKey="hr" title="Personal">
-              <Row className="g-3 pt-3">
-                <Col md={4}><Form.Group><Form.Label>Urlaubstage / Jahr</Form.Label><Form.Control type="number" {...form.register("vacationDays")} /></Form.Group></Col>
-                <Col md={4}><Form.Group><Form.Label>Anfahrt (km)</Form.Label><Form.Control type="number" {...form.register("commuteKm")} /></Form.Group></Col>
-                <Col md={4}><Form.Group><Form.Label>Stunden / Woche</Form.Label><Form.Control type="number" step="0.01" {...form.register("hoursPerWeek")} /></Form.Group></Col>
-              </Row>
-            </Tab>
-            <Tab eventKey="roles" title="Gruppen">
-              <div className="pt-3">
-                {isLoadingRoles ? <p>Gruppen werden geladen...</p> : (
-                  <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {allRoles?.map((role) => (
-                      <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} defaultChecked={user.roles.some(userRole => userRole.id === role.id)} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Tab>
-          </Tabs>
+          <Row className="g-3 pt-3">
+            <Col md={6}><Form.Group><Form.Label>Vorname</Form.Label><Form.Control {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} /></Form.Group></Col>
+            <Col md={6}><Form.Group><Form.Label>Nachname</Form.Label><Form.Control {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} /></Form.Group></Col>
+            <Col md={6}><Form.Group><Form.Label>Benutzername</Form.Label><Form.Control {...form.register("username")} isInvalid={!!form.formState.errors.username} /></Form.Group></Col>
+            <Col md={6}><Form.Group><Form.Label>Email</Form.Label><Form.Control type="email" value={user.email} disabled /></Form.Group></Col>
+          </Row>
+          <hr />
+          <h5 className="h6">Gruppen</h5>
+          {isLoadingRoles ? <p>Gruppen werden geladen...</p> : (
+            <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {allRoles?.map((role) => (
+                <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} defaultChecked={user.roles.some(userRole => userRole.id === role.id)} />
+              ))}
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onHide}>Abbrechen</Button>

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Card, Button, Table, Badge } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, FileText } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import TablePlaceholder from '@/components/TablePlaceholder';
+import { useNavigate } from 'react-router-dom';
 
 type User = {
   id: string;
@@ -30,6 +31,7 @@ const UserManagement = () => {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: users, isLoading, error } = useQuery<User[]>({
     queryKey: ['users'],
@@ -118,6 +120,9 @@ const UserManagement = () => {
                     <td>{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/users/${user.id}/personnel-file`)}>
+                          <FileText size={16} />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>
                           <Edit size={16} />
                         </Button>

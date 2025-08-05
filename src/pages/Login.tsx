@@ -110,9 +110,9 @@ const Login = () => {
               </Button>
             </div>
           </Form>
-        </Modal.Body>
-      </Form>
-    </Card>
+        </Card.Body>
+      </Card>
+    </div>
   );
 };
 

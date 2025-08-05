@@ -30,6 +30,7 @@ import InvoiceManagement from "./pages/InvoiceManagement";
 import DashboardSettings from "./pages/DashboardSettings";
 import TourManagement from "./pages/TourManagement";
 import VehicleGroupManagement from "./pages/VehicleGroupManagement";
+import PersonnelFile from "./pages/PersonnelFile";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const AppRoutes = () => {
           
           <Route element={<ProtectedRoute requiredPermission="users.manage" />}>
             <Route path="users" element={<UserManagement />} />
+            <Route path="users/:id/personnel-file" element={<PersonnelFile />} />
           </Route>
           
           <Route element={<ProtectedRoute requiredPermission="roles.manage" />}>
