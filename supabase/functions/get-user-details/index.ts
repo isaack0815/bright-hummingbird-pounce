@@ -23,7 +23,10 @@ serve(async (req) => {
     if (permError) throw permError;
     
     const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
-    if (!permissionNames.includes('personnel_files.manage')) {
+    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+    const hasPermission = permissionNames.includes('personnel_files.manage');
+
+    if (!isSuperAdmin && !hasPermission) {
         return new Response(JSON.stringify({ error: 'Forbidden: You do not have permission to access personnel files.' }), { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 403 
