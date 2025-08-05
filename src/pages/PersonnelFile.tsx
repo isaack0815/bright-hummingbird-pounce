@@ -8,11 +8,13 @@ import { Card, Row, Col, Button, Form, Spinner, Tabs, Tab, Table, Placeholder } 
 import { ArrowLeft, Save } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
 
 const formSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
   lastName: z.string().min(1, "Nachname ist erforderlich."),
   username: z.string().min(3, "Benutzername muss mind. 3 Zeichen haben.").regex(/^[a-zA-Z0-9_]+$/, "Nur Buchstaben, Zahlen und Unterstriche."),
+  birthDate: z.string().nullable().optional(),
   vacationDays: z.coerce.number().optional(),
   commuteKm: z.coerce.number().optional(),
   hoursPerWeek: z.coerce.number().optional(),
@@ -46,6 +48,7 @@ const PersonnelFile = () => {
         firstName: user.first_name || "",
         lastName: user.last_name || "",
         username: user.username || "",
+        birthDate: user.birth_date ? format(parseISO(user.birth_date), 'yyyy-MM-dd') : "",
         vacationDays: user.vacation_days_per_year || undefined,
         commuteKm: user.commute_km || undefined,
         hoursPerWeek: user.work_hours_history?.[0]?.hours_per_week || undefined,
@@ -92,7 +95,8 @@ const PersonnelFile = () => {
                 <Col md={6}><Form.Group><Form.Label>Vorname</Form.Label><Form.Control {...form.register("firstName")} /></Form.Group></Col>
                 <Col md={6}><Form.Group><Form.Label>Nachname</Form.Label><Form.Control {...form.register("lastName")} /></Form.Group></Col>
                 <Col md={6}><Form.Group><Form.Label>Benutzername</Form.Label><Form.Control {...form.register("username")} /></Form.Group></Col>
-                <Col md={6}><Form.Group><Form.Label>Email</Form.Label><Form.Control type="email" value={user.email} disabled /></Form.Group></Col>
+                <Col md={6}><Form.Group><Form.Label>Geburtsdatum</Form.Label><Form.Control type="date" {...form.register("birthDate")} /></Form.Group></Col>
+                <Col md={12}><Form.Group><Form.Label>Email</Form.Label><Form.Control type="email" value={user.email} disabled /></Form.Group></Col>
               </Row>
             </Tab>
             <Tab eventKey="hr" title="Arbeitsverhältnis">
