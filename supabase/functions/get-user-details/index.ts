@@ -29,7 +29,7 @@ serve(async (req) => {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() to handle cases where a profile might not exist
     if (profileError) throw profileError;
 
     const { data: roles, error: rolesError } = await supabaseAdmin
