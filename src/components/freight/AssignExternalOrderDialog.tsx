@@ -152,7 +152,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     },
     onSuccess: (updatedOrder) => {
       showSuccess("Auftrag erfolgreich extern vergeben!");
-      queryClient.setQueryData(['freightOrder', order?.id], updatedOrder);
+      queryClient.setQueryData(['freightOrder', String(order?.id)], updatedOrder);
       queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
       pdfMutation.mutate(updatedOrder as FreightOrder);
       onOpenChange(false);
@@ -174,7 +174,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     },
     onSuccess: (updatedOrder) => {
       showSuccess("Externe Vergabe storniert.");
-      queryClient.setQueryData(['freightOrder', order?.id], updatedOrder);
+      queryClient.setQueryData(['freightOrder', String(order?.id)], updatedOrder);
       queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
       onOpenChange(false);
     },
