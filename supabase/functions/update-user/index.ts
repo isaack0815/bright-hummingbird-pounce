@@ -66,14 +66,16 @@ serve(async (req) => {
       }
     }
 
-    // 3. Update user roles
-    await supabaseAdmin.from('user_roles').delete().eq('user_id', userId)
-    if (roleIds && roleIds.length > 0) {
-      const rolesToInsert = roleIds.map((roleId: number) => ({
-        user_id: userId,
-        role_id: roleId,
-      }));
-      await supabaseAdmin.from('user_roles').insert(rolesToInsert)
+    // 3. Update user roles, ONLY if roleIds are provided in the request
+    if (roleIds !== undefined) {
+      await supabaseAdmin.from('user_roles').delete().eq('user_id', userId)
+      if (roleIds && roleIds.length > 0) {
+        const rolesToInsert = roleIds.map((roleId: number) => ({
+          user_id: userId,
+          role_id: roleId,
+        }));
+        await supabaseAdmin.from('user_roles').insert(rolesToInsert)
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
