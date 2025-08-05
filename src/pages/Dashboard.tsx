@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
 import { StatsWidget } from '@/components/dashboard/StatsWidget';
 import { FreightOrderWidget } from '@/components/dashboard/freight/FreightOrderWidget';
+import { CalendarWidget } from '@/components/dashboard/calendar/CalendarWidget';
 import type { DashboardLayout } from '@/types/dashboard';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -18,6 +19,7 @@ const componentMap: { [key: string]: React.ComponentType } = {
   todos: TodoWidget,
   stats: StatsWidget,
   freightOrders: FreightOrderWidget,
+  calendar: CalendarWidget,
 };
 
 const Dashboard = () => {

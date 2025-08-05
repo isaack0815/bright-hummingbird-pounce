@@ -6,13 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const defaultLayout = [
-  { i: 'stats', x: 0, y: 0, w: 12, h: 1, enabled: true },
-  { i: 'todos', x: 0, y: 1, w: 6, h: 4, enabled: true },
-  { i: 'freightOrders', x: 6, y: 1, w: 6, h: 4, enabled: true },
-  { i: 'calendar', x: 0, y: 5, w: 6, h: 4, enabled: true },
-];
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -25,24 +18,24 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error("User not found")
-
-    const { data, error } = await supabase
-      .from('dashboard_layouts')
-      .select('layout')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw error;
+    const { title, description, start_time, end_time, attendee_ids } = await req.json();
+    if (!title || !start_time) {
+      return new Response(JSON.stringify({ error: 'Title and start time are required' }), { status: 400 });
     }
 
-    const layout = data ? data.layout : defaultLayout;
+    const { data, error } = await supabase.rpc('create_event_with_attendees', {
+      p_title: title,
+      p_description: description,
+      p_start_time: start_time,
+      p_end_time: end_time,
+      p_attendee_ids: attendee_ids,
+    });
 
-    return new Response(JSON.stringify({ layout }), {
+    if (error) throw error;
+
+    return new Response(JSON.stringify({ eventId: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 201,
     })
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), {

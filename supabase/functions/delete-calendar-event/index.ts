@@ -6,13 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const defaultLayout = [
-  { i: 'stats', x: 0, y: 0, w: 12, h: 1, enabled: true },
-  { i: 'todos', x: 0, y: 1, w: 6, h: 4, enabled: true },
-  { i: 'freightOrders', x: 6, y: 1, w: 6, h: 4, enabled: true },
-  { i: 'calendar', x: 0, y: 5, w: 6, h: 4, enabled: true },
-];
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -25,25 +18,15 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error("User not found")
-
-    const { data, error } = await supabase
-      .from('dashboard_layouts')
-      .select('layout')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw error;
+    const { id } = await req.json();
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Event ID is required' }), { status: 400 });
     }
 
-    const layout = data ? data.layout : defaultLayout;
+    const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+    if (error) throw error;
 
-    return new Response(JSON.stringify({ layout }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    return new Response(null, { status: 204, headers: corsHeaders });
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

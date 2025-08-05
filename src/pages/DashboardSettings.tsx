@@ -15,6 +15,7 @@ const availableWidgets = [
   { i: 'stats', name: 'Statistiken', description: 'Zeigt Nutzer- und Gruppenzahlen an.', defaultW: 12, defaultH: 1 },
   { i: 'todos', name: 'Meine ToDos', description: 'Listet Ihre persönlichen Aufgaben auf.', defaultW: 6, defaultH: 4 },
   { i: 'freightOrders', name: 'Letzte Aufträge', description: 'Zeigt die 10 neuesten Frachtaufträge an.', defaultW: 6, defaultH: 4 },
+  { i: 'calendar', name: 'Kalender', description: 'Zeigt Termine und Geburtstage an.', defaultW: 6, defaultH: 4 },
 ];
 
 const fetchLayout = async (): Promise<DashboardLayout> => {
