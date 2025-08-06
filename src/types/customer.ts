@@ -7,15 +7,3 @@ export type CustomerDetails = {
   customer: Customer;
   orders: FreightOrder[];
 };
-
-export type LexInvoice = {
-  id: string;
-  voucherNumber: string;
-  contactName: string;
-  voucherDate: string;
-  voucherStatus: string;
-  totalPrice: {
-    currency: string;
-    totalGrossAmount: number;
-  } | null;
-};

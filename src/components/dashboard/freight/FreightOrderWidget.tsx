@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react';
+import { Card, Table, Spinner, Badge } from 'react-bootstrap';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { NavLink } from 'react-router-dom';
-import { ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 
 type Order = {
   id: number;
@@ -63,44 +61,46 @@ export function FreightOrderWidget() {
     if (!sortConfig || sortConfig.key !== key) {
       return null;
     }
-    return sortConfig.direction === 'ascending' ? <ArrowUp size={14} className="ml-1 inline" /> : <ArrowDown size={14} className="ml-1 inline" />;
+    return sortConfig.direction === 'ascending' ? <ArrowUp size={14} className="ms-1" /> : <ArrowDown size={14} className="ms-1" />;
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>Letzte Frachtaufträge</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-grow overflow-y-auto">
+    <Card className="h-100">
+      <Card.Header>
+        <Card.Title as="h6" className="mb-0">Letzte Frachtaufträge</Card.Title>
+      </Card.Header>
+      <Card.Body style={{ overflowY: 'auto', maxHeight: '400px' }}>
         {isLoading ? (
-          <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          <div className="text-center"><Spinner animation="border" size="sm" /></div>
         ) : sortedOrders.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => requestSort('order_number')} className="cursor-pointer">Auftragsnr. {getSortIcon('order_number')}</TableHead>
-                <TableHead onClick={() => requestSort('customers')} className="cursor-pointer">Kunde {getSortIcon('customers')}</TableHead>
-                <TableHead onClick={() => requestSort('pickup_date')} className="cursor-pointer">Abholung {getSortIcon('pickup_date')}</TableHead>
-                <TableHead onClick={() => requestSort('status')} className="cursor-pointer">Status {getSortIcon('status')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <Table responsive hover size="sm">
+            <thead>
+              <tr>
+                <th onClick={() => requestSort('order_number')} className="cursor-pointer">Auftragsnr. {getSortIcon('order_number')}</th>
+                <th onClick={() => requestSort('customers')} className="cursor-pointer">Kunde {getSortIcon('customers')}</th>
+                <th onClick={() => requestSort('pickup_date')} className="cursor-pointer">Abholung {getSortIcon('pickup_date')}</th>
+                <th onClick={() => requestSort('delivery_date')} className="cursor-pointer">Lieferung {getSortIcon('delivery_date')}</th>
+                <th onClick={() => requestSort('status')} className="cursor-pointer">Status {getSortIcon('status')}</th>
+              </tr>
+            </thead>
+            <tbody>
               {sortedOrders.map(order => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">
-                    <NavLink to={`/freight-orders/edit/${order.id}`} className="text-primary hover:underline">{order.order_number}</NavLink>
-                  </TableCell>
-                  <TableCell>{order.customers?.company_name || '-'}</TableCell>
-                  <TableCell>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</TableCell>
-                  <TableCell><Badge variant="secondary">{order.status}</Badge></TableCell>
-                </TableRow>
+                <tr key={order.id}>
+                  <td className="fw-medium">
+                    <NavLink to={`/freight-orders/edit/${order.id}`}>{order.order_number}</NavLink>
+                  </td>
+                  <td>{order.customers?.company_name || '-'}</td>
+                  <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
+                  <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
+                  <td><Badge bg="secondary">{order.status}</Badge></td>
+                </tr>
               ))}
-            </TableBody>
+            </tbody>
           </Table>
         ) : (
-          <p className="text-muted-foreground text-center">Keine Aufträge gefunden.</p>
+          <p className="text-muted text-center">Keine Aufträge gefunden.</p>
         )}
-      </CardContent>
+      </Card.Body>
     </Card>
   );
 }

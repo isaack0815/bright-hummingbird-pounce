@@ -1,18 +1,16 @@
 import { useState, useMemo } from 'react';
-import { PlusCircle, ChevronLeft, ChevronRight, Trash2, Users, Cake, Loader2 } from 'lucide-react';
+import { Card, Button, Popover, OverlayTrigger, Badge, Spinner } from 'react-bootstrap';
+import { PlusCircle, ChevronLeft, ChevronRight, Trash2, Users, Cake } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { de } from 'date-fns/locale';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { AddEventDialog } from './AddEventDialog';
-import type { CalendarEvent, Birthday } from '@/types/calendar';
+import type { CalendarEvent, Birthday, DayData } from '@/types/calendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const fetchCalendarData = async (month: number, year: number): Promise<{ events: CalendarEvent[], birthdays: Birthday[] }> => {
   const { data, error } = await supabase.functions.invoke('get-calendar-events', {
@@ -66,80 +64,77 @@ export function CalendarWidget() {
     const hasEvents = (dayData?.events?.length ?? 0) > 0;
     const hasBirthdays = (dayData?.birthdays?.length ?? 0) > 0;
 
-    const content = (
-      <div className="relative">
+    return (
+      <div className="position-relative">
         {props.date.getDate()}
         {(hasEvents || hasBirthdays) && (
-          <div className="flex absolute bottom-1 left-1/2 -translate-x-1/2 gap-px">
-            {hasEvents && <span className="h-1 w-1 rounded-full bg-primary" />}
-            {hasBirthdays && <span className="h-1 w-1 rounded-full bg-yellow-500" />}
+          <div className="d-flex position-absolute bottom-0 start-50 translate-middle-x" style={{ gap: '2px' }}>
+            {hasEvents && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--bs-primary)' }} />}
+            {hasBirthdays && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--bs-warning)' }} />}
           </div>
         )}
       </div>
     );
-
-    if (hasEvents || hasBirthdays) {
-      return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <div className="w-full h-full flex items-center justify-center">{content}</div>
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            {dayData?.birthdays.map((b, i) => (
-              <div key={`b-${i}`} className="flex items-center text-sm mb-2"><Cake size={14} className="mr-2 text-yellow-500" />{b.name} hat Geburtstag!</div>
-            ))}
-            {dayData?.events.map(event => (
-              <div key={event.id} className="mb-2 border-b pb-2 last:border-b-0 last:pb-0">
-                <div className="flex justify-between items-start">
-                  <p className="font-semibold text-sm mb-0">{event.title}</p>
-                  {event.created_by === user?.id && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteMutation.mutate(event.id)}><Trash2 size={14} /></Button>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mb-1">{format(new Date(event.start_time), 'HH:mm')} Uhr</p>
-                <p className="text-sm mb-1">{event.description}</p>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Users size={14} className="mr-1" />
-                  {event.attendees.map(a => a.profiles?.first_name).join(', ')}
-                </div>
-              </div>
-            ))}
-          </PopoverContent>
-        </Popover>
-      );
-    }
-
-    return content;
   };
+
+  const DayPopover = ({ dayData }: { dayData: { events: CalendarEvent[], birthdays: Birthday[] } }) => (
+    <Popover id="popover-basic">
+      <Popover.Body>
+        {dayData.birthdays.map((b, i) => (
+          <div key={`b-${i}`} className="d-flex align-items-center small mb-2"><Cake size={14} className="me-2 text-warning" />{b.name} hat Geburtstag!</div>
+        ))}
+        {dayData.events.map(event => (
+          <div key={event.id} className="mb-2 border-bottom pb-2">
+            <div className="d-flex justify-content-between align-items-start">
+              <p className="fw-bold small mb-0">{event.title}</p>
+              {event.created_by === user?.id && (
+                <Button variant="ghost" size="sm" className="p-0 text-danger" onClick={() => deleteMutation.mutate(event.id)}><Trash2 size={14} /></Button>
+              )}
+            </div>
+            <p className="small text-muted mb-1">{format(new Date(event.start_time), 'HH:mm')} Uhr</p>
+            <p className="small mb-1">{event.description}</p>
+            <div className="d-flex align-items-center small text-muted">
+              <Users size={14} className="me-1" />
+              {event.attendees.map(a => a.profiles?.first_name).join(', ')}
+            </div>
+          </div>
+        ))}
+      </Popover.Body>
+    </Popover>
+  );
 
   return (
     <>
-      <Card className="h-full flex flex-col">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Kalender</CardTitle>
-          <Button variant="ghost" size="icon" onClick={() => { setSelectedDate(new Date()); setIsAddDialogOpen(true); }}>
-            <PlusCircle className="h-4 w-4" />
+      <Card className="h-100">
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <Card.Title as="h6" className="mb-0">Kalender</Card.Title>
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedDate(new Date()); setIsAddDialogOpen(true); }}>
+            <PlusCircle size={16} />
           </Button>
-        </CardHeader>
-        <CardContent className="flex-grow flex justify-center items-center">
-          {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-            <DayPicker
-              locale={de}
-              month={currentMonth}
-              onMonthChange={setCurrentMonth}
-              showOutsideDays
-              components={{
-                DayContent: DayContent,
-                IconLeft: () => <ChevronLeft size={16} />,
-                IconRight: () => <ChevronRight size={16} />,
-              }}
-              onDayClick={(date) => { setSelectedDate(date); setIsAddDialogOpen(true); }}
-              formatters={{
-                formatCaption: (date) => format(date, 'MMMM yyyy', { locale: de }),
-              }}
-            />
-          )}
-        </CardContent>
+        </Card.Header>
+        <Card.Body>
+          <DayPicker
+            locale={de}
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            showOutsideDays
+            components={{
+              DayContent: DayContent,
+              IconLeft: () => <ChevronLeft size={16} />,
+              IconRight: () => <ChevronRight size={16} />,
+            }}
+            onDayClick={(date) => { setSelectedDate(date); setIsAddDialogOpen(true); }}
+            modifiers={{
+              withData: Array.from(eventsByDay.keys()).map(day => new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)),
+            }}
+            modifiersClassNames={{
+              withData: 'day-with-data',
+            }}
+            formatters={{
+              formatCaption: (date) => format(date, 'MMMM yyyy', { locale: de }),
+            }}
+          />
+        </Card.Body>
       </Card>
       <AddEventDialog show={isAddDialogOpen} onHide={() => setIsAddDialogOpen(false)} selectedDate={selectedDate} />
     </>

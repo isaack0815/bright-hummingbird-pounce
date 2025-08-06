@@ -1,72 +1,125 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, User, Menu } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from './ui/button';
+import { Navbar, Nav, NavDropdown, Container, Spinner } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { LogOut, User } from 'lucide-react';
+import DynamicIcon from './DynamicIcon';
+import { useQuery } from '@tanstack/react-query';
+import type { MenuItem } from '@/types/menu';
 
-const Header = ({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean, setSidebarOpen: (open: boolean) => void }) => {
+type TreeMenuItem = MenuItem & { children: TreeMenuItem[] };
+
+const fetchMenuItems = async (): Promise<MenuItem[]> => {
+  const { data, error } = await supabase.functions.invoke('get-menu-items');
+  if (error) throw new Error(error.message);
+  return data.items;
+};
+
+const buildTree = (items: MenuItem[]): TreeMenuItem[] => {
+  const itemMap = new Map<number, TreeMenuItem>();
+  const tree: TreeMenuItem[] = [];
+
+  items.forEach(item => {
+    itemMap.set(item.id, { ...item, children: [] });
+  });
+
+  items.forEach(item => {
+    if (item.parent_id && itemMap.has(item.parent_id)) {
+      const parent = itemMap.get(item.parent_id)!;
+      parent.children.push(itemMap.get(item.id)!);
+    } else {
+      tree.push(itemMap.get(item.id)!);
+    }
+  });
+
+  const sortChildren = (node: TreeMenuItem) => {
+    node.children.sort((a, b) => a.position - b.position);
+    node.children.forEach(sortChildren);
+  };
+  tree.sort((a, b) => a.position - b.position);
+  tree.forEach(sortChildren);
+
+  return tree;
+};
+
+const Header = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+
+  const { data: menuItems, isLoading: isLoadingMenu } = useQuery<MenuItem[]>({
+    queryKey: ['menuItems'],
+    queryFn: fetchMenuItems,
+  });
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
 
-  return (
-    <header className="sticky top-0 z-40 flex w-full bg-white drop-shadow-sm dark:bg-boxdark dark:drop-shadow-none">
-      <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-sm md:px-6 2xl:px-11">
-        <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSidebarOpen(!sidebarOpen);
-            }}
+  const visibleItems = menuItems?.filter(item => 
+    !item.required_permission || hasPermission(item.required_permission)
+  ) || [];
+
+  const menuTree = buildTree(visibleItems);
+
+  const renderMenuItems = (items: TreeMenuItem[]) => {
+    return items.map(item => {
+      if (item.children && item.children.length > 0) {
+        return (
+          <NavDropdown 
+            title={
+              <span className="d-inline-flex align-items-center">
+                {item.icon && <DynamicIcon name={item.icon} className="me-2 h-4 w-4" />}
+                {item.name}
+              </span>
+            } 
+            id={`dropdown-${item.id}`} 
+            key={item.id}
           >
-            <Menu className="h-6 w-6" />
-          </Button>
-        </div>
+            {item.children.map(child => (
+              <NavDropdown.Item as={NavLink} to={child.link || '#'} key={child.id}>
+                {child.icon && <DynamicIcon name={child.icon} className="me-2 h-4 w-4" />}
+                {child.name}
+              </NavDropdown.Item>
+            ))}
+          </NavDropdown>
+        );
+      }
+      return (
+        <Nav.Link as={NavLink} to={item.link || '#'} key={item.id}>
+          {item.icon && <DynamicIcon name={item.icon} className="me-2 h-4 w-4" />}
+          {item.name}
+        </Nav.Link>
+      );
+    });
+  };
 
-        <div className="hidden sm:block">
-          {/* Can add a search bar here later if needed */}
-        </div>
-
-        <div className="flex items-center gap-3 2xsm:gap-7 ml-auto">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <User />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <NavLink to="/profile">
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </NavLink>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </header>
+  return (
+    <Navbar bg="light" expand="lg" className="shadow-sm">
+      <Container fluid>
+        <Navbar.Brand as={NavLink} to="/" className="d-flex align-items-center">
+          <DynamicIcon name="Building2" className="me-2" />
+          <span>ERP System</span>
+        </Navbar.Brand>
+        <Navbar.Toggle aria-controls="basic-navbar-nav" />
+        <Navbar.Collapse id="basic-navbar-nav">
+          <Nav className="me-auto">
+            {isLoadingMenu ? <Spinner animation="border" size="sm" /> : renderMenuItems(menuTree)}
+          </Nav>
+          <Nav>
+            <NavDropdown title={<User />} id="user-dropdown" align="end" renderOnMount popperConfig={{ strategy: 'fixed' }}>
+              <NavDropdown.Item as={NavLink} to="/profile">
+                <User className="me-2 h-4 w-4" /> Mein Profil
+              </NavDropdown.Item>
+              <NavDropdown.Divider />
+              <NavDropdown.Item onClick={handleLogout}>
+                <LogOut className="me-2 h-4 w-4" /> Abmelden
+              </NavDropdown.Item>
+            </NavDropdown>
+          </Nav>
+        </Navbar.Collapse>
+      </Container>
+    </Navbar>
   );
 };
 

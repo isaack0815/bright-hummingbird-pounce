@@ -1,11 +1,11 @@
-import { StatsWidget } from '@/components/dashboard/StatsWidget';
-import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
-import { FreightOrderWidget } from '@/components/dashboard/freight/FreightOrderWidget';
-import { CalendarWidget } from '@/components/dashboard/calendar/CalendarWidget';
+import { Responsive, WidthProvider } from 'react-grid-layout';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
+import { StatsWidget } from '@/components/dashboard/StatsWidget';
+import { FreightOrderWidget } from '@/components/dashboard/freight/FreightOrderWidget';
+import { CalendarWidget } from '@/components/dashboard/calendar/CalendarWidget';
 import type { DashboardLayout } from '@/types/dashboard';
-import { Responsive, WidthProvider } from 'react-grid-layout';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -15,9 +15,9 @@ const fetchLayout = async (): Promise<DashboardLayout> => {
   return data.layout;
 };
 
-const widgetMap: { [key: string]: React.ComponentType } = {
-  stats: StatsWidget,
+const componentMap: { [key: string]: React.ComponentType } = {
   todos: TodoWidget,
+  stats: StatsWidget,
   freightOrders: FreightOrderWidget,
   calendar: CalendarWidget,
 };
@@ -29,30 +29,35 @@ const Dashboard = () => {
   });
 
   if (isLoading) {
-    return <div>Lade Dashboard...</div>;
+    return <p>Lade Dashboard...</p>;
   }
 
   const enabledWidgets = layout?.filter(w => w.enabled) || [];
+  const staticLayout = enabledWidgets.map(w => ({ ...w, isDraggable: false, isResizable: false }));
 
   return (
-    <ResponsiveGridLayout
-      layouts={{ lg: enabledWidgets }}
-      isDraggable={false}
-      isResizable={false}
-      breakpoints={{ lg: 1200 }}
-      cols={{ lg: 12 }}
-      rowHeight={100}
-      margin={[24, 24]}
-    >
-      {enabledWidgets.map(widget => {
-        const Component = widgetMap[widget.i];
-        return (
-          <div key={widget.i}>
-            {Component ? <Component /> : <div className="bg-gray-200 h-full w-full rounded-lg flex items-center justify-center">Widget not found: {widget.i}</div>}
-          </div>
-        );
-      })}
-    </ResponsiveGridLayout>
+    <div>
+      <h1 className="mb-4">Dashboard</h1>
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={{ lg: staticLayout }}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+        rowHeight={100}
+        isDraggable={false}
+        isResizable={false}
+      >
+        {enabledWidgets.map(widget => {
+          const Component = componentMap[widget.i];
+          if (!Component) return null;
+          return (
+            <div key={widget.i}>
+              <Component />
+            </div>
+          );
+        })}
+      </ResponsiveGridLayout>
+    </div>
   );
 };
 

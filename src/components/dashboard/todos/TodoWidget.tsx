@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { Card, Button, ListGroup, Form, Badge, Spinner } from 'react-bootstrap';
+import { PlusCircle, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -8,10 +9,6 @@ import type { Todo } from '@/types/todo';
 import { format, parseISO, isPast } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 
 const fetchTodos = async (): Promise<Todo[]> => {
   const { data, error } = await supabase.functions.invoke('get-my-todos');
@@ -57,52 +54,52 @@ export function TodoWidget() {
   const getDueDateBadge = (dueDate: string | null) => {
     if (!dueDate) return null;
     const date = parseISO(dueDate);
-    const isOverdue = isPast(date) && date.toDateString() !== new Date().toDateString();
-    return <Badge variant={isOverdue ? "destructive" : "secondary"}>{isOverdue ? 'Überfällig' : format(date, 'dd.MM.yyyy', { locale: de })}</Badge>;
+    if (isPast(date) && !date.toDateString() === new Date().toDateString()) return <Badge bg="danger">Überfällig</Badge>;
+    return <Badge bg="secondary">{format(date, 'dd.MM.yyyy', { locale: de })}</Badge>;
   };
 
   return (
     <>
-      <Card className="h-full flex flex-col">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Meine ToDos</CardTitle>
-          <Button variant="ghost" size="icon" onClick={() => setIsAddDialogOpen(true)}>
-            <PlusCircle className="h-4 w-4" />
+      <Card className="h-100">
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <Card.Title as="h6" className="mb-0">Meine ToDos</Card.Title>
+          <Button variant="ghost" size="sm" onClick={() => setIsAddDialogOpen(true)}>
+            <PlusCircle size={16} />
           </Button>
-        </CardHeader>
-        <CardContent className="flex-grow overflow-y-auto">
+        </Card.Header>
+        <Card.Body style={{ overflowY: 'auto', maxHeight: '400px' }}>
           {isLoading ? (
-            <div className="flex justify-center items-center h-full"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            <div className="text-center"><Spinner animation="border" size="sm" /></div>
           ) : todos && todos.length > 0 ? (
-            <div className="space-y-4">
+            <ListGroup variant="flush">
               {todos.map(todo => (
-                <div key={todo.id} className="flex items-start gap-4">
-                  <Checkbox
-                    id={`todo-${todo.id}`}
+                <ListGroup.Item key={todo.id} className={`d-flex align-items-start gap-3 ${todo.is_completed ? 'text-muted text-decoration-line-through' : ''}`}>
+                  <Form.Check
+                    type="checkbox"
                     checked={todo.is_completed}
-                    onCheckedChange={(checked) => updateStatusMutation.mutate({ id: todo.id, is_completed: !!checked })}
+                    onChange={(e) => updateStatusMutation.mutate({ id: todo.id, is_completed: e.target.checked })}
                     className="mt-1"
                   />
-                  <div className={`flex-grow grid gap-1 ${todo.is_completed ? 'text-muted-foreground line-through' : ''}`}>
-                    <label htmlFor={`todo-${todo.id}`} className="font-medium leading-none">{todo.subject}</label>
-                    <p className="text-sm text-muted-foreground">{todo.description}</p>
-                    <div className="flex items-center gap-2 text-sm">
+                  <div className="flex-grow-1">
+                    <p className="mb-0 fw-medium">{todo.subject}</p>
+                    <p className="small mb-1">{todo.description}</p>
+                    <div className="d-flex align-items-center gap-2 small">
                       {getDueDateBadge(todo.due_date)}
                       <span>Erstellt von: {todo.creator_first_name || 'Unbekannt'}</span>
                     </div>
                   </div>
                   {user?.id === todo.created_by && (
-                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteMutation.mutate(todo.id)}>
-                      <Trash2 className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="text-danger p-0" onClick={() => deleteMutation.mutate(todo.id)}>
+                      <Trash2 size={16} />
                     </Button>
                   )}
-                </div>
+                </ListGroup.Item>
               ))}
-            </div>
+            </ListGroup>
           ) : (
-            <p className="text-muted-foreground text-center">Keine ToDos vorhanden. Gut gemacht!</p>
+            <p className="text-muted text-center">Keine ToDos vorhanden. Gut gemacht!</p>
           )}
-        </CardContent>
+        </Card.Body>
       </Card>
       <AddTodoDialog show={isAddDialogOpen} onHide={() => setIsAddDialogOpen(false)} />
     </>

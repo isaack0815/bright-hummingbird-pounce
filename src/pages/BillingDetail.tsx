@@ -12,10 +12,10 @@ import type { Customer } from '@/pages/CustomerManagement';
 import type { BillingLineItem } from '@/types/billing';
 import { useEffect } from 'react';
 
-interface BillingOrder extends FreightOrder {
+type BillingOrder = Omit<FreightOrder, 'customers'> & {
   customers: Customer | null;
   line_items: BillingLineItem[];
-}
+};
 
 const lineItemSchema = z.object({
   id: z.number().optional(),

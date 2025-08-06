@@ -9,6 +9,7 @@ import { EditCustomerDialog } from '@/components/EditCustomerDialog';
 import { useError } from '@/contexts/ErrorContext';
 import TablePlaceholder from '@/components/TablePlaceholder';
 import { NavLink } from 'react-router-dom';
+import type { Customer } from "@/types/customer";
 
 export type Customer = {
   id: number;
