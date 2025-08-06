@@ -69,7 +69,7 @@ serve(async (req) => {
 
     const { data: creds } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user.id).single();
     if (!creds) throw new Error("Email account not configured.");
-    const decryptedPassword = await decrypt(creds.encrypted_imappassword, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
+    const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
     
     const client = new ImapFlow({
         host: Deno.env.get('IMAP_HOST')!,
