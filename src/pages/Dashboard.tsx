@@ -1,63 +1,26 @@
-import { Responsive, WidthProvider } from 'react-grid-layout';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
 import { StatsWidget } from '@/components/dashboard/StatsWidget';
+import { TodoWidget } from '@/components/dashboard/todos/TodoWidget';
 import { FreightOrderWidget } from '@/components/dashboard/freight/FreightOrderWidget';
 import { CalendarWidget } from '@/components/dashboard/calendar/CalendarWidget';
-import type { DashboardLayout } from '@/types/dashboard';
-
-const ResponsiveGridLayout = WidthProvider(Responsive);
-
-const fetchLayout = async (): Promise<DashboardLayout> => {
-  const { data, error } = await supabase.functions.invoke('get-dashboard-layout');
-  if (error) throw new Error(error.message);
-  return data.layout;
-};
-
-const componentMap: { [key: string]: React.ComponentType } = {
-  todos: TodoWidget,
-  stats: StatsWidget,
-  freightOrders: FreightOrderWidget,
-  calendar: CalendarWidget,
-};
 
 const Dashboard = () => {
-  const { data: layout, isLoading } = useQuery<DashboardLayout>({
-    queryKey: ['dashboardLayout'],
-    queryFn: fetchLayout,
-  });
-
-  if (isLoading) {
-    return <p>Lade Dashboard...</p>;
-  }
-
-  const enabledWidgets = layout?.filter(w => w.enabled) || [];
-  const staticLayout = enabledWidgets.map(w => ({ ...w, isDraggable: false, isResizable: false }));
-
   return (
-    <div>
-      <h1 className="mb-4">Dashboard</h1>
-      <ResponsiveGridLayout
-        className="layout"
-        layouts={{ lg: staticLayout }}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-        cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-        rowHeight={100}
-        isDraggable={false}
-        isResizable={false}
-      >
-        {enabledWidgets.map(widget => {
-          const Component = componentMap[widget.i];
-          if (!Component) return null;
-          return (
-            <div key={widget.i}>
-              <Component />
-            </div>
-          );
-        })}
-      </ResponsiveGridLayout>
-    </div>
+    <>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">
+        {/* This is a placeholder for where the stats cards would go. I will refactor the StatsWidget next. */}
+      </div>
+      <div className="mt-4 grid grid-cols-12 gap-4 md:mt-6 md:gap-6 2xl:mt-7.5">
+        <div className="col-span-12 xl:col-span-8">
+          <FreightOrderWidget />
+        </div>
+        <div className="col-span-12 xl:col-span-4">
+          <TodoWidget />
+        </div>
+        <div className="col-span-12">
+            <CalendarWidget />
+        </div>
+      </div>
+    </>
   );
 };
 

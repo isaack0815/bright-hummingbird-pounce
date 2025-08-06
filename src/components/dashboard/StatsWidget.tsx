@@ -1,7 +1,7 @@
-import { Card, Row, Col, Placeholder } from 'react-bootstrap';
 import { Users, Shield } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type DashboardStats = {
   userCount: number;
@@ -15,25 +15,19 @@ const fetchDashboardStats = async (): Promise<DashboardStats> => {
 };
 
 const StatCard = ({ title, value, icon, note, isLoading }: { title: string, value?: number, icon: React.ReactNode, note: string, isLoading: boolean }) => (
-  <Card className="shadow-sm h-100">
-    <Card.Body>
-      <div className="d-flex justify-content-between align-items-start">
-        <div>
-          <h6 className="card-subtitle mb-2 text-muted">{title}</h6>
-          {isLoading ? (
-            <Placeholder as="p" animation="glow" className="mt-2">
-              <Placeholder xs={6} size="lg" />
-            </Placeholder>
-          ) : (
-            <div className="h2 fw-bold">{value}</div>
-          )}
-        </div>
-        {icon}
-      </div>
-      <Card.Text className="text-muted small mt-1">
-        {note}
-      </Card.Text>
-    </Card.Body>
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      {icon}
+    </CardHeader>
+    <CardContent>
+      {isLoading ? (
+        <div className="h-8 w-1/2 bg-gray-200 animate-pulse rounded-md" />
+      ) : (
+        <div className="text-2xl font-bold">{value}</div>
+      )}
+      <p className="text-xs text-muted-foreground">{note}</p>
+    </CardContent>
   </Card>
 );
 
@@ -44,25 +38,21 @@ export function StatsWidget() {
   });
 
   return (
-    <Row>
-      <Col md={6} className="mb-4 mb-md-0">
+    <div className="grid gap-4 md:grid-cols-2 md:gap-8">
         <StatCard
           title="Aktive Nutzer"
           value={data?.userCount}
-          icon={<Users className="text-muted" size={24} />}
+          icon={<Users className="h-4 w-4 text-muted-foreground" />}
           note="Anzahl der registrierten Benutzer"
           isLoading={isLoading}
         />
-      </Col>
-      <Col md={6}>
         <StatCard
           title="Benutzergruppen"
           value={data?.roleCount}
-          icon={<Shield className="text-muted" size={24} />}
+          icon={<Shield className="h-4 w-4 text-muted-foreground" />}
           note="Anzahl der erstellten Gruppen"
           isLoading={isLoading}
         />
-      </Col>
-    </Row>
+    </div>
   );
 }

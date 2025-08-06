@@ -1,12 +1,24 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
 body {
-  background-color: #f8f9fa;
+  background-color: #F1F5F9; /* Equivalent to tailwind bg-slate-100 */
 }
 
-.menu-item-row .menu-item-actions {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
+/* Custom styles for react-day-picker to match the new theme */
+.rdp {
+    --rdp-cell-size: 40px;
+    --rdp-accent-color: #3B82F6; /* blue-500 */
+    --rdp-background-color: #EFF6FF; /* blue-50 */
+    --rdp-accent-color-dark: #1D4ED8; /* blue-700 */
+    --rdp-background-color-dark: #1E293B; /* slate-800 */
+    --rdp-outline: 2px solid var(--rdp-accent-color);
+    --rdp-outline-selected: 3px solid var(--rdp-accent-color);
+    --rdp-border-radius: 6px;
 }
 
-.menu-item-row:hover .menu-item-actions {
-  opacity: 1;
+.day-with-data {
+    font-weight: bold;
+    color: var(--rdp-accent-color);
 }
