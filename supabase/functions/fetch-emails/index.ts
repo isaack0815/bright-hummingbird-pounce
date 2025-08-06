@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import Imap from 'npm:node-imap-next';
+import { ImapFlow } from 'npm:imapflow';
 import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
@@ -52,8 +52,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  let connection: Imap | null = null;
-
   try {
     const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
@@ -88,65 +86,50 @@ serve(async (req) => {
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY')!;
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
 
-    const config = {
-      user: creds.imap_username,
-      password: decryptedPassword,
-      host: Deno.env.get('SMTP_HOST')!,
-      port: 993,
-      tls: true,
-      tlsOptions: { rejectUnauthorized: false },
-    };
+    const client = new ImapFlow({
+        host: Deno.env.get('SMTP_HOST')!,
+        port: 993,
+        secure: true,
+        auth: {
+            user: creds.imap_username,
+            pass: decryptedPassword,
+        },
+        tls: {
+            rejectUnauthorized: false
+        },
+        logger: false
+    });
 
-    connection = new Imap(config);
-    await connection.connect();
-    await connection.openBox('INBOX');
-    
-    const messages = await connection.search(['ALL']);
     const emails = [];
+    await client.connect();
 
-    if (messages.length > 0) {
-        const source = messages.map(m => m.uid);
-        const fetch = connection.fetch(source, { bodies: '' });
-        const emailPromises = [];
-
-        for await (const msg of fetch) {
-            const emailPromise = new Promise((resolve, reject) => {
-                let buffer = '';
-                msg.on('body', (stream) => {
-                    stream.on('data', (chunk) => buffer += chunk.toString('utf8'));
-                    stream.on('end', () => {
-                        simpleParser(buffer)
-                            .then(mail => resolve({
-                                uid: msg.attributes.uid,
-                                from: mail.from?.text,
-                                to: mail.to?.text,
-                                subject: mail.subject,
-                                date: mail.date,
-                                text: mail.text,
-                                html: mail.html,
-                                attachments: mail.attachments,
-                            }))
-                            .catch(reject);
-                    });
-                });
+    try {
+        await client.mailboxOpen('INBOX');
+        
+        for await (const msg of client.fetch('1:*', { source: true })) {
+            const mail = await simpleParser(msg.source);
+            emails.push({
+                uid: msg.uid,
+                from: mail.from?.text,
+                to: mail.to?.text,
+                subject: mail.subject,
+                date: mail.date,
+                text: mail.text,
+                html: mail.html,
+                attachments: mail.attachments,
             });
-            emailPromises.push(emailPromise);
         }
-        emails.push(...await Promise.all(emailPromises));
+    } finally {
+        await client.logout();
     }
 
-    await connection.closeBox();
-    await connection.end();
-    connection = null;
+    emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return new Response(JSON.stringify({ emails }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (e) {
-    if (connection) {
-      connection.end();
-    }
     console.error("Fetch-Emails Error:", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

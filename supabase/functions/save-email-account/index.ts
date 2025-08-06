@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
-import Imap from 'npm:node-imap-next';
+import { ImapFlow } from 'npm:imapflow';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,23 +61,24 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Alle Felder sind erforderlich' }), { status: 400 })
     }
 
-    // --- NEU: Verbindungstest mit node-imap-next ---
-    const imap = new Imap({
-        user: imap_username,
-        password: imap_password,
+    // --- Verbindungstest mit imapflow ---
+    const client = new ImapFlow({
         host: Deno.env.get('SMTP_HOST')!,
         port: 993,
-        tls: true,
-        tlsOptions: { rejectUnauthorized: false } // Behält die Kompatibilität mit selbst-signierten Zertifikaten bei
+        secure: true,
+        auth: {
+            user: imap_username,
+            pass: imap_password,
+        },
+        tls: {
+            rejectUnauthorized: false
+        },
+        logger: false
     });
 
     try {
-        await new Promise<void>((resolve, reject) => {
-            imap.once('ready', () => resolve());
-            imap.once('error', (err: Error) => reject(err));
-            imap.connect();
-        });
-        imap.end();
+        await client.connect();
+        await client.logout();
     } catch (e) {
         console.error("IMAP Connection Test Failed:", e);
         return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie die globalen SMTP-Einstellungen und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
