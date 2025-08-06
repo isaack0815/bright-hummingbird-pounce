@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { ImapFlow } from 'npm:imapflow';
+import imaps from 'npm:imap-simple';
+import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
 const corsHeaders = {
@@ -31,21 +32,11 @@ async function decrypt(encryptedData: string, iv_b64: string, key_hex: string): 
   return new TextDecoder().decode(decrypted);
 }
 
-const formatAddress = (addr: { name?: string, mailbox?: string, host?: string } | undefined): string | null => {
-    if (!addr || !addr.mailbox || !addr.host) return null;
-    const name = addr.name ? `"${addr.name}" ` : '';
-    return `${name}<${addr.mailbox}@${addr.host}>`;
-}
-
-async function streamToBuffer(stream: ReadableStream): Promise<Buffer> {
-  const reader = stream.getReader();
-  const chunks = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks);
+const formatAddress = (addr: any): string | null => {
+    if (!addr || !addr.value || addr.value.length === 0) return null;
+    const { name, address } = addr.value[0];
+    if (!address) return null;
+    return name ? `"${name}" <${address}>` : `<${address}>`;
 }
 
 serve(async (req) => {
@@ -81,81 +72,67 @@ serve(async (req) => {
     const { data: latestEmail } = await supabaseAdmin.from('emails').select('uid').eq('user_id', user.id).order('uid', { ascending: false }).limit(1).single();
     const highestUidInDb = latestEmail?.uid || 0;
 
-    const client = new ImapFlow({ host: imapHost, port: 993, secure: true, auth: { user: creds.imap_username, pass: decryptedPassword }, tls: { rejectUnauthorized: false }, logger: false });
+    const config = {
+      imap: {
+        user: creds.imap_username,
+        pass: decryptedPassword,
+        host: imapHost,
+        port: 993,
+        tls: true,
+        authTimeout: 10000,
+        tlsOptions: {
+          rejectUnauthorized: false
+        }
+      }
+    };
 
     let newEmailsCount = 0;
     let moreEmailsExist = false;
-
-    await client.connect();
+    
+    const connection = await imaps.connect(config);
     try {
-      await client.mailboxOpen('INBOX');
-      const newUidList = await client.search({ uid: `${highestUidInDb + 1}:*` });
+      await connection.openBox('INBOX');
+      const searchCriteria = ['UID', `${highestUidInDb + 1}:*`];
+      const allNewUids = await connection.search(searchCriteria, {});
       
-      if (newUidList.length > 0) {
-        const uidsToFetch = newUidList.slice(0, BATCH_SIZE);
-        moreEmailsExist = newUidList.length > BATCH_SIZE;
-        
-        for await (const msg of client.fetch(uidsToFetch, { envelope: true, bodyStructure: true })) {
-          let textBody = '';
-          let htmlBody = '';
-          const attachmentsToProcess = [];
+      if (allNewUids.length > 0) {
+        const uidsToFetch = allNewUids.slice(0, BATCH_SIZE);
+        moreEmailsExist = allNewUids.length > BATCH_SIZE;
 
-          const processPart = async (part: any, partID: string) => {
-            if (part.disposition === 'attachment' && part.dispositionParameters?.filename) {
-              attachmentsToProcess.push({ part, partID, filename: part.dispositionParameters.filename });
-            } else if (part.type === 'text/plain' && !part.disposition) {
-              const contentStream = await client.download(msg.uid, partID);
-              if (contentStream) textBody = new TextDecoder().decode(await streamToBuffer(contentStream.content));
-            } else if (part.type === 'text/html' && !part.disposition) {
-              const contentStream = await client.download(msg.uid, partID);
-              if (contentStream) htmlBody = new TextDecoder().decode(await streamToBuffer(contentStream.content));
-            }
-          };
+        const messages = await connection.fetch(uidsToFetch, { bodies: [''] });
 
-          const walkParts = async (parts: any[], prefix = '') => {
-            for (const [i, part] of parts.entries()) {
-              const partID = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
-              if (part.childNodes) {
-                await walkParts(part.childNodes, partID);
-              } else {
-                await processPart(part, partID);
-              }
-            }
-          };
+        for (const item of messages) {
+          const rawEmail = item.parts.find(part => part.which === '')?.body;
+          if (!rawEmail) continue;
 
-          if (msg.bodyStructure.childNodes) {
-            await walkParts(msg.bodyStructure.childNodes);
-          } else {
-            await processPart(msg.bodyStructure, '1');
-          }
+          const uid = item.attributes.uid;
+          const parsed = await simpleParser(rawEmail);
 
           const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin
             .from('emails')
             .insert({
               user_id: user.id,
-              uid: msg.uid,
+              uid: uid,
               mailbox: 'INBOX',
-              from_address: formatAddress(msg.envelope.from?.[0]),
-              to_address: formatAddress(msg.envelope.to?.[0]),
-              subject: msg.envelope.subject || null,
-              sent_at: msg.envelope.date || null,
-              body_text: textBody,
-              body_html: htmlBody || null,
+              from_address: formatAddress(parsed.from),
+              to_address: formatAddress(parsed.to),
+              subject: parsed.subject || null,
+              sent_at: parsed.date || null,
+              body_text: parsed.text || null,
+              body_html: parsed.html || null,
             })
             .select('id')
             .single();
 
           if (insertEmailError) throw insertEmailError;
 
-          for (const attachment of attachmentsToProcess) {
-            const contentStream = await client.download(msg.uid, attachment.partID);
-            if (contentStream) {
-              const buffer = await streamToBuffer(contentStream.content);
-              const filePath = `${user.id}/${msg.uid}/${attachment.filename}`;
+          if (parsed.attachments && parsed.attachments.length > 0) {
+            for (const attachment of parsed.attachments) {
+              const filePath = `${user.id}/${uid}/${attachment.filename}`;
               
               const { error: uploadError } = await supabaseAdmin.storage
                 .from('email-attachments')
-                .upload(filePath, buffer, { contentType: attachment.part.type, upsert: true });
+                .upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
 
               if (uploadError) {
                 console.error(`Failed to upload attachment: ${attachment.filename}`, uploadError);
@@ -166,7 +143,7 @@ serve(async (req) => {
                 email_id: insertedEmail.id,
                 file_name: attachment.filename,
                 file_path: filePath,
-                file_type: attachment.part.type,
+                file_type: attachment.contentType,
               });
             }
           }
@@ -174,7 +151,7 @@ serve(async (req) => {
         }
       }
     } finally {
-      await client.logout();
+      connection.end();
     }
 
     return new Response(JSON.stringify({ newEmails: newEmailsCount, moreEmailsExist }), {
