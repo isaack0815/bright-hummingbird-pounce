@@ -33,22 +33,24 @@ async function decrypt(encryptedData: string, iv_b64: string, key_hex: string): 
 }
 
 serve(async (req) => {
+  console.log("--- [fetch-emails] Function invoked ---");
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    console.log("--- Starting fetch-emails function ---");
-
     const imapHost = Deno.env.get('IMAP_HOST');
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
 
     if (!imapHost) {
-      throw new Error("Server-Konfigurationsfehler: Das Secret 'IMAP_HOST' ist nicht gesetzt oder die Funktion wurde noch nicht neu bereitgestellt.");
+      console.error("[fetch-emails] CRITICAL ERROR: IMAP_HOST secret is not set.");
+      throw new Error("Server-Konfigurationsfehler: Das Secret 'IMAP_HOST' ist nicht gesetzt.");
     }
     if (!encryptionKey || encryptionKey.length !== 64) {
-        throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
+      console.error("[fetch-emails] CRITICAL ERROR: APP_ENCRYPTION_KEY secret is not set or invalid.");
+      throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
     }
+    console.log(`[fetch-emails] Step 1: Secrets found (IMAP_HOST: ${imapHost}).`);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -57,7 +59,7 @@ serve(async (req) => {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
-    console.log("Step 1: User authenticated with ID:", user.id);
+    console.log(`[fetch-emails] Step 2: User authenticated with ID: ${user.id}`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -71,18 +73,17 @@ serve(async (req) => {
       .single();
       
     if (credsError || !creds) {
+      console.error("[fetch-emails] Error fetching credentials for user.", credsError);
       throw new Error("E-Mail-Konto nicht konfiguriert oder Abruffehler.");
     }
-    console.log("Step 2: Found IMAP credentials for user:", creds.imap_username);
-    
-    console.log("Step 3: Encryption key found.");
+    console.log(`[fetch-emails] Step 3: Found IMAP credentials for user: ${creds.imap_username}`);
 
     let decryptedPassword;
     try {
         decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
-        console.log("Step 3.1: Password decrypted successfully.");
+        console.log("[fetch-emails] Step 4: Password decrypted successfully.");
     } catch (decryptionError) {
-        console.error("DECRYPTION FAILED:", decryptionError);
+        console.error("[fetch-emails] DECRYPTION FAILED:", decryptionError);
         throw new Error("Could not decrypt password. The encryption key may have changed or the data is corrupt.");
     }
 
@@ -95,7 +96,7 @@ serve(async (req) => {
       .single();
     if (latestEmailError && latestEmailError.code !== 'PGRST116') throw latestEmailError;
     const sinceUid = latestEmail?.uid;
-    console.log("Step 4: Latest UID in DB is:", sinceUid);
+    console.log(`[fetch-emails] Step 5: Latest UID in DB is: ${sinceUid}`);
 
     const client = new ImapFlow({
         host: imapHost,
@@ -107,14 +108,14 @@ serve(async (req) => {
     });
 
     const emailsToInsert = [];
-    console.log("Step 5: Connecting to IMAP server...");
+    console.log("[fetch-emails] Step 6: Connecting to IMAP server...");
     await client.connect();
-    console.log("Step 6: IMAP connection successful.");
+    console.log("[fetch-emails] Step 7: IMAP connection successful.");
     try {
         await client.mailboxOpen('INBOX');
-        console.log("Step 7: INBOX opened.");
+        console.log("[fetch-emails] Step 8: INBOX opened.");
         const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { all: true };
-        console.log("Step 8: Fetching emails with criteria:", fetchCriteria);
+        console.log(`[fetch-emails] Step 9: Fetching emails with criteria: ${JSON.stringify(fetchCriteria)}`);
         
         for await (const msg of client.fetch(fetchCriteria, { source: true })) {
             console.log(`  - Processing message with UID: ${msg.uid}`);
@@ -131,29 +132,29 @@ serve(async (req) => {
                 body_html: mail.html || null,
             });
         }
-        console.log(`Step 9: Found ${emailsToInsert.length} new emails to insert.`);
+        console.log(`[fetch-emails] Step 10: Found ${emailsToInsert.length} new emails to insert.`);
     } finally {
         await client.logout();
-        console.log("Step 11: IMAP client logged out.");
+        console.log("[fetch-emails] Step 12: IMAP client logged out.");
     }
 
     if (emailsToInsert.length > 0) {
-        console.log("Step 10: Inserting new emails into database...");
+        console.log("[fetch-emails] Step 11: Inserting new emails into database...");
         const { error: insertError } = await supabaseAdmin.from('emails').insert(emailsToInsert);
         if (insertError) {
-            console.error("DATABASE INSERT FAILED:", insertError);
+            console.error("[fetch-emails] DATABASE INSERT FAILED:", insertError);
             throw insertError;
         }
-        console.log("Step 10.1: Insert successful.");
+        console.log("[fetch-emails] Step 11.1: Insert successful.");
     }
 
-    console.log("--- fetch-emails function finished successfully ---");
+    console.log("--- [fetch-emails] Function finished successfully ---");
     return new Response(JSON.stringify({ newEmails: emailsToInsert.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (e) {
-    console.error("!!! FETCH-EMAILS FUNCTION CRASHED !!!", e);
+    console.error("--- [fetch-emails] FUNCTION CRASHED ---", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

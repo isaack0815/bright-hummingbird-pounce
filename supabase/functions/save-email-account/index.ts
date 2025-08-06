@@ -42,6 +42,7 @@ async function encrypt(data: string, key_hex: string): Promise<{ encrypted: stri
 }
 
 serve(async (req) => {
+  console.log("--- [save-email-account] Function invoked ---");
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -61,17 +62,29 @@ serve(async (req) => {
     const hasPermission = permissionNames.includes('personnel_files.manage');
 
     if (!isSuperAdmin && !hasPermission) {
+      console.error("[save-email-account] Error: Permission denied.");
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
     }
+    console.log("[save-email-account] Step 1: Permission check passed.");
 
     const { userId, email_address, imap_username, imap_password } = await req.json()
+    console.log(`[save-email-account] Step 2: Received data for user ID: ${userId}`);
     if (!userId || !email_address || !imap_username || !imap_password) {
+      console.error("[save-email-account] Error: Missing required fields in request body.");
       return new Response(JSON.stringify({ error: 'Alle Felder sind erforderlich' }), { status: 400 })
     }
 
+    const imapHost = Deno.env.get('IMAP_HOST');
+    if (!imapHost) {
+        console.error("[save-email-account] CRITICAL ERROR: IMAP_HOST secret is not set in environment.");
+        throw new Error("Server-Konfigurationsfehler: Das Secret 'IMAP_HOST' ist nicht gesetzt.");
+    }
+    console.log(`[save-email-account] Step 3: IMAP_HOST found: ${imapHost}`);
+
     // --- Verbindungstest mit imapflow ---
+    console.log("[save-email-account] Step 4: Starting IMAP connection test...");
     const client = new ImapFlow({
-        host: Deno.env.get('IMAP_HOST')!,
+        host: imapHost,
         port: 993,
         secure: true,
         auth: {
@@ -86,25 +99,31 @@ serve(async (req) => {
 
     try {
         await client.connect();
+        console.log("[save-email-account] Step 4.1: IMAP connection successful.");
         await client.logout();
+        console.log("[save-email-account] Step 4.2: IMAP logout successful.");
     } catch (e) {
-        console.error("IMAP Connection Test Failed:", e);
+        console.error("[save-email-account] CRITICAL ERROR: IMAP Connection Test Failed.", e);
         return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie den IMAP_HOST in den Secrets und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
     }
     // --- Ende Verbindungstest ---
 
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
     if (!encryptionKey || encryptionKey.length !== 64) {
+        console.error("[save-email-account] CRITICAL ERROR: APP_ENCRYPTION_KEY secret is not set or invalid.");
         throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
     }
+    console.log("[save-email-account] Step 5: Encryption key found.");
 
     const { encrypted, iv } = await encrypt(imap_password, encryptionKey);
+    console.log("[save-email-account] Step 6: Password encrypted successfully.");
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    console.log("[save-email-account] Step 7: Upserting data into 'email_accounts' table...");
     const { error } = await supabaseAdmin
       .from('email_accounts')
       .upsert({
@@ -115,13 +134,19 @@ serve(async (req) => {
         iv: iv,
       }, { onConflict: 'user_id' });
 
-    if (error) throw error
+    if (error) {
+        console.error("[save-email-account] CRITICAL ERROR: Database upsert failed.", error);
+        throw error;
+    }
+    console.log("[save-email-account] Step 8: Database upsert successful.");
 
+    console.log("--- [save-email-account] Function finished successfully ---");
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (e) {
+    console.error("--- [save-email-account] FUNCTION CRASHED ---", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
