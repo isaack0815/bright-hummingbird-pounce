@@ -31,6 +31,7 @@ serve(async (req) => {
 
     // Check for secrets
     const secrets = [
+        'IMAP_HOST',
         'SMTP_HOST', 
         'SMTP_PORT', 
         'SMTP_USER', 

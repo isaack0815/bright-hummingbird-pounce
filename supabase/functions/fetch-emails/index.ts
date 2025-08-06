@@ -40,9 +40,9 @@ serve(async (req) => {
   try {
     console.log("--- Starting fetch-emails function ---");
 
-    const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
+    const requiredEnv = ['IMAP_HOST', 'APP_ENCRYPTION_KEY'];
     if (requiredEnv.some(v => !Deno.env.get(v))) {
-      throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets.`);
+      throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets (IMAP_HOST, APP_ENCRYPTION_KEY).`);
     }
 
     const supabase = createClient(
@@ -97,7 +97,7 @@ serve(async (req) => {
     console.log("Step 4: Latest UID in DB is:", sinceUid);
 
     const client = new ImapFlow({
-        host: Deno.env.get('SMTP_HOST')!,
+        host: Deno.env.get('IMAP_HOST')!,
         port: 993,
         secure: true,
         auth: { user: creds.imap_username, pass: decryptedPassword },

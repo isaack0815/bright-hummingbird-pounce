@@ -71,7 +71,7 @@ serve(async (req) => {
 
     // --- Verbindungstest mit imapflow ---
     const client = new ImapFlow({
-        host: Deno.env.get('SMTP_HOST')!,
+        host: Deno.env.get('IMAP_HOST')!,
         port: 993,
         secure: true,
         auth: {
@@ -89,7 +89,7 @@ serve(async (req) => {
         await client.logout();
     } catch (e) {
         console.error("IMAP Connection Test Failed:", e);
-        return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie die globalen SMTP-Einstellungen und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
+        return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie den IMAP_HOST in den Secrets und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
     }
     // --- Ende Verbindungstest ---
 

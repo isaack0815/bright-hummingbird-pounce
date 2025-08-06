@@ -29,8 +29,8 @@ const fetchSettings = async (): Promise<Setting[]> => {
   return data.settings;
 };
 
-const fetchSmtpStatus = async (): Promise<Record<string, boolean>> => {
-  const { data, error } = await supabase.functions.invoke('get-smtp-secrets-status');
+const fetchEmailSecretsStatus = async (): Promise<Record<string, boolean>> => {
+  const { data, error } = await supabase.functions.invoke('get-email-secrets-status');
   if (error) throw error;
   return data.status;
 };
@@ -50,9 +50,9 @@ const Settings = () => {
     queryFn: fetchSettings,
   });
 
-  const { data: smtpStatus, isLoading: isLoadingSmtpStatus } = useQuery<Record<string, boolean>>({
-    queryKey: ['smtpStatus'],
-    queryFn: fetchSmtpStatus,
+  const { data: emailSecretsStatus, isLoading: isLoadingEmailSecrets } = useQuery<Record<string, boolean>>({
+    queryKey: ['emailSecretsStatus'],
+    queryFn: fetchEmailSecretsStatus,
   });
 
   const { data: vehicleGroups, isLoading: isLoadingVehicleGroups } = useQuery<VehicleGroup[]>({
@@ -256,7 +256,7 @@ const Settings = () => {
                     <div>
                       <Alert.Heading as="h5">Wichtiger Hinweis!</Alert.Heading>
                       <p className="mb-0">
-                        Die SMTP-Zugangsdaten müssen als Secrets direkt in Ihrem Supabase-Projekt hinterlegt werden. Fügen Sie auch `SMTP_SECURE` mit dem Wert `tls`, `ssl` oder `none` hinzu.
+                        Die Zugangsdaten müssen als Secrets direkt in Ihrem Supabase-Projekt hinterlegt werden.
                       </p>
                     </div>
                   </div>
@@ -264,15 +264,16 @@ const Settings = () => {
                 <div className="row g-4 mt-3">
                   <div className="col-md-6">
                     <div className="border p-3 rounded h-100">
-                      <h4 className="h6">Status der SMTP-Secrets</h4>
-                      {isLoadingSmtpStatus ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder> : (
+                      <h4 className="h6">Status der E-Mail-Secrets</h4>
+                      {isLoadingEmailSecrets ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder> : (
                         <ul className="list-unstyled mb-0">
-                          <SecretStatusItem name="SMTP_HOST" isSet={smtpStatus?.SMTP_HOST} />
-                          <SecretStatusItem name="SMTP_PORT" isSet={smtpStatus?.SMTP_PORT} />
-                          <SecretStatusItem name="SMTP_USER" isSet={smtpStatus?.SMTP_USER} />
-                          <SecretStatusItem name="SMTP_PASS" isSet={smtpStatus?.SMTP_PASS} />
-                          <SecretStatusItem name="SMTP_FROM_EMAIL" isSet={smtpStatus?.SMTP_FROM_EMAIL} />
-                          <SecretStatusItem name="SMTP_SECURE" isSet={smtpStatus?.SMTP_SECURE} />
+                          <SecretStatusItem name="IMAP_HOST" isSet={emailSecretsStatus?.IMAP_HOST} />
+                          <SecretStatusItem name="SMTP_HOST" isSet={emailSecretsStatus?.SMTP_HOST} />
+                          <SecretStatusItem name="SMTP_PORT" isSet={emailSecretsStatus?.SMTP_PORT} />
+                          <SecretStatusItem name="SMTP_USER" isSet={emailSecretsStatus?.SMTP_USER} />
+                          <SecretStatusItem name="SMTP_PASS" isSet={emailSecretsStatus?.SMTP_PASS} />
+                          <SecretStatusItem name="SMTP_FROM_EMAIL" isSet={emailSecretsStatus?.SMTP_FROM_EMAIL} />
+                          <SecretStatusItem name="SMTP_SECURE" isSet={emailSecretsStatus?.SMTP_SECURE} />
                         </ul>
                       )}
                     </div>
@@ -281,7 +282,7 @@ const Settings = () => {
                     <div className="border p-3 rounded h-100">
                       <h4 className="h6">SMTP-Verbindung testen</h4>
                       <p className="small text-muted">
-                        Prüfen Sie, ob die in den Secrets hinterlegten Daten korrekt sind.
+                        Prüfen Sie, ob die in den Secrets hinterlegten Daten für den E-Mail-Versand korrekt sind.
                       </p>
                       <Button 
                         type="button" 
