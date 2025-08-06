@@ -31,6 +31,7 @@ import DashboardSettings from "./pages/DashboardSettings";
 import TourManagement from "./pages/TourManagement";
 import VehicleGroupManagement from "./pages/VehicleGroupManagement";
 import PersonnelFile from "./pages/PersonnelFile";
+import EmailClient from "./pages/EmailClient";
 
 const queryClient = new QueryClient();
 
@@ -101,6 +102,10 @@ const AppRoutes = () => {
             <Route path="fernverkehr" element={<Fernverkehr />} />
             <Route path="billing/:id" element={<BillingDetail />} />
             <Route path="invoices" element={<InvoiceManagement />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requiredPermission="email.access" />}>
+            <Route path="email" element={<EmailClient />} />
           </Route>
 
           <Route path="access-denied" element={<AccessDenied />} />
