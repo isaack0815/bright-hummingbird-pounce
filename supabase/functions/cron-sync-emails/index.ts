@@ -7,14 +7,24 @@ const corsHeaders = {
 }
 
 // This function is designed to be run on a schedule (e.g., every 15 minutes).
-// Supabase Dashboard -> Edge Functions -> cron-sync-emails -> Schedules
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Ensure the request is from a trusted source, e.g., Supabase scheduler
-  // For simplicity, we're skipping auth here, but in production, you'd add a secret.
+  // Authorization check to ensure the request is from a trusted source (pg_cron)
+  const authHeader = req.headers.get('Authorization');
+  const cronSecret = Deno.env.get('CRON_SECRET');
+
+  if (!cronSecret) {
+    console.error("[CRON-SYNC] CRON_SECRET is not set in environment variables.");
+    return new Response(JSON.stringify({ error: 'Internal Server Configuration Error' }), { status: 500 });
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    console.warn("[CRON-SYNC] Unauthorized access attempt.");
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  }
 
   console.log("[CRON-SYNC] Starting scheduled email sync for all users.");
 
