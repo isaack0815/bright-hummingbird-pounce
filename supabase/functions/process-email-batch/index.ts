@@ -95,7 +95,7 @@ serve(async (req) => {
                 break;
             }
             // Skip folders that cannot contain messages
-            if (mailbox.flags.includes('\\Noselect')) {
+            if (mailbox.flags.has('\\Noselect')) {
                 console.log(`[PROCESS-EMAIL-BATCH] Skipping non-selectable mailbox: ${mailbox.path}`);
                 continue;
             }
