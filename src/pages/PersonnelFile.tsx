@@ -9,6 +9,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
+import { EmailAccountForm } from '@/components/user/EmailAccountForm';
 
 const formSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
@@ -120,6 +121,11 @@ const PersonnelFile = () => {
                   </tbody>
                 </Table>
               </div>
+            </Tab>
+            <Tab eventKey="email" title="E-Mail-Konto">
+                <div className="pt-3">
+                    <EmailAccountForm userId={id!} />
+                </div>
             </Tab>
           </Tabs>
         </Card.Body>

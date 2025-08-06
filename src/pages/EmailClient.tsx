@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Container, Row, Col, Card, ListGroup, Spinner, Button, Alert } from 'react-bootstrap';
-import { Settings, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { Email } from '@/types/email';
-import { EmailSettingsDialog } from '@/components/email/EmailSettingsDialog';
 
 const fetchEmails = async (): Promise<Email[]> => {
   const { data, error } = await supabase.functions.invoke('fetch-emails');
@@ -16,7 +15,6 @@ const fetchEmails = async (): Promise<Email[]> => {
 
 const EmailClient = () => {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Initialisiere Verbindung...');
 
   const { data: emails, isLoading, error, refetch } = useQuery<Email[]>({
@@ -59,9 +57,6 @@ const EmailClient = () => {
             <Button variant="outline-secondary" onClick={() => refetch()} disabled={isLoading} className="me-2">
               <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             </Button>
-            <Button variant="outline-secondary" onClick={() => setIsSettingsOpen(true)}>
-              <Settings size={16} />
-            </Button>
           </div>
         </div>
 
@@ -69,7 +64,7 @@ const EmailClient = () => {
           <Alert variant="danger">
             <Alert.Heading>Fehler beim Abrufen der E-Mails</Alert.Heading>
             <p>{error.message}</p>
-            <p>Möglicherweise müssen Sie Ihr E-Mail-Konto zuerst in den Einstellungen konfigurieren.</p>
+            <p>Möglicherweise muss ein Administrator Ihr E-Mail-Konto zuerst in Ihrer Personalakte konfigurieren.</p>
           </Alert>
         )}
 
@@ -122,7 +117,6 @@ const EmailClient = () => {
           </Col>
         </Row>
       </Container>
-      <EmailSettingsDialog show={isSettingsOpen} onHide={() => setIsSettingsOpen(false)} />
     </>
   );
 };

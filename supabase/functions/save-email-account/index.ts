@@ -47,17 +47,21 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    // Permission check
+    const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
+    const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
+    if (permError) throw permError;
+    const hasPermission = permissions.some((p: any) => p.permission_name === 'personnel_files.manage');
+    if (!hasPermission) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
+    }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error("User not found")
-
-    const { email_address, imap_username, imap_password } = await req.json()
-    if (!email_address || !imap_username || !imap_password) {
+    const { userId, email_address, imap_username, imap_password } = await req.json()
+    if (!userId || !email_address || !imap_username || !imap_password) {
       return new Response(JSON.stringify({ error: 'Alle Felder sind erforderlich' }), { status: 400 })
     }
 
@@ -100,7 +104,7 @@ serve(async (req) => {
     const { error } = await supabaseAdmin
       .from('email_accounts')
       .upsert({
-        user_id: user.id,
+        user_id: userId,
         email_address: email_address,
         imap_username: imap_username,
         encrypted_imap_password: encrypted,
