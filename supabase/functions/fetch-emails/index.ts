@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { ImapFlow } from 'npm:imapflow';
-import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
 const corsHeaders = {
@@ -32,6 +31,12 @@ async function decrypt(encryptedData: string, iv_b64: string, key_hex: string): 
   return new TextDecoder().decode(decrypted);
 }
 
+const formatAddress = (addr: { name?: string, mailbox?: string, host?: string } | undefined): string | null => {
+    if (!addr || !addr.mailbox || !addr.host) return null;
+    const name = addr.name ? `"${addr.name}" ` : '';
+    return `${name}<${addr.mailbox}@${addr.host}>`;
+}
+
 serve(async (req) => {
   console.log("--- [fetch-emails] Function invoked ---");
   if (req.method === 'OPTIONS') {
@@ -39,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const BATCH_SIZE = 50;
+    const BATCH_SIZE = 5; // Reduced batch size for testing
     const imapHost = Deno.env.get('IMAP_HOST');
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
 
@@ -112,15 +117,28 @@ serve(async (req) => {
             const startUid = sinceUid + 1;
             const endUid = Math.min(startUid + BATCH_SIZE - 1, highestUidOnServer);
             const fetchCriteria = { uid: `${startUid}:${endUid}` };
-            console.log(`[fetch-emails] Step 10: Fetching batch with criteria: ${JSON.stringify(fetchCriteria)}`);
+            
+            // New fetch options: only get envelope (headers) and text body
+            const fetchOptions = { 
+                envelope: true, 
+                body: ['TEXT']
+            };
+            console.log(`[fetch-emails] Step 10: Fetching batch with criteria: ${JSON.stringify(fetchCriteria)} and options: ${JSON.stringify(fetchOptions)}`);
 
-            for await (const msg of client.fetch(fetchCriteria, { source: true })) {
-                const mail = await simpleParser(msg.source);
+            for await (const msg of client.fetch(fetchCriteria, fetchOptions)) {
+                const envelope = msg.envelope;
+                const bodyText = msg.body.get('TEXT')?.toString();
+
                 emailsToInsert.push({
-                    user_id: user.id, uid: msg.uid, mailbox: 'INBOX',
-                    from_address: mail.from?.text || null, to_address: mail.to?.text || null,
-                    subject: mail.subject || null, sent_at: mail.date || null,
-                    body_text: mail.text || null, body_html: mail.html || null,
+                    user_id: user.id, 
+                    uid: msg.uid, 
+                    mailbox: 'INBOX',
+                    from_address: formatAddress(envelope.from?.[0]),
+                    to_address: formatAddress(envelope.to?.[0]),
+                    subject: envelope.subject || null, 
+                    sent_at: envelope.date || null,
+                    body_text: bodyText || null, 
+                    body_html: null, // Explicitly set to null as we are not fetching it
                 });
             }
             console.log(`[fetch-emails] Step 11: Finished fetch loop. Found ${emailsToInsert.length} new emails.`);
