@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Container, Row, Col, Card, ListGroup, Spinner, Button, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, ListGroup, Spinner, Button, Alert, ProgressBar } from 'react-bootstrap';
 import { RefreshCw, Paperclip, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -11,13 +11,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 const fetchEmailsFromDB = async (): Promise<Email[]> => {
   const { data, error } = await supabase.functions.invoke('get-emails');
   if (error) throw new Error(error.message);
-  // Ensure attachments is always an array
   return data.emails.map((email: Email) => ({ ...email, attachments: email.attachments || [] }));
 };
 
 const EmailClient = () => {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const [totalSynced, setTotalSynced] = useState(0);
+  const [syncJob, setSyncJob] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: emails, isLoading, error: queryError } = useQuery<Email[]>({
@@ -25,42 +24,62 @@ const EmailClient = () => {
     queryFn: fetchEmailsFromDB,
   });
 
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('fetch-emails');
+  const processBatchMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      const { data, error } = await supabase.functions.invoke('process-email-batch', { body: { jobId } });
       if (error) throw new Error(error.message);
       return data;
     },
     onSuccess: (data) => {
-      const newTotal = totalSynced + data.newEmails;
-      if (data.newEmails > 0) {
-        queryClient.invalidateQueries({ queryKey: ['userEmails'] });
-      }
-      
-      if (data.moreEmailsExist) {
-        setTotalSynced(newTotal);
-        showSuccess(`${newTotal} neue E-Mail(s) synchronisiert. Weitere werden geladen...`);
-        syncMutation.mutate(); // Fetch next batch
-      } else {
-        if (newTotal > 0) {
-          showSuccess(`Synchronisierung abgeschlossen. Insgesamt ${newTotal} neue E-Mail(s).`);
-        } else {
-          showSuccess("Posteingang ist auf dem neuesten Stand.");
-        }
-        setTotalSynced(0); // Reset after full sync
-      }
+      setSyncJob(data);
+      queryClient.invalidateQueries({ queryKey: ['userEmails'] });
     },
     onError: (err: any) => {
-      showError(err.message || "Fehler bei der Synchronisierung.");
-      setTotalSynced(0); // Reset on error
+      showError(`Fehler im Batch-Prozess: ${err.message}`);
+      setSyncJob(null);
     },
   });
 
-  const handleDownloadAttachment = async (attachment: EmailAttachment) => {
-    const { data, error } = await supabase.storage
-      .from('email-attachments')
-      .createSignedUrl(attachment.file_path, 60); // URL valid for 60 seconds
+  const createJobMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('create-email-sync-job');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.message === "No new emails.") {
+        showSuccess("Posteingang ist auf dem neuesten Stand.");
+        setSyncJob(null);
+      } else {
+        setSyncJob(data);
+      }
+    },
+    onError: (err: any) => {
+      showError(`Fehler beim Erstellen des Sync-Jobs: ${err.message}`);
+      setSyncJob(null);
+    },
+  });
 
+  const handleSync = () => {
+    setSyncJob({ status: 'starting' });
+    createJobMutation.mutate();
+  };
+
+  useEffect(() => {
+    if (syncJob?.status === 'processing' && !processBatchMutation.isPending) {
+      processBatchMutation.mutate(syncJob.id);
+    }
+    if (syncJob?.status === 'completed') {
+      showSuccess(`Synchronisierung abgeschlossen. ${syncJob.total_count} E-Mails verarbeitet.`);
+      setSyncJob(null);
+    }
+  }, [syncJob, processBatchMutation]);
+
+  const isSyncing = !!syncJob;
+  const syncProgress = syncJob?.total_count > 0 ? (syncJob.processed_count / syncJob.total_count) * 100 : 0;
+
+  const handleDownloadAttachment = async (attachment: EmailAttachment) => {
+    const { data, error } = await supabase.storage.from('email-attachments').createSignedUrl(attachment.file_path, 60);
     if (error) {
       showError("Fehler beim Erstellen des Download-Links.");
       return;
@@ -72,18 +91,19 @@ const EmailClient = () => {
     <Container fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h2">E-Mail-Posteingang</h1>
-        <Button variant="outline-secondary" onClick={() => { setTotalSynced(0); syncMutation.mutate(); }} disabled={syncMutation.isPending}>
-          <RefreshCw size={16} className={syncMutation.isPending ? 'animate-spin' : ''} />
-          <span className="ms-2">{syncMutation.isPending ? 'Synchronisiere...' : 'Aktualisieren'}</span>
+        <Button variant="outline-secondary" onClick={handleSync} disabled={isSyncing}>
+          <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+          <span className="ms-2">{isSyncing ? 'Synchronisiere...' : 'Aktualisieren'}</span>
         </Button>
       </div>
 
-      {queryError && (
-        <Alert variant="danger">
-          <Alert.Heading>Fehler beim Laden der E-Mails</Alert.Heading>
-          <p>{queryError.message}</p>
-        </Alert>
+      {isSyncing && syncJob.total_count > 0 && (
+        <div className="mb-3">
+          <ProgressBar now={syncProgress} label={`${syncJob.processed_count} / ${syncJob.total_count}`} />
+        </div>
       )}
+
+      {queryError && <Alert variant="danger"><Alert.Heading>Fehler beim Laden der E-Mails</Alert.Heading><p>{queryError.message}</p></Alert>}
 
       <Row>
         <Col md={4}>
@@ -91,16 +111,12 @@ const EmailClient = () => {
             <Card.Header>Posteingang</Card.Header>
             <ListGroup variant="flush" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
               {isLoading && <div className="text-center p-4"><Spinner size="sm" /></div>}
-              {!isLoading && emails?.length === 0 && (
-                <div className="text-center p-4 text-muted">
-                  Keine E-Mails gefunden.
-                </div>
-              )}
+              {!isLoading && emails?.length === 0 && <div className="text-center p-4 text-muted">Keine E-Mails gefunden.</div>}
               {emails?.map(email => (
                 <ListGroup.Item key={email.uid} action active={selectedEmail?.uid === email.uid} onClick={() => setSelectedEmail(email)}>
                   <div className="d-flex justify-content-between">
                     <p className="fw-bold mb-0 text-truncate">{email.from_address}</p>
-                    {email.attachments && email.attachments.length > 0 && <Paperclip size={14} className="text-muted" />}
+                    {email.attachments?.length > 0 && <Paperclip size={14} className="text-muted" />}
                   </div>
                   <p className="mb-1 text-truncate">{email.subject}</p>
                   <p className="small text-muted mb-0">{format(new Date(email.sent_at), 'dd.MM.yyyy HH:mm', { locale: de })}</p>
@@ -118,15 +134,14 @@ const EmailClient = () => {
                     <h5 className="mb-1">{selectedEmail.subject}</h5>
                     <p className="mb-0"><strong>Von:</strong> {selectedEmail.from_address}</p>
                     <p className="text-muted small"><strong>Datum:</strong> {format(new Date(selectedEmail.sent_at), 'eeee, d. MMMM yyyy HH:mm', { locale: de })}</p>
-                    {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                    {selectedEmail.attachments?.length > 0 && (
                       <div className="mt-2">
                         <strong>Anhänge:</strong>
                         <ul className="list-unstyled mb-0">
                           {selectedEmail.attachments.map(att => (
                             <li key={att.id}>
                               <Button variant="link" size="sm" onClick={() => handleDownloadAttachment(att)} className="p-0">
-                                <Download size={14} className="me-1" />
-                                {att.file_name}
+                                <Download size={14} className="me-1" /> {att.file_name}
                               </Button>
                             </li>
                           ))}
@@ -143,9 +158,7 @@ const EmailClient = () => {
                   </div>
                 </>
               ) : (
-                <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-                  <p>Wählen Sie eine E-Mail aus, um sie anzuzeigen.</p>
-                </div>
+                <div className="d-flex align-items-center justify-content-center h-100 text-muted"><p>Wählen Sie eine E-Mail aus, um sie anzuzeigen.</p></div>
               )}
             </Card.Body>
           </Card>
