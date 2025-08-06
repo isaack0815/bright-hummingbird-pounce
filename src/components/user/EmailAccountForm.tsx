@@ -50,13 +50,18 @@ export function EmailAccountForm({ userId }: EmailAccountFormProps) {
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!values.imap_password && account) {
-        showError("Bitte geben Sie ein Passwort ein, um die Einstellungen zu speichern.");
-        return;
+        // Allow saving other fields without changing password
+        const { imap_password, ...rest } = values;
+        const { error } = await supabase.functions.invoke('save-email-account', {
+          body: { ...rest, userId },
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.functions.invoke('save-email-account', {
+          body: { ...values, userId },
+        });
+        if (error) throw error;
       }
-      const { error } = await supabase.functions.invoke('save-email-account', {
-        body: { ...values, userId },
-      });
-      if (error) throw error;
     },
     onSuccess: () => {
       showSuccess("Kontodaten gespeichert!");
@@ -66,12 +71,16 @@ export function EmailAccountForm({ userId }: EmailAccountFormProps) {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern."),
   });
 
+  const handleSave = () => {
+    form.handleSubmit((v) => mutation.mutate(v))();
+  };
+
   if (isLoading) {
     return <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '200px'}} /></Placeholder>
   }
 
   return (
-    <Form onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+    <Form>
         <Alert variant="info">
             Die IMAP-Serverdaten (Host, Port) werden aus den globalen Einstellungen übernommen. Das Passwort wird verschlüsselt gespeichert.
         </Alert>
@@ -87,7 +96,7 @@ export function EmailAccountForm({ userId }: EmailAccountFormProps) {
             <Form.Label>IMAP Passwort</Form.Label>
             <Form.Control type="password" {...form.register("imap_password")} placeholder={account ? "Zum Ändern neu eingeben" : ""} isInvalid={!!form.formState.errors.imap_password} />
         </Form.Group>
-        <Button type="submit" disabled={mutation.isPending}>
+        <Button type="button" onClick={handleSave} disabled={mutation.isPending}>
             {mutation.isPending ? <Spinner as="span" size="sm" /> : "Speichern"}
         </Button>
     </Form>
