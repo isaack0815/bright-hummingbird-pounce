@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const BATCH_SIZE = 5; // Reduced batch size for testing
+    const BATCH_SIZE = 5;
     const imapHost = Deno.env.get('IMAP_HOST');
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
 
@@ -86,8 +86,8 @@ serve(async (req) => {
       .order('uid', { ascending: false })
       .limit(1)
       .single();
-    const sinceUid = latestEmail?.uid || 0;
-    console.log(`[fetch-emails] Step 5: Latest UID in DB is: ${sinceUid}`);
+    const highestUidInDb = latestEmail?.uid || 0;
+    console.log(`[fetch-emails] Step 5: Highest UID in DB is: ${highestUidInDb}`);
 
     const client = new ImapFlow({
         host: imapHost,
@@ -101,6 +101,7 @@ serve(async (req) => {
     const emailsToInsert = [];
     let highestUidOnServer = 0;
     let newEmailsCount = 0;
+    let serverMessageCount = 0;
 
     console.log("[fetch-emails] Step 6: Connecting to IMAP server...");
     await client.connect();
@@ -109,20 +110,23 @@ serve(async (req) => {
         const mailbox = await client.mailboxOpen('INBOX');
         console.log("[fetch-emails] Step 8: INBOX opened.");
         
-        // RELIABLE WAY to get highest UID
-        highestUidOnServer = mailbox.uidNext - 1;
-        console.log(`[fetch-emails] Step 9: Highest UID on server is reliably determined as ${highestUidOnServer} (from uidNext: ${mailbox.uidNext})`);
+        const serverStatus = await client.status('INBOX', {messages: true});
+        serverMessageCount = serverStatus.messages || 0;
+        
+        highestUidOnServer = mailbox.uidNext > 1 ? mailbox.uidNext - 1 : 0;
+        console.log(`[fetch-emails] Step 9: Highest UID on server is ${highestUidOnServer}. Total messages on server: ${serverMessageCount}`);
 
-        if (highestUidOnServer > sinceUid) {
-            const startUid = sinceUid + 1;
-            const endUid = Math.min(startUid + BATCH_SIZE - 1, highestUidOnServer);
+        if (highestUidOnServer > highestUidInDb) {
+            // Fetch newest emails first
+            const endUid = highestUidOnServer;
+            const startUid = Math.max(highestUidInDb + 1, endUid - BATCH_SIZE + 1);
             const fetchCriteria = { uid: `${startUid}:${endUid}` };
             
             const fetchOptions = { 
                 envelope: true, 
                 body: ['TEXT']
             };
-            console.log(`[fetch-emails] Step 10: Fetching batch with criteria: ${JSON.stringify(fetchCriteria)} and options: ${JSON.stringify(fetchOptions)}`);
+            console.log(`[fetch-emails] Step 10: Fetching batch with criteria: ${JSON.stringify(fetchCriteria)}`);
 
             for await (const msg of client.fetch(fetchCriteria, fetchOptions)) {
                 const envelope = msg.envelope;
@@ -142,7 +146,7 @@ serve(async (req) => {
             }
             console.log(`[fetch-emails] Step 11: Finished fetch loop. Found ${emailsToInsert.length} new emails.`);
         } else {
-            console.log("[fetch-emails] Step 10: No new emails found on server (highest on server is not greater than highest in DB).");
+            console.log("[fetch-emails] Step 10: No new emails found on server.");
         }
     } finally {
         await client.logout();
@@ -150,17 +154,21 @@ serve(async (req) => {
     }
 
     if (emailsToInsert.length > 0) {
-        console.log("[fetch-emails] Step 12: Inserting new emails into database...");
+        console.log(`[fetch-emails] Step 12: Inserting ${emailsToInsert.length} new emails into database...`);
         const { error: insertError } = await supabaseAdmin.from('emails').insert(emailsToInsert);
         if (insertError) throw insertError;
         newEmailsCount = emailsToInsert.length;
         console.log("[fetch-emails] Step 12.1: Insert successful.");
     }
 
-    const finalLatestUid = sinceUid + newEmailsCount;
-    const moreEmailsExist = finalLatestUid < highestUidOnServer;
+    const { count: dbMessageCount } = await supabaseAdmin
+      .from('emails')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
 
-    console.log("--- [fetch-emails] Function finished successfully ---");
+    const moreEmailsExist = (dbMessageCount || 0) < serverMessageCount;
+
+    console.log(`--- [fetch-emails] Function finished successfully. DB count: ${dbMessageCount}, Server count: ${serverMessageCount}, More exist: ${moreEmailsExist} ---`);
     return new Response(JSON.stringify({ newEmails: newEmailsCount, moreEmailsExist }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
