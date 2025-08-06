@@ -9,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Decryption helpers (unchanged)
+// Decryption helpers
 const b64_to_ab = (b64: string) => {
   const byteString = Buffer.from(b64, "base64").toString("binary");
   const len = byteString.length;
@@ -38,6 +38,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("--- Starting fetch-emails function ---");
+
     const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
     if (requiredEnv.some(v => !Deno.env.get(v))) {
       throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets.`);
@@ -50,6 +52,7 @@ serve(async (req) => {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
+    console.log("Step 1: User authenticated with ID:", user.id);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -65,11 +68,12 @@ serve(async (req) => {
     if (credsError || !creds) {
       throw new Error("E-Mail-Konto nicht konfiguriert oder Abruffehler.");
     }
+    console.log("Step 2: Found IMAP credentials for user:", creds.imap_username);
 
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY')!;
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
+    console.log("Step 3: Password decrypted successfully.");
 
-    // Get the latest UID from our database
     const { data: latestEmail, error: latestEmailError } = await supabaseAdmin
       .from('emails')
       .select('uid')
@@ -79,6 +83,7 @@ serve(async (req) => {
       .single();
     if (latestEmailError && latestEmailError.code !== 'PGRST116') throw latestEmailError;
     const sinceUid = latestEmail?.uid;
+    console.log("Step 4: Latest UID in DB is:", sinceUid);
 
     const client = new ImapFlow({
         host: Deno.env.get('SMTP_HOST')!,
@@ -86,15 +91,21 @@ serve(async (req) => {
         secure: true,
         auth: { user: creds.imap_username, pass: decryptedPassword },
         tls: { rejectUnauthorized: false },
-        logger: false
+        logger: console // <-- ENABLED DETAILED LOGGING
     });
 
     const emailsToInsert = [];
+    console.log("Step 5: Connecting to IMAP server...");
     await client.connect();
+    console.log("Step 6: IMAP connection successful.");
     try {
         await client.mailboxOpen('INBOX');
+        console.log("Step 7: INBOX opened.");
         const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { all: true };
+        console.log("Step 8: Fetching emails with criteria:", fetchCriteria);
+        
         for await (const msg of client.fetch(fetchCriteria, { source: true })) {
+            console.log(`  - Processing message with UID: ${msg.uid}`);
             const mail = await simpleParser(msg.source);
             emailsToInsert.push({
                 user_id: user.id,
@@ -108,21 +119,29 @@ serve(async (req) => {
                 body_html: mail.html || null,
             });
         }
+        console.log(`Step 9: Found ${emailsToInsert.length} new emails to insert.`);
     } finally {
         await client.logout();
+        console.log("Step 11: IMAP client logged out.");
     }
 
     if (emailsToInsert.length > 0) {
+        console.log("Step 10: Inserting new emails into database...");
         const { error: insertError } = await supabaseAdmin.from('emails').insert(emailsToInsert);
-        if (insertError) throw insertError;
+        if (insertError) {
+            console.error("DATABASE INSERT FAILED:", insertError);
+            throw insertError;
+        }
+        console.log("Step 10.1: Insert successful.");
     }
 
+    console.log("--- fetch-emails function finished successfully ---");
     return new Response(JSON.stringify({ newEmails: emailsToInsert.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (e) {
-    console.error("Fetch-Emails Error:", e);
+    console.error("!!! FETCH-EMAILS FUNCTION CRASHED !!!", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
