@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
+import imaps from 'npm:imap-simple';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,6 +60,27 @@ serve(async (req) => {
     if (!email_address || !imap_username || !imap_password) {
       return new Response(JSON.stringify({ error: 'Alle Felder sind erforderlich' }), { status: 400 })
     }
+
+    // --- NEU: Verbindungstest ---
+    const testConfig = {
+      imap: {
+        user: imap_username,
+        password: imap_password,
+        host: Deno.env.get('SMTP_HOST')!,
+        port: 993,
+        tls: true,
+        authTimeout: 5000
+      }
+    };
+
+    try {
+      const connection = await imaps.connect(testConfig);
+      await connection.end();
+    } catch (e) {
+      console.error("IMAP Connection Test Failed:", e);
+      return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie die globalen SMTP-Einstellungen und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
+    }
+    // --- Ende Verbindungstest ---
 
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
     if (!encryptionKey || encryptionKey.length !== 64) {

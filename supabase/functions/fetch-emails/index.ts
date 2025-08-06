@@ -53,6 +53,13 @@ serve(async (req) => {
   }
 
   try {
+    // --- NEU: Überprüfung der Umgebungsvariablen ---
+    const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
+    const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
+    if (missingEnv.length > 0) {
+      throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets: ${missingEnv.join(', ')}`);
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -77,11 +84,7 @@ serve(async (req) => {
       throw new Error("E-Mail-Konto nicht konfiguriert oder Abruffehler.");
     }
 
-    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
-    if (!encryptionKey || encryptionKey.length !== 64) {
-        throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
-    }
-
+    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY')!;
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
 
     const config = {
@@ -91,7 +94,7 @@ serve(async (req) => {
         host: Deno.env.get('SMTP_HOST')!,
         port: 993,
         tls: true,
-        authTimeout: 3000
+        authTimeout: 5000
       }
     };
 
@@ -134,6 +137,7 @@ serve(async (req) => {
       status: 200,
     })
   } catch (e) {
+    console.error("Fetch-Emails Error:", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
