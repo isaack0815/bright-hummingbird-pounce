@@ -91,7 +91,7 @@ serve(async (req) => {
         secure: true,
         auth: { user: creds.imap_username, pass: decryptedPassword },
         tls: { rejectUnauthorized: false },
-        logger: console // <-- ENABLED DETAILED LOGGING
+        logger: false // Disabled verbose logging for production
     });
 
     const emailsToInsert = [];
@@ -111,11 +111,11 @@ serve(async (req) => {
                 user_id: user.id,
                 uid: msg.uid,
                 mailbox: 'INBOX',
-                from_address: mail.from?.text,
-                to_address: mail.to?.text,
-                subject: mail.subject,
-                sent_at: mail.date,
-                body_text: mail.text,
+                from_address: mail.from?.text || null,
+                to_address: mail.to?.text || null,
+                subject: mail.subject || null,
+                sent_at: mail.date || null,
+                body_text: mail.text || null,
                 body_html: mail.html || null,
             });
         }
