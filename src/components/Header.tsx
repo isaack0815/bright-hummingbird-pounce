@@ -107,7 +107,7 @@ const Header = () => {
             {isLoadingMenu ? <Spinner animation="border" size="sm" /> : renderMenuItems(menuTree)}
           </Nav>
           <Nav>
-            <NavDropdown title={<User />} id="user-dropdown" align="end" renderOnMount popperConfig={{ strategy: 'fixed' }}>
+            <NavDropdown title={<User />} id="user-dropdown" align="end" renderMenuOnMount popperConfig={{ strategy: 'fixed' }}>
               <NavDropdown.Item as={NavLink} to="/profile">
                 <User className="me-2 h-4 w-4" /> Mein Profil
               </NavDropdown.Item>

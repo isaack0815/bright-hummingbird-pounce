@@ -52,8 +52,15 @@ const EmailClient = () => {
             <Card>
               <Card.Header>Posteingang</Card.Header>
               <ListGroup variant="flush" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-                {isLoading && <div className="text-center p-3"><Spinner size="sm" /></div>}
-                {emails?.map(email => (
+                {isLoading && (
+                  <div className="text-center p-4 text-muted">
+                    <Spinner size="sm" className="me-2" />
+                    Verbinde mit dem Server und lade E-Mails...
+                    <br />
+                    Dies kann einen Moment dauern.
+                  </div>
+                )}
+                {!isLoading && emails?.map(email => (
                   <ListGroup.Item key={email.uid} action active={selectedEmail?.uid === email.uid} onClick={() => setSelectedEmail(email)}>
                     <p className="fw-bold mb-0 text-truncate">{email.from}</p>
                     <p className="mb-1 text-truncate">{email.subject}</p>
