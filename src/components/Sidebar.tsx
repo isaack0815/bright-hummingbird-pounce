@@ -8,7 +8,7 @@ import { Building2, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-type TreeMenuItem = MenuItem & { children: TreeMenuItem[] };
+type TreeMenuItem = Omit<MenuItem, 'children'> & { children: TreeMenuItem[] };
 
 const fetchMenuItems = async (): Promise<MenuItem[]> => {
   const { data, error } = await supabase.functions.invoke('get-menu-items');
