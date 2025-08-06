@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import imaps from 'npm:imap-simple';
+import { ImapFlow } from 'npm:imapflow';
 import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
@@ -39,18 +39,14 @@ serve(async (req) => {
   }
 
   try {
+    const BATCH_SIZE = 50;
     const imapHost = Deno.env.get('IMAP_HOST');
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
 
-    if (!imapHost) {
-      console.error("[fetch-emails] CRITICAL ERROR: IMAP_HOST secret is not set.");
-      throw new Error("Server-Konfigurationsfehler: Das Secret 'IMAP_HOST' ist nicht gesetzt.");
+    if (!imapHost || !encryptionKey || encryptionKey.length !== 64) {
+      throw new Error("Server-Konfigurationsfehler: Wichtige Secrets fehlen oder sind ungültig.");
     }
-    if (!encryptionKey || encryptionKey.length !== 64) {
-      console.error("[fetch-emails] CRITICAL ERROR: APP_ENCRYPTION_KEY secret is not set or invalid.");
-      throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
-    }
-    console.log(`[fetch-emails] Step 1: Secrets found (IMAP_HOST: ${imapHost}).`);
+    console.log(`[fetch-emails] Step 1: Secrets found.`);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -59,7 +55,7 @@ serve(async (req) => {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
-    console.log(`[fetch-emails] Step 2: User authenticated with ID: ${user.id}`);
+    console.log(`[fetch-emails] Step 2: User authenticated.`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -72,109 +68,83 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .single();
       
-    if (credsError || !creds) {
-      console.error("[fetch-emails] Error fetching credentials for user.", credsError);
-      throw new Error("E-Mail-Konto nicht konfiguriert oder Abruffehler.");
-    }
-    console.log(`[fetch-emails] Step 3: Found IMAP credentials for user: ${creds.imap_username}`);
+    if (credsError || !creds) throw new Error("E-Mail-Konto nicht konfiguriert.");
+    console.log(`[fetch-emails] Step 3: Found IMAP credentials.`);
 
-    let decryptedPassword;
-    try {
-        decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
-        console.log("[fetch-emails] Step 4: Password decrypted successfully.");
-    } catch (decryptionError) {
-        console.error("[fetch-emails] DECRYPTION FAILED:", decryptionError);
-        throw new Error("Could not decrypt password. The encryption key may have changed or the data is corrupt.");
-    }
+    const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
+    console.log("[fetch-emails] Step 4: Password decrypted.");
 
-    const { data: latestEmail, error: latestEmailError } = await supabaseAdmin
+    const { data: latestEmail } = await supabaseAdmin
       .from('emails')
       .select('uid')
       .eq('user_id', user.id)
       .order('uid', { ascending: false })
       .limit(1)
       .single();
-    if (latestEmailError && latestEmailError.code !== 'PGRST116') throw latestEmailError;
-    const sinceUid = latestEmail?.uid;
+    const sinceUid = latestEmail?.uid || 0;
     console.log(`[fetch-emails] Step 5: Latest UID in DB is: ${sinceUid}`);
 
-    const config = {
-        imap: {
-            user: creds.imap_username,
-            password: decryptedPassword,
-            host: imapHost,
-            port: 993,
-            tls: true,
-            tlsOptions: {
-                rejectUnauthorized: false
-            }
-        }
-    };
-    console.log("[fetch-emails] Step 6: IMAP config created for imap-simple.");
+    const client = new ImapFlow({
+        host: imapHost,
+        port: 993,
+        secure: true,
+        auth: { user: creds.imap_username, pass: decryptedPassword },
+        tls: { rejectUnauthorized: false },
+        logger: false
+    });
 
     const emailsToInsert = [];
-    let connection;
+    let highestUidOnServer = 0;
+    let newEmailsCount = 0;
+
+    console.log("[fetch-emails] Step 6: Connecting to IMAP server...");
+    await client.connect();
+    console.log("[fetch-emails] Step 7: IMAP connection successful.");
     try {
-        console.log("[fetch-emails] Step 7: Attempting to connect with imap-simple...");
-        connection = await imaps.connect(config);
-        console.log("[fetch-emails] Step 8: IMAP connection successful.");
-
-        await connection.openBox('INBOX');
-        console.log("[fetch-emails] Step 9: INBOX opened.");
-
-        const twoDaysAgo = new Date();
-        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        await client.mailboxOpen('INBOX');
+        console.log("[fetch-emails] Step 8: INBOX opened.");
         
-        const searchCriteria = sinceUid ? [['UID', `${sinceUid + 1}:*`]] : [['SINCE', twoDaysAgo.toISOString()]];
-        console.log(`[fetch-emails] Step 10: Search criteria: ${JSON.stringify(searchCriteria)}`);
+        const latestMessage = await client.fetchOne('*', { uid: true });
+        highestUidOnServer = latestMessage?.uid || 0;
+        console.log(`[fetch-emails] Step 9: Highest UID on server is ${highestUidOnServer}`);
 
-        const fetchOptions = {
-            bodies: [''], // Fetch the full raw message
-            struct: true
-        };
+        if (highestUidOnServer > sinceUid) {
+            const startUid = sinceUid + 1;
+            const endUid = Math.min(startUid + BATCH_SIZE - 1, highestUidOnServer);
+            const fetchCriteria = { uid: `${startUid}:${endUid}` };
+            console.log(`[fetch-emails] Step 10: Fetching batch with criteria: ${JSON.stringify(fetchCriteria)}`);
 
-        const messages = await connection.search(searchCriteria, fetchOptions);
-        console.log(`[fetch-emails] Step 11: Found ${messages.length} messages to process.`);
-
-        for (const item of messages) {
-            const rawEmail = item.parts.find(part => part.which === '')?.body;
-            if (rawEmail) {
-                console.log(`  - Processing message with UID: ${item.attributes.uid}`);
-                const mail = await simpleParser(rawEmail);
+            for await (const msg of client.fetch(fetchCriteria, { source: true })) {
+                const mail = await simpleParser(msg.source);
                 emailsToInsert.push({
-                    user_id: user.id,
-                    uid: item.attributes.uid,
-                    mailbox: 'INBOX',
-                    from_address: mail.from?.text || null,
-                    to_address: mail.to?.text || null,
-                    subject: mail.subject || null,
-                    sent_at: mail.date || null,
-                    body_text: mail.text || null,
-                    body_html: mail.html || null,
+                    user_id: user.id, uid: msg.uid, mailbox: 'INBOX',
+                    from_address: mail.from?.text || null, to_address: mail.to?.text || null,
+                    subject: mail.subject || null, sent_at: mail.date || null,
+                    body_text: mail.text || null, body_html: mail.html || null,
                 });
             }
+            console.log(`[fetch-emails] Step 11: Finished fetch loop. Found ${emailsToInsert.length} new emails.`);
+        } else {
+            console.log("[fetch-emails] Step 10: No new emails found on server.");
         }
-        console.log(`[fetch-emails] Step 12: Finished processing. ${emailsToInsert.length} emails ready for insertion.`);
-
     } finally {
-        if (connection) {
-            await connection.end();
-            console.log("[fetch-emails] Step 14: IMAP connection ended.");
-        }
+        await client.logout();
+        console.log("[fetch-emails] Step 13: IMAP client logged out.");
     }
 
     if (emailsToInsert.length > 0) {
-        console.log("[fetch-emails] Step 13: Inserting new emails into database...");
+        console.log("[fetch-emails] Step 12: Inserting new emails into database...");
         const { error: insertError } = await supabaseAdmin.from('emails').insert(emailsToInsert);
-        if (insertError) {
-            console.error("[fetch-emails] DATABASE INSERT FAILED:", insertError);
-            throw insertError;
-        }
-        console.log("[fetch-emails] Step 13.1: Insert successful.");
+        if (insertError) throw insertError;
+        newEmailsCount = emailsToInsert.length;
+        console.log("[fetch-emails] Step 12.1: Insert successful.");
     }
 
+    const finalLatestUid = sinceUid + newEmailsCount;
+    const moreEmailsExist = finalLatestUid < highestUidOnServer;
+
     console.log("--- [fetch-emails] Function finished successfully ---");
-    return new Response(JSON.stringify({ newEmails: emailsToInsert.length }), {
+    return new Response(JSON.stringify({ newEmails: newEmailsCount, moreEmailsExist }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

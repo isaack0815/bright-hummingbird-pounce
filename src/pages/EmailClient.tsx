@@ -30,12 +30,17 @@ const EmailClient = () => {
       return data;
     },
     onSuccess: (data) => {
+      let message = "";
       if (data.newEmails > 0) {
-        showSuccess(`${data.newEmails} neue E-Mail(s) synchronisiert!`);
+        message = `${data.newEmails} neue E-Mail(s) synchronisiert!`;
+        if (data.moreEmailsExist) {
+          message += " Es sind weitere E-Mails vorhanden. Bitte erneut aktualisieren.";
+        }
         queryClient.invalidateQueries({ queryKey: ['userEmails'] });
       } else {
-        showSuccess("Posteingang ist auf dem neuesten Stand.");
+        message = "Posteingang ist auf dem neuesten Stand.";
       }
+      showSuccess(message);
     },
     onError: (err: any) => {
       showError(err.message || "Fehler bei der Synchronisierung.");
