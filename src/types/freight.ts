@@ -57,6 +57,8 @@ export type FreightOrder = {
   discount_amount: number | null;
   vat_rate: number | null;
   is_intra_community: boolean | null;
+  total_discount: number | null;
+  total_discount_type: string | null;
 
   customers: Pick<Customer, 'id' | 'company_name'> | null;
   freight_order_stops: Stop[];
