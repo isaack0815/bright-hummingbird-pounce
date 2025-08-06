@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Container, Row, Col, Card, ListGroup, Spinner, Button, Alert } from 'react-bootstrap';
@@ -17,12 +17,38 @@ const fetchEmails = async (): Promise<Email[]> => {
 const EmailClient = () => {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Initialisiere Verbindung...');
 
   const { data: emails, isLoading, error, refetch } = useQuery<Email[]>({
     queryKey: ['emails'],
     queryFn: fetchEmails,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (isLoading) {
+      const messages = [
+        "Stelle Verbindung zum IMAP-Server her...",
+        "Authentifiziere...",
+        "Frage Postfach-Informationen ab...",
+        "Lade E-Mail-Liste herunter...",
+        "Synchronisiere E-Mails (dies kann einen Moment dauern)..."
+      ];
+      let messageIndex = 0;
+      setLoadingMessage(messages[0]);
+
+      const intervalId = setInterval(() => {
+        messageIndex++;
+        if (messageIndex < messages.length) {
+          setLoadingMessage(messages[messageIndex]);
+        } else {
+          clearInterval(intervalId); // Am Ende bei der letzten Nachricht bleiben
+        }
+      }, 2500); // Nachricht alle 2.5 Sekunden wechseln
+
+      return () => clearInterval(intervalId);
+    }
+  }, [isLoading]);
 
   return (
     <>
@@ -55,9 +81,7 @@ const EmailClient = () => {
                 {isLoading && (
                   <div className="text-center p-4 text-muted">
                     <Spinner size="sm" className="me-2" />
-                    Verbinde mit dem Server und lade E-Mails...
-                    <br />
-                    Dies kann einen Moment dauern.
+                    {loadingMessage}
                   </div>
                 )}
                 {!isLoading && emails?.map(email => (
