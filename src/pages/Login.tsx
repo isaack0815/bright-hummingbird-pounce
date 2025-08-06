@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Card, Form, Button, Spinner, Alert } from 'react-bootstrap';
 import { showError, showSuccess } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -68,49 +72,41 @@ const Login = () => {
   };
 
   return (
-    <div className="d-flex align-items-center justify-content-center vh-100 bg-light">
-      <Card style={{ width: '24rem' }} className="shadow-sm">
-        <Card.Header className="p-4">
-          <Card.Title as="h2" className="text-center">Anmelden</Card.Title>
-        </Card.Header>
-        <Card.Body className="p-4">
-          {error && <Alert variant="danger">{error}</Alert>}
-          <Form onSubmit={handleLogin}>
-            <Form.Group className="mb-3" controlId="loginIdentifier">
-              <Form.Label>Benutzername oder E-Mail</Form.Label>
-              <Form.Control
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-boxdark-2">
+      <Card className="w-full max-w-md mx-4">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">Anmelden</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {error && <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">{error}</div>}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="loginIdentifier">Benutzername oder E-Mail</Label>
+              <Input
+                id="loginIdentifier"
                 type="text"
                 placeholder="max_mustermann oder m@example.com"
                 required
                 value={loginIdentifier}
                 onChange={(e) => setLoginIdentifier(e.target.value)}
               />
-            </Form.Group>
-
-            <Form.Group className="mb-4" controlId="password">
-              <Form.Label>Passwort</Form.Label>
-              <Form.Control
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Passwort</Label>
+              <Input
+                id="password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-            </Form.Group>
-
-            <div className="d-grid">
-              <Button variant="primary" type="submit" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
-                    <span className="ms-2">Anmelden...</span>
-                  </>
-                ) : (
-                  'Anmelden'
-                )}
-              </Button>
             </div>
-          </Form>
-        </Card.Body>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Anmelden
+            </Button>
+          </form>
+        </CardContent>
       </Card>
     </div>
   );
