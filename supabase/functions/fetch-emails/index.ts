@@ -115,10 +115,10 @@ serve(async (req) => {
         await client.mailboxOpen('INBOX');
         console.log("[fetch-emails] Step 8: INBOX opened.");
         
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const twoDaysAgo = new Date();
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
         
-        const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { since: thirtyDaysAgo };
+        const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { since: twoDaysAgo };
         console.log(`[fetch-emails] Step 9: Fetching emails with criteria: ${JSON.stringify(fetchCriteria)}`);
         
         console.log("[fetch-emails] Step 9.1: Entering fetch loop...");
