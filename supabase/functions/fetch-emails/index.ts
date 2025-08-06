@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import imaps from 'npm:imap-simple';
+import { ImapFlow } from 'npm:imapflow';
 import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
@@ -39,6 +39,17 @@ const formatAddress = (addr: any): string | null => {
     return name ? `"${name}" <${address}>` : `<${address}>`;
 }
 
+async function streamToBuffer(stream: ReadableStream): Promise<Buffer> {
+  const reader = stream.getReader();
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -72,41 +83,33 @@ serve(async (req) => {
     const { data: latestEmail } = await supabaseAdmin.from('emails').select('uid').eq('user_id', user.id).order('uid', { ascending: false }).limit(1).single();
     const highestUidInDb = latestEmail?.uid || 0;
 
-    const config = {
-      imap: {
-        user: creds.imap_username,
-        pass: decryptedPassword,
+    const client = new ImapFlow({
         host: imapHost,
         port: 993,
-        tls: true,
-        authTimeout: 10000,
-        tlsOptions: {
-          rejectUnauthorized: false
-        }
-      }
-    };
+        secure: true,
+        auth: { user: creds.imap_username, pass: decryptedPassword },
+        tls: { rejectUnauthorized: false },
+        logger: false
+    });
 
     let newEmailsCount = 0;
     let moreEmailsExist = false;
-    
-    const connection = await imaps.connect(config);
+
+    await client.connect();
     try {
-      await connection.openBox('INBOX');
-      const searchCriteria = ['UID', `${highestUidInDb + 1}:*`];
-      const allNewUids = await connection.search(searchCriteria, {});
+      await client.mailboxOpen('INBOX');
+      const newUidList = await client.search({ uid: `${highestUidInDb + 1}:*` });
       
-      if (allNewUids.length > 0) {
-        const uidsToFetch = allNewUids.slice(0, BATCH_SIZE);
-        moreEmailsExist = allNewUids.length > BATCH_SIZE;
+      if (newUidList.length > 0) {
+        const uidsToFetch = newUidList.slice(0, BATCH_SIZE);
+        moreEmailsExist = newUidList.length > BATCH_SIZE;
 
-        const messages = await connection.fetch(uidsToFetch, { bodies: [''] });
+        for (const uid of uidsToFetch) {
+          const { content } = await client.fetchOne(uid, { source: true });
+          if (!content) continue;
 
-        for (const item of messages) {
-          const rawEmail = item.parts.find(part => part.which === '')?.body;
-          if (!rawEmail) continue;
-
-          const uid = item.attributes.uid;
-          const parsed = await simpleParser(rawEmail);
+          const source = await streamToBuffer(content);
+          const parsed = await simpleParser(source);
 
           const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin
             .from('emails')
@@ -124,7 +127,10 @@ serve(async (req) => {
             .select('id')
             .single();
 
-          if (insertEmailError) throw insertEmailError;
+          if (insertEmailError) {
+              console.error(`Failed to insert email with UID ${uid}:`, insertEmailError);
+              continue;
+          }
 
           if (parsed.attachments && parsed.attachments.length > 0) {
             for (const attachment of parsed.attachments) {
@@ -135,7 +141,7 @@ serve(async (req) => {
                 .upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
 
               if (uploadError) {
-                console.error(`Failed to upload attachment: ${attachment.filename}`, uploadError);
+                console.error(`Failed to upload attachment for UID ${uid}: ${attachment.filename}`, uploadError);
                 continue;
               }
 
@@ -151,7 +157,7 @@ serve(async (req) => {
         }
       }
     } finally {
-      connection.end();
+      await client.logout();
     }
 
     return new Response(JSON.stringify({ newEmails: newEmailsCount, moreEmailsExist }), {
