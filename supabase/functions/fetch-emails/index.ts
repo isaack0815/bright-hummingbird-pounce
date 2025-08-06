@@ -53,6 +53,8 @@ serve(async (req) => {
   }
 
   try {
+    const { sinceUid } = await req.json();
+
     const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
     if (missingEnv.length > 0) {
@@ -106,7 +108,9 @@ serve(async (req) => {
     try {
         await client.mailboxOpen('INBOX');
         
-        for await (const msg of client.fetch('1:*', { source: true })) {
+        const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { all: true };
+
+        for await (const msg of client.fetch(fetchCriteria, { source: true })) {
             const mail = await simpleParser(msg.source);
             emails.push({
                 uid: msg.uid,
@@ -122,8 +126,6 @@ serve(async (req) => {
     } finally {
         await client.logout();
     }
-
-    emails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return new Response(JSON.stringify({ emails }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

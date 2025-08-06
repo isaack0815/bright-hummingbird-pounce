@@ -58,6 +58,7 @@
     "embla-carousel-react": "^8.3.0",
     "emoji-picker-react": "^4.13.2",
     "express": "^4.19.2",
+    "idb": "^8.0.3",
     "imap-simple": "^5.1.0",
     "input-otp": "^1.2.4",
     "jspdf": "^2.5.1",
