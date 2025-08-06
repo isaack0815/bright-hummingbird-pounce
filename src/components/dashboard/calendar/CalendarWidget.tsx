@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Card, Button, Spinner, ListGroup, Row, Col } from 'react-bootstrap';
-import { PlusCircle, ChevronLeft, ChevronRight, Trash2, Users, Cake } from 'lucide-react';
+import { Card, Button, Spinner, Row, Col } from 'react-bootstrap';
+import { PlusCircle, ChevronLeft, ChevronRight, Trash2, Users, Cake, Edit } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { DayPicker } from 'react-day-picker';
@@ -8,6 +8,7 @@ import 'react-day-picker/dist/style.css';
 import { de } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { AddEventDialog } from './AddEventDialog';
+import { EditEventDialog } from './EditEventDialog';
 import type { CalendarEvent, Birthday } from '@/types/calendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
@@ -20,7 +21,7 @@ const fetchCalendarData = async (month: number, year: number): Promise<{ events:
   return data;
 };
 
-const DayDetails = ({ date, data, onDelete }: { date: Date, data?: { events: CalendarEvent[], birthdays: Birthday[] }, onDelete: (id: number) => void }) => {
+const DayDetails = ({ date, data, onDelete, onEdit }: { date: Date, data?: { events: CalendarEvent[], birthdays: Birthday[] }, onDelete: (id: number) => void, onEdit: (event: CalendarEvent) => void }) => {
   const { user } = useAuth();
   return (
     <div className="ps-3 border-start h-100">
@@ -37,7 +38,10 @@ const DayDetails = ({ date, data, onDelete }: { date: Date, data?: { events: Cal
               <div className="d-flex justify-content-between align-items-start">
                 <p className="fw-bold small mb-0">{event.title}</p>
                 {event.created_by === user?.id && (
-                  <Button variant="ghost" size="sm" className="p-0 text-danger" onClick={() => onDelete(event.id)}><Trash2 size={14} /></Button>
+                  <div className="d-flex">
+                    <Button variant="ghost" size="sm" className="p-0" onClick={() => onEdit(event)}><Edit size={14} /></Button>
+                    <Button variant="ghost" size="sm" className="p-0 text-danger" onClick={() => onDelete(event.id)}><Trash2 size={14} /></Button>
+                  </div>
                 )}
               </div>
               <p className="small text-muted mb-1">{format(new Date(event.start_time), 'HH:mm')} Uhr</p>
@@ -60,6 +64,8 @@ export function CalendarWidget() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -93,6 +99,11 @@ export function CalendarWidget() {
     });
     return map;
   }, [data]);
+
+  const handleEditClick = (event: CalendarEvent) => {
+    setEventToEdit(event);
+    setIsEditDialogOpen(true);
+  };
 
   const DayContent = (props: { date: Date }) => {
     const dayData = eventsByDay.get(props.date.getDate());
@@ -153,6 +164,7 @@ export function CalendarWidget() {
                   date={selectedDate} 
                   data={eventsByDay.get(selectedDate.getDate())}
                   onDelete={deleteMutation.mutate}
+                  onEdit={handleEditClick}
                 />
               </Col>
             </Row>
@@ -160,6 +172,7 @@ export function CalendarWidget() {
         </Card.Body>
       </Card>
       <AddEventDialog show={isAddDialogOpen} onHide={() => setIsAddDialogOpen(false)} selectedDate={selectedDate} />
+      <EditEventDialog show={isEditDialogOpen} onHide={() => setIsEditDialogOpen(false)} event={eventToEdit} />
     </>
   );
 }
