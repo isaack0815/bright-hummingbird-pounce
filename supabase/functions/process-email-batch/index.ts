@@ -46,15 +46,17 @@ serve(async (req) => {
 
     const { data: job, error: fetchError } = await supabaseAdmin.from('email_sync_jobs').select().eq('id', jobId).single();
     if (fetchError || !job) throw new Error(`Job not found or fetch error: ${fetchError?.message}`);
-    console.log("[PROCESS-BATCH] Job details fetched:", job);
+    console.log("[PROCESS-BATCH] Job details fetched successfully.");
 
     if (job.status !== 'processing') {
       console.log(`[PROCESS-BATCH] Job status is '${job.status}', not 'processing'. Exiting.`);
       return new Response(JSON.stringify(job), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    console.log("[PROCESS-BATCH] Finding next mailbox to process...");
     const uidsByMailbox: Record<string, number[]> = job.uids_to_process || {};
     const mailboxToProcess = Object.keys(uidsByMailbox).find(key => uidsByMailbox[key].length > 0);
+    console.log(`[PROCESS-BATCH] Next mailbox: ${mailboxToProcess}`);
 
     if (!mailboxToProcess) {
       console.log("[PROCESS-BATCH] No more emails to process. Completing job.");
@@ -62,14 +64,19 @@ serve(async (req) => {
       return new Response(JSON.stringify(updatedJob), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 5; // Reduced batch size
     const uidsForMailbox = uidsByMailbox[mailboxToProcess];
     const batchUids = uidsForMailbox.slice(0, BATCH_SIZE);
     console.log(`[PROCESS-BATCH] Processing mailbox '${mailboxToProcess}' with UIDs: ${batchUids.join(', ')}`);
 
+    console.log("[PROCESS-BATCH] Fetching credentials...");
     const { data: creds } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user.id).single();
     if (!creds) throw new Error("Email account not configured.");
+    console.log("[PROCESS-BATCH] Credentials fetched.");
+
+    console.log("[PROCESS-BATCH] Decrypting password...");
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
+    console.log("[PROCESS-BATCH] Password decrypted.");
     
     const client = new ImapFlow({
         host: Deno.env.get('IMAP_HOST')!,
@@ -81,7 +88,9 @@ serve(async (req) => {
     });
     
     let processedCountInBatch = 0;
+    console.log("[PROCESS-BATCH] Connecting to IMAP...");
     await client.connect();
+    console.log("[PROCESS-BATCH] IMAP connected.");
     try {
         await client.mailboxOpen(mailboxToProcess);
         const messages = client.fetch(batchUids, { source: true, uid: true });
