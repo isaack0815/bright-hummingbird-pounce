@@ -1,9 +1,43 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Helper to convert ArrayBuffer to Base64
+const ab_to_b64 = (ab: ArrayBuffer) => Buffer.from(ab).toString("base64");
+
+// Helper to convert hex string to ArrayBuffer
+const hex_to_ab = (hex: string) => {
+  const typedArray = new Uint8Array(hex.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16)));
+  return typedArray.buffer;
+};
+
+async function encrypt(data: string, key_hex: string): Promise<{ encrypted: string, iv: string }> {
+  const keyBuffer = hex_to_ab(key_hex);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyBuffer,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encodedData = new TextEncoder().encode(data);
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    key,
+    encodedData
+  );
+
+  return {
+    encrypted: ab_to_b64(encrypted),
+    iv: ab_to_b64(iv),
+  };
 }
 
 serve(async (req) => {
@@ -26,12 +60,27 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Alle Felder sind erforderlich' }), { status: 400 })
     }
 
-    const { error } = await supabase.rpc('save_email_credentials', {
-      p_user_id: user.id,
-      p_email_address: email_address,
-      p_imap_username: imap_username,
-      p_imap_password: imap_password,
-    })
+    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
+    if (!encryptionKey || encryptionKey.length !== 64) {
+        throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
+    }
+
+    const { encrypted, iv } = await encrypt(imap_password, encryptionKey);
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { error } = await supabaseAdmin
+      .from('email_accounts')
+      .upsert({
+        user_id: user.id,
+        email_address: email_address,
+        imap_username: imap_username,
+        encrypted_imap_password: encrypted,
+        iv: iv,
+      }, { onConflict: 'user_id' });
 
     if (error) throw error
 
