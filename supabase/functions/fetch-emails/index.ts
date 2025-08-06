@@ -40,9 +40,14 @@ serve(async (req) => {
   try {
     console.log("--- Starting fetch-emails function ---");
 
-    const requiredEnv = ['IMAP_HOST', 'APP_ENCRYPTION_KEY'];
-    if (requiredEnv.some(v => !Deno.env.get(v))) {
-      throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets (IMAP_HOST, APP_ENCRYPTION_KEY).`);
+    const imapHost = Deno.env.get('IMAP_HOST');
+    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
+
+    if (!imapHost) {
+      throw new Error("Server-Konfigurationsfehler: Das Secret 'IMAP_HOST' ist nicht gesetzt oder die Funktion wurde noch nicht neu bereitgestellt.");
+    }
+    if (!encryptionKey || encryptionKey.length !== 64) {
+        throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
     }
 
     const supabase = createClient(
@@ -69,11 +74,7 @@ serve(async (req) => {
       throw new Error("E-Mail-Konto nicht konfiguriert oder Abruffehler.");
     }
     console.log("Step 2: Found IMAP credentials for user:", creds.imap_username);
-
-    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
-    if (!encryptionKey || encryptionKey.length !== 64) {
-        throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
-    }
+    
     console.log("Step 3: Encryption key found.");
 
     let decryptedPassword;
@@ -97,7 +98,7 @@ serve(async (req) => {
     console.log("Step 4: Latest UID in DB is:", sinceUid);
 
     const client = new ImapFlow({
-        host: Deno.env.get('IMAP_HOST')!,
+        host: imapHost,
         port: 993,
         secure: true,
         auth: { user: creds.imap_username, pass: decryptedPassword },
