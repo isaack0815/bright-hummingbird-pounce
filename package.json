@@ -60,6 +60,7 @@
     "express": "^4.19.2",
     "idb": "^8.0.3",
     "imap-simple": "^5.1.0",
+    "imapflow": "^1.0.193",
     "input-otp": "^1.2.4",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
