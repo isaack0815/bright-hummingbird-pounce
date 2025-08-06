@@ -3,6 +3,13 @@ export type EmailAccount = {
   imap_username: string;
 };
 
+export type EmailAttachment = {
+  id: number;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+};
+
 export type Email = {
   id: number;
   user_id: string;
@@ -15,4 +22,5 @@ export type Email = {
   body_html: string | null;
   sent_at: string;
   created_at: string;
+  attachments: EmailAttachment[];
 };

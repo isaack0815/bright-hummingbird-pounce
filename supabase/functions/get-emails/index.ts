@@ -23,10 +23,10 @@ serve(async (req) => {
 
     const { data, error } = await supabase
       .from('emails')
-      .select('*')
+      .select('*, attachments:email_attachments(*)')
       .eq('user_id', user.id)
       .order('sent_at', { ascending: false })
-      .limit(100); // Add a limit for performance
+      .limit(100);
 
     if (error) throw error
 

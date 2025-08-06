@@ -37,21 +37,28 @@ const formatAddress = (addr: { name?: string, mailbox?: string, host?: string } 
     return `${name}<${addr.mailbox}@${addr.host}>`;
 }
 
+async function streamToBuffer(stream: ReadableStream): Promise<Buffer> {
+  const reader = stream.getReader();
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
 serve(async (req) => {
-  console.log("--- [fetch-emails] Function invoked ---");
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 10;
     const imapHost = Deno.env.get('IMAP_HOST');
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
 
-    if (!imapHost || !encryptionKey || encryptionKey.length !== 64) {
-      throw new Error("Server-Konfigurationsfehler: Wichtige Secrets fehlen oder sind ungültig.");
-    }
-    console.log(`[fetch-emails] Step 1: Secrets found.`);
+    if (!imapHost || !encryptionKey) throw new Error("Server configuration error.");
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -60,115 +67,116 @@ serve(async (req) => {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
-    console.log(`[fetch-emails] Step 2: User authenticated.`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { data: creds, error: credsError } = await supabaseAdmin
-      .from('email_accounts')
-      .select('imap_username, encrypted_imap_password, iv')
-      .eq('user_id', user.id)
-      .single();
-      
-    if (credsError || !creds) throw new Error("E-Mail-Konto nicht konfiguriert.");
-    console.log(`[fetch-emails] Step 3: Found IMAP credentials.`);
+    const { data: creds } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user.id).single();
+    if (!creds) throw new Error("Email account not configured.");
 
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
-    console.log("[fetch-emails] Step 4: Password decrypted.");
 
-    const { data: latestEmail } = await supabaseAdmin
-      .from('emails')
-      .select('uid')
-      .eq('user_id', user.id)
-      .order('uid', { ascending: false })
-      .limit(1)
-      .single();
+    const { data: latestEmail } = await supabaseAdmin.from('emails').select('uid').eq('user_id', user.id).order('uid', { ascending: false }).limit(1).single();
     const highestUidInDb = latestEmail?.uid || 0;
-    console.log(`[fetch-emails] Step 5: Highest UID in DB is: ${highestUidInDb}`);
 
-    const client = new ImapFlow({
-        host: imapHost,
-        port: 993,
-        secure: true,
-        auth: { user: creds.imap_username, pass: decryptedPassword },
-        tls: { rejectUnauthorized: false },
-        logger: false
-    });
+    const client = new ImapFlow({ host: imapHost, port: 993, secure: true, auth: { user: creds.imap_username, pass: decryptedPassword }, tls: { rejectUnauthorized: false }, logger: false });
 
-    const emailsToInsert = [];
-    let highestUidOnServer = 0;
     let newEmailsCount = 0;
-    let serverMessageCount = 0;
+    let moreEmailsExist = false;
 
-    console.log("[fetch-emails] Step 6: Connecting to IMAP server...");
     await client.connect();
-    console.log("[fetch-emails] Step 7: IMAP connection successful.");
     try {
-        const mailbox = await client.mailboxOpen('INBOX');
-        console.log("[fetch-emails] Step 8: INBOX opened.");
+      await client.mailboxOpen('INBOX');
+      const newUidList = await client.search({ uid: `${highestUidInDb + 1}:*` });
+      
+      if (newUidList.length > 0) {
+        const uidsToFetch = newUidList.slice(0, BATCH_SIZE);
+        moreEmailsExist = newUidList.length > BATCH_SIZE;
         
-        const serverStatus = await client.status('INBOX', {messages: true});
-        serverMessageCount = serverStatus.messages || 0;
-        
-        highestUidOnServer = mailbox.uidNext > 1 ? mailbox.uidNext - 1 : 0;
-        console.log(`[fetch-emails] Step 9: Highest UID on server is ${highestUidOnServer}. Total messages on server: ${serverMessageCount}`);
+        for await (const msg of client.fetch(uidsToFetch, { envelope: true, bodyStructure: true })) {
+          let textBody = '';
+          let htmlBody = '';
+          const attachmentsToProcess = [];
 
-        if (highestUidOnServer > highestUidInDb) {
-            // Fetch newest emails first
-            const endUid = highestUidOnServer;
-            const startUid = Math.max(highestUidInDb + 1, endUid - BATCH_SIZE + 1);
-            const fetchCriteria = { uid: `${startUid}:${endUid}` };
-            
-            const fetchOptions = { 
-                envelope: true, 
-                body: ['TEXT']
-            };
-            console.log(`[fetch-emails] Step 10: Fetching batch with criteria: ${JSON.stringify(fetchCriteria)}`);
-
-            for await (const msg of client.fetch(fetchCriteria, fetchOptions)) {
-                const envelope = msg.envelope;
-                const bodyText = msg.body.get('TEXT')?.toString();
-
-                emailsToInsert.push({
-                    user_id: user.id, 
-                    uid: msg.uid, 
-                    mailbox: 'INBOX',
-                    from_address: formatAddress(envelope.from?.[0]),
-                    to_address: formatAddress(envelope.to?.[0]),
-                    subject: envelope.subject || null, 
-                    sent_at: envelope.date || null,
-                    body_text: bodyText || null, 
-                    body_html: null,
-                });
+          const processPart = async (part: any, partID: string) => {
+            if (part.disposition === 'attachment' && part.dispositionParameters?.filename) {
+              attachmentsToProcess.push({ part, partID, filename: part.dispositionParameters.filename });
+            } else if (part.type === 'text/plain' && !part.disposition) {
+              const contentStream = await client.download(msg.uid, partID);
+              if (contentStream) textBody = new TextDecoder().decode(await streamToBuffer(contentStream.content));
+            } else if (part.type === 'text/html' && !part.disposition) {
+              const contentStream = await client.download(msg.uid, partID);
+              if (contentStream) htmlBody = new TextDecoder().decode(await streamToBuffer(contentStream.content));
             }
-            console.log(`[fetch-emails] Step 11: Finished fetch loop. Found ${emailsToInsert.length} new emails.`);
-        } else {
-            console.log("[fetch-emails] Step 10: No new emails found on server.");
+          };
+
+          const walkParts = async (parts: any[], prefix = '') => {
+            for (const [i, part] of parts.entries()) {
+              const partID = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
+              if (part.childNodes) {
+                await walkParts(part.childNodes, partID);
+              } else {
+                await processPart(part, partID);
+              }
+            }
+          };
+
+          if (msg.bodyStructure.childNodes) {
+            await walkParts(msg.bodyStructure.childNodes);
+          } else {
+            await processPart(msg.bodyStructure, '1');
+          }
+
+          const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin
+            .from('emails')
+            .insert({
+              user_id: user.id,
+              uid: msg.uid,
+              mailbox: 'INBOX',
+              from_address: formatAddress(msg.envelope.from?.[0]),
+              to_address: formatAddress(msg.envelope.to?.[0]),
+              subject: msg.envelope.subject || null,
+              sent_at: msg.envelope.date || null,
+              body_text: textBody,
+              body_html: htmlBody || null,
+            })
+            .select('id')
+            .single();
+
+          if (insertEmailError) throw insertEmailError;
+
+          for (const attachment of attachmentsToProcess) {
+            const contentStream = await client.download(msg.uid, attachment.partID);
+            if (contentStream) {
+              const buffer = await streamToBuffer(contentStream.content);
+              const filePath = `${user.id}/${msg.uid}/${attachment.filename}`;
+              
+              const { error: uploadError } = await supabaseAdmin.storage
+                .from('email-attachments')
+                .upload(filePath, buffer, { contentType: attachment.part.type, upsert: true });
+
+              if (uploadError) {
+                console.error(`Failed to upload attachment: ${attachment.filename}`, uploadError);
+                continue;
+              }
+
+              await supabaseAdmin.from('email_attachments').insert({
+                email_id: insertedEmail.id,
+                file_name: attachment.filename,
+                file_path: filePath,
+                file_type: attachment.part.type,
+              });
+            }
+          }
+          newEmailsCount++;
         }
+      }
     } finally {
-        await client.logout();
-        console.log("[fetch-emails] Step 13: IMAP client logged out.");
+      await client.logout();
     }
 
-    if (emailsToInsert.length > 0) {
-        console.log(`[fetch-emails] Step 12: Inserting ${emailsToInsert.length} new emails into database...`);
-        const { error: insertError } = await supabaseAdmin.from('emails').insert(emailsToInsert);
-        if (insertError) throw insertError;
-        newEmailsCount = emailsToInsert.length;
-        console.log("[fetch-emails] Step 12.1: Insert successful.");
-    }
-
-    const { count: dbMessageCount } = await supabaseAdmin
-      .from('emails')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    const moreEmailsExist = (dbMessageCount || 0) < serverMessageCount;
-
-    console.log(`--- [fetch-emails] Function finished successfully. DB count: ${dbMessageCount}, Server count: ${serverMessageCount}, More exist: ${moreEmailsExist} ---`);
     return new Response(JSON.stringify({ newEmails: newEmailsCount, moreEmailsExist }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
