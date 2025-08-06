@@ -12,6 +12,7 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Create a client with user's auth token to get user
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -25,32 +26,51 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Event ID, title and start time are required' }), { status: 400 });
     }
 
-    // Update the event details
-    const { error: updateError } = await supabase
+    // 2. Create an admin client to perform operations, bypassing RLS after manual checks
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // 3. Manually verify that the user is the creator of the event before proceeding
+    const { data: event, error: fetchError } = await supabaseAdmin
+      .from('calendar_events')
+      .select('created_by')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (event.created_by !== user.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden: You are not the creator of this event.' }), { status: 403 });
+    }
+
+    // 4. Update the event details using the admin client
+    const { error: updateError } = await supabaseAdmin
       .from('calendar_events')
       .update({ title, description, start_time, end_time })
-      .eq('id', id)
-      .eq('created_by', user.id); // RLS also protects this, but it's good practice
+      .eq('id', id);
     if (updateError) throw updateError;
 
-    // Delete existing attendees
-    const { error: deleteError } = await supabase
+    // 5. Delete existing attendees using the admin client
+    const { error: deleteError } = await supabaseAdmin
       .from('calendar_event_attendees')
       .delete()
       .eq('event_id', id);
     if (deleteError) throw deleteError;
 
-    // Add new attendees, ensuring creator is always included
+    // 6. Add new attendees, ensuring creator is always included
     const allAttendees = [...new Set([...(attendee_ids || []), user.id])];
-    const attendeesToInsert = allAttendees.map(userId => ({
-      event_id: id,
-      user_id: userId,
-    }));
+    if (allAttendees.length > 0) {
+      const attendeesToInsert = allAttendees.map(userId => ({
+        event_id: id,
+        user_id: userId,
+      }));
 
-    const { error: insertError } = await supabase
-      .from('calendar_event_attendees')
-      .insert(attendeesToInsert);
-    if (insertError) throw insertError;
+      const { error: insertError } = await supabaseAdmin
+        .from('calendar_event_attendees')
+        .insert(attendeesToInsert);
+      if (insertError) throw insertError;
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
