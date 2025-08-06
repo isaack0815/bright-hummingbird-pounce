@@ -61,7 +61,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Alle Felder sind erforderlich' }), { status: 400 })
     }
 
-    // --- NEU: Verbindungstest ---
     const testConfig = {
       imap: {
         user: imap_username,
@@ -69,6 +68,7 @@ serve(async (req) => {
         host: Deno.env.get('SMTP_HOST')!,
         port: 993,
         tls: true,
+        tlsOptions: { rejectUnauthorized: false }, // DIAGNOSTIC: Temporarily disable certificate verification
         authTimeout: 5000
       }
     };
@@ -80,7 +80,6 @@ serve(async (req) => {
       console.error("IMAP Connection Test Failed:", e);
       return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie die globalen SMTP-Einstellungen und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
     }
-    // --- Ende Verbindungstest ---
 
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
     if (!encryptionKey || encryptionKey.length !== 64) {

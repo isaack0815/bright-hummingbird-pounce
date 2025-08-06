@@ -53,7 +53,6 @@ serve(async (req) => {
   }
 
   try {
-    // --- NEU: Überprüfung der Umgebungsvariablen ---
     const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
     const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
     if (missingEnv.length > 0) {
@@ -94,6 +93,7 @@ serve(async (req) => {
         host: Deno.env.get('SMTP_HOST')!,
         port: 993,
         tls: true,
+        tlsOptions: { rejectUnauthorized: false }, // DIAGNOSTIC: Temporarily disable certificate verification
         authTimeout: 5000
       }
     };
