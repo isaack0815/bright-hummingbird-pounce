@@ -41,15 +41,15 @@ serve(async (req) => {
         secure: true,
         auth: { user: creds.imap_username, pass: decryptedPassword },
         tls: { rejectUnauthorized: false },
-        logger: false // Disable ImapFlow's internal logger
+        logger: false
     });
 
     let allNewUids: number[] = [];
     await client.connect();
     try {
         await client.mailboxOpen('INBOX');
-        const messages = await client.search({ uid: `${highestUidInDb + 1}:*` });
-        allNewUids = messages.map(m => m.uid);
+        // CORRECTED: The result of search is already the array of UIDs. No .map() needed.
+        allNewUids = await client.search({ uid: `${highestUidInDb + 1}:*` });
     } finally {
         await client.logout();
     }
