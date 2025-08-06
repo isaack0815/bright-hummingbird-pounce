@@ -29,48 +29,47 @@ async function streamToBuffer(stream: ReadableStream): Promise<Buffer> {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  console.log("[PROCESS-EMAIL-BATCH] Function invoked.");
+  console.log("[PROCESS-BATCH] Function invoked.");
 
   let jobId: number | null = null;
   try {
     const body = await req.json();
     jobId = body.jobId;
-    console.log(`[PROCESS-EMAIL-BATCH] Received request for Job ID: ${jobId}`);
     if (!jobId) throw new Error("Job ID is required.");
+    console.log(`[PROCESS-BATCH] Received request for Job ID: ${jobId}`);
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: req.headers.get('Authorization')! } } });
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not found");
-    console.log(`[PROCESS-EMAIL-BATCH] Authenticated user: ${user.id}`);
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    console.log(`[PROCESS-EMAIL-BATCH] Fetching job details for job ${jobId}...`);
     const { data: job, error: fetchError } = await supabaseAdmin.from('email_sync_jobs').select().eq('id', jobId).single();
     if (fetchError || !job) throw new Error(`Job not found or fetch error: ${fetchError?.message}`);
-    console.log("[PROCESS-EMAIL-BATCH] Job details fetched:", job);
+    console.log("[PROCESS-BATCH] Job details fetched:", job);
 
     if (job.status !== 'processing') {
-      console.log(`[PROCESS-EMAIL-BATCH] Job status is '${job.status}', not 'processing'. Exiting.`);
+      console.log(`[PROCESS-BATCH] Job status is '${job.status}', not 'processing'. Exiting.`);
       return new Response(JSON.stringify(job), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const BATCH_SIZE = 10;
-    let uids_to_process: number[] = job.uids_to_process || [];
-    const batchUids = uids_to_process.slice(0, BATCH_SIZE);
-    let uidsToSearch = [...batchUids];
-    console.log(`[PROCESS-EMAIL-BATCH] UIDs to process in this batch: ${uidsToSearch.join(', ')}`);
+    const uidsByMailbox: Record<string, number[]> = job.uids_to_process || {};
+    const mailboxToProcess = Object.keys(uidsByMailbox).find(key => uidsByMailbox[key].length > 0);
 
-    if (uidsToSearch.length === 0) {
-        console.log("[PROCESS-EMAIL-BATCH] No UIDs in batch. Completing job.");
-        const { data: updatedJob } = await supabaseAdmin.from('email_sync_jobs').update({ status: 'completed' }).eq('id', jobId).select().single();
-        return new Response(JSON.stringify(updatedJob), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (!mailboxToProcess) {
+      console.log("[PROCESS-BATCH] No more emails to process. Completing job.");
+      const { data: updatedJob } = await supabaseAdmin.from('email_sync_jobs').update({ status: 'completed', uids_to_process: {} }).eq('id', jobId).select().single();
+      return new Response(JSON.stringify(updatedJob), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log("[PROCESS-EMAIL-BATCH] Fetching email account credentials...");
+    const BATCH_SIZE = 10;
+    const uidsForMailbox = uidsByMailbox[mailboxToProcess];
+    const batchUids = uidsForMailbox.slice(0, BATCH_SIZE);
+    console.log(`[PROCESS-BATCH] Processing mailbox '${mailboxToProcess}' with UIDs: ${batchUids.join(', ')}`);
+
     const { data: creds } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user.id).single();
     if (!creds) throw new Error("Email account not configured.");
-    const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
+    const decryptedPassword = await decrypt(creds.encrypted_imappassword, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
     
     const client = new ImapFlow({
         host: Deno.env.get('IMAP_HOST')!,
@@ -82,94 +81,63 @@ serve(async (req) => {
     });
     
     let processedCountInBatch = 0;
-    console.log("[PROCESS-EMAIL-BATCH] Connecting to IMAP server...");
     await client.connect();
-    console.log("[PROCESS-EMAIL-BATCH] IMAP client connected.");
     try {
-        const mailboxes = await client.list();
-        console.log(`[PROCESS-EMAIL-BATCH] Found ${mailboxes.length} mailboxes to scan.`);
+        await client.mailboxOpen(mailboxToProcess);
+        const messages = client.fetch(batchUids, { source: true, uid: true });
+        
+        for await (const msg of messages) {
+            if (!msg.source) continue;
 
-        for (const mailbox of mailboxes) {
-            if (uidsToSearch.length === 0) {
-                console.log("[PROCESS-EMAIL-BATCH] All UIDs for this batch found. Stopping mailbox scan.");
-                break;
-            }
-            // Skip folders that cannot contain messages
-            if (mailbox.flags.has('\\Noselect')) {
-                console.log(`[PROCESS-EMAIL-BATCH] Skipping non-selectable mailbox: ${mailbox.path}`);
+            const source = await streamToBuffer(msg.source);
+            const parsed = await simpleParser(source);
+
+            const emailData = { user_id: user.id, uid: msg.uid, mailbox: mailboxToProcess, from_address: formatAddress(parsed.from), to_address: formatAddress(parsed.to), subject: parsed.subject, sent_at: parsed.date, body_text: parsed.text, body_html: parsed.html };
+            const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin.from('emails').insert(emailData).select('id').single();
+            
+            if (insertEmailError) {
+                console.error(`[PROCESS-BATCH] Failed to insert email UID ${msg.uid}:`, insertEmailError);
                 continue;
             }
 
-            console.log(`[PROCESS-EMAIL-BATCH] Opening mailbox: ${mailbox.path}`);
-            await client.mailboxOpen(mailbox.path);
-            
-            console.log(`[PROCESS-EMAIL-BATCH] In ${mailbox.path}, searching for UIDs: ${uidsToSearch.join(', ')}`);
-            const messages = client.fetch(uidsToSearch, { source: true, uid: true });
-            
-            for await (const msg of messages) {
-                console.log(`[PROCESS-EMAIL-BATCH] Found and processing UID: ${msg.uid} in mailbox ${mailbox.path}`);
-                if (!msg.source) {
-                    console.log(`[PROCESS-EMAIL-BATCH] No source for UID ${msg.uid}, skipping.`);
-                    continue;
+            if (parsed.attachments && parsed.attachments.length > 0) {
+                for (const attachment of parsed.attachments) {
+                    if (typeof attachment.content === 'string' || !attachment.filename) continue;
+                    const filePath = `${user.id}/${msg.uid}/${attachment.filename}`;
+                    await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
+                    await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
                 }
-
-                const source = await streamToBuffer(msg.source);
-                const parsed = await simpleParser(source);
-                console.log(`[PROCESS-EMAIL-BATCH] Parsed email from UID ${msg.uid}. Subject: ${parsed.subject}`);
-
-                const emailData = { user_id: user.id, uid: msg.uid, mailbox: mailbox.path, from_address: formatAddress(parsed.from), to_address: formatAddress(parsed.to), subject: parsed.subject, sent_at: parsed.date, body_text: parsed.text, body_html: parsed.html };
-                const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin.from('emails').insert(emailData).select('id').single();
-                
-                if (insertEmailError) {
-                    console.error(`[PROCESS-EMAIL-BATCH] Failed to insert email with UID ${msg.uid}:`, insertEmailError);
-                    continue;
-                }
-                console.log(`[PROCESS-EMAIL-BATCH] Successfully inserted email for UID ${msg.uid}. New email ID: ${insertedEmail.id}`);
-
-                if (parsed.attachments && parsed.attachments.length > 0) {
-                    for (const attachment of parsed.attachments) {
-                        if (typeof attachment.content === 'string' || !attachment.filename) continue;
-                        const filePath = `${user.id}/${msg.uid}/${attachment.filename}`;
-                        const { error: uploadError } = await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
-                        if (uploadError) {
-                            console.error(`[PROCESS-EMAIL-BATCH] Failed to upload attachment ${attachment.filename}:`, uploadError);
-                            continue;
-                        }
-                        await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
-                    }
-                }
-                
-                // Remove the found UID from the search list and increment count
-                uidsToSearch = uidsToSearch.filter(uid => uid !== msg.uid);
-                processedCountInBatch++;
             }
+            processedCountInBatch++;
         }
     } finally {
-        console.log("[PROCESS-EMAIL-BATCH] Logging out from IMAP server...");
         await client.logout();
-        console.log("[PROCESS-EMAIL-BATCH] IMAP logout successful.");
     }
 
-    const remainingUids = uids_to_process.slice(processedCountInBatch);
+    // Update the job state
+    const remainingUidsInMailbox = uidsForMailbox.slice(processedCountInBatch);
+    if (remainingUidsInMailbox.length === 0) {
+        delete uidsByMailbox[mailboxToProcess];
+    } else {
+        uidsByMailbox[mailboxToProcess] = remainingUidsInMailbox;
+    }
+
     const newProcessedCount = job.processed_count + processedCountInBatch;
-    const newStatus = remainingUids.length === 0 ? 'completed' : 'processing';
+    const newStatus = Object.keys(uidsByMailbox).length === 0 ? 'completed' : 'processing';
     
-    const updatePayload = { uids_to_process: remainingUids, processed_count: newProcessedCount, status: newStatus };
-    console.log("[PROCESS-EMAIL-BATCH] Updating job with payload:", updatePayload);
+    const updatePayload = { uids_to_process: uidsByMailbox, processed_count: newProcessedCount, status: newStatus };
+    console.log("[PROCESS-BATCH] Updating job with payload:", updatePayload);
 
     const { data: updatedJob, error: updateError } = await supabaseAdmin.from('email_sync_jobs').update(updatePayload).eq('id', jobId).select().single();
     if (updateError) throw updateError;
     
-    console.log("[PROCESS-EMAIL-BATCH] Job updated successfully. Final job state:", updatedJob);
     return new Response(JSON.stringify(updatedJob), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (e) {
-    console.error("[PROCESS-EMAIL-BATCH] CATASTROPHIC ERROR:", e);
+    console.error("[PROCESS-BATCH] CATASTROPHIC ERROR:", e);
     if (jobId) {
-        console.log(`[PROCESS-EMAIL-BATCH] Attempting to mark job ${jobId} as failed.`);
         const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
         await supabaseAdmin.from('email_sync_jobs').update({ status: 'failed', error_message: e.message }).eq('id', jobId);
-        console.log(`[PROCESS-EMAIL-BATCH] Job ${jobId} marked as failed.`);
     }
     return new Response(JSON.stringify({ error: e.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
   }
