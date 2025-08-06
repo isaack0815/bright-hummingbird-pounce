@@ -70,9 +70,20 @@ serve(async (req) => {
     }
     console.log("Step 2: Found IMAP credentials for user:", creds.imap_username);
 
-    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY')!;
-    const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
-    console.log("Step 3: Password decrypted successfully.");
+    const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
+    if (!encryptionKey || encryptionKey.length !== 64) {
+        throw new Error("APP_ENCRYPTION_KEY secret is not set or is not a 64-character hex string (32 bytes).");
+    }
+    console.log("Step 3: Encryption key found.");
+
+    let decryptedPassword;
+    try {
+        decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
+        console.log("Step 3.1: Password decrypted successfully.");
+    } catch (decryptionError) {
+        console.error("DECRYPTION FAILED:", decryptionError);
+        throw new Error("Could not decrypt password. The encryption key may have changed or the data is corrupt.");
+    }
 
     const { data: latestEmail, error: latestEmailError } = await supabaseAdmin
       .from('emails')
@@ -91,7 +102,7 @@ serve(async (req) => {
         secure: true,
         auth: { user: creds.imap_username, pass: decryptedPassword },
         tls: { rejectUnauthorized: false },
-        logger: false // Disabled verbose logging for production
+        logger: false
     });
 
     const emailsToInsert = [];
