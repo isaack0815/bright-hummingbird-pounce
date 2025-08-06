@@ -48,8 +48,7 @@ serve(async (req) => {
     await client.connect();
     try {
         await client.mailboxOpen('INBOX');
-        // Use client.search which directly returns an array of numbers (UIDs).
-        // This is the most direct and correct way.
+        // CORRECTED: The result of search is already the array of UIDs. No .map() needed.
         allNewUids = await client.search({ uid: `${highestUidInDb + 1}:*` });
     } finally {
         await client.logout();
