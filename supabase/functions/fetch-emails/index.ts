@@ -114,9 +114,14 @@ serve(async (req) => {
     try {
         await client.mailboxOpen('INBOX');
         console.log("[fetch-emails] Step 8: INBOX opened.");
-        const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { all: true };
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { since: thirtyDaysAgo };
         console.log(`[fetch-emails] Step 9: Fetching emails with criteria: ${JSON.stringify(fetchCriteria)}`);
         
+        console.log("[fetch-emails] Step 9.1: Entering fetch loop...");
         for await (const msg of client.fetch(fetchCriteria, { source: true })) {
             console.log(`  - Processing message with UID: ${msg.uid}`);
             const mail = await simpleParser(msg.source);
@@ -132,7 +137,7 @@ serve(async (req) => {
                 body_html: mail.html || null,
             });
         }
-        console.log(`[fetch-emails] Step 10: Found ${emailsToInsert.length} new emails to insert.`);
+        console.log(`[fetch-emails] Step 10: Finished fetch loop. Found ${emailsToInsert.length} new emails to insert.`);
     } finally {
         await client.logout();
         console.log("[fetch-emails] Step 12: IMAP client logged out.");
