@@ -12,16 +12,42 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authorization check to ensure the request is from a trusted source (pg_cron)
+  // Authorization check
   const authHeader = req.headers.get('Authorization');
   const cronSecret = Deno.env.get('CRON_SECRET');
+  let isAuthorized = false;
 
-  if (!cronSecret) {
-    console.error("[CRON-SYNC] CRON_SECRET is not set in environment variables.");
-    return new Response(JSON.stringify({ error: 'Internal Server Configuration Error' }), { status: 500 });
+  // 1. Check for Cron Secret
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    isAuthorized = true;
+    console.log("[CRON-SYNC] Authorized via CRON_SECRET.");
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  // 2. If not authorized by secret, check for admin user permissions
+  if (!isAuthorized && authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const userClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
+      if (permError) {
+        console.error("[CRON-SYNC] Error checking permissions:", permError.message);
+      } else if (permissions) {
+        const permissionNames = permissions.map((p: any) => p.permission_name);
+        // Using a combination of permissions that indicates a super admin
+        if (permissionNames.includes('roles.manage') && permissionNames.includes('users.manage')) {
+          isAuthorized = true;
+          console.log("[CRON-SYNC] Authorized via admin user permissions.");
+        }
+      }
+    } catch (e) {
+      console.error("[CRON-SYNC] Error during user permission check:", e.message);
+    }
+  }
+
+  if (!isAuthorized) {
     console.warn("[CRON-SYNC] Unauthorized access attempt.");
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }

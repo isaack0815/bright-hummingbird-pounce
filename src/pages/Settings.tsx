@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Terminal, Wifi, CheckCircle2, XCircle } from "lucide-react";
+import { Terminal, Wifi, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import type { Setting } from "@/types/settings";
 import type { VehicleGroup } from "@/types/vehicle";
 
@@ -142,6 +142,20 @@ const Settings = () => {
     },
   });
 
+  const syncAllEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('cron-sync-emails');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      showSuccess(data.message || "E-Mail-Synchronisation für alle Konten wurde erfolgreich angestoßen.");
+    },
+    onError: (err: any) => {
+      showError(err.message || "Fehler beim Anstoßen der E-Mail-Synchronisation.");
+    },
+  });
+
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateSettingsMutation.mutate(values);
   };
@@ -244,7 +258,7 @@ const Settings = () => {
                 )}
               </Card.Body>
             </Card>
-            <Card>
+            <Card className="mb-4">
               <Card.Header>
                 <Card.Title>E-Mail Konfiguration</Card.Title>
                 <Card.Text className="text-muted">Allgemeine Einstellungen für den E-Mail-Versand.</Card.Text>
@@ -306,6 +320,27 @@ const Settings = () => {
                     <Form.Group><Form.Label>Standard-Signatur (HTML)</Form.Label><Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen</p>" className="font-monospace" {...form.register("email_signature")} /></Form.Group>
                   </div>
                 )}
+              </Card.Body>
+            </Card>
+            <Card className="mt-4">
+              <Card.Header>
+                <Card.Title>Manuelle System-Aktionen</Card.Title>
+                <Card.Text className="text-muted">Diese Aktionen werden normalerweise automatisch ausgeführt.</Card.Text>
+              </Card.Header>
+              <Card.Body>
+                <h4 className="h6">E-Mail-Synchronisation</h4>
+                <p className="small text-muted">
+                  Starten Sie manuell die Synchronisation aller konfigurierten E-Mail-Konten. Dies kann einige Minuten dauern.
+                </p>
+                <Button 
+                  type="button" 
+                  variant="outline-secondary" 
+                  onClick={() => syncAllEmailsMutation.mutate()}
+                  disabled={syncAllEmailsMutation.isPending}
+                >
+                  <RefreshCw className="me-2" size={16} />
+                  {syncAllEmailsMutation.isPending ? <><Spinner as="span" size="sm" className="me-2" />Wird synchronisiert...</> : "Alle E-Mails jetzt synchronisieren"}
+                </Button>
               </Card.Body>
             </Card>
           </Tab>
