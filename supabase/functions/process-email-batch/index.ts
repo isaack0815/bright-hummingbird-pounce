@@ -3,16 +3,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import imaps from 'npm:imap-simple';
 import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
+globalThis.Buffer = Buffer;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Decryption logic placeholder
-const b64_to_ab_full = (b64: string) => { const byteString = Buffer.from(b64, "base64").toString("binary"); const len = byteString.length; const bytes = new Uint8Array(len); for (let i = 0; i < len; i++) { bytes[i] = byteString.charCodeAt(i); } return bytes.buffer; };
-const hex_to_ab_full = (hex: string) => { const typedArray = new Uint8Array(hex.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16))); return typedArray.buffer; };
-async function decrypt_full(encryptedData: string, iv_b64: string, key_hex: string): Promise<string> { const keyBuffer = hex_to_ab_full(key_hex); const key = await crypto.subtle.importKey("raw", keyBuffer, { name: "AES-GCM" }, false, ["decrypt"]); const iv = new Uint8Array(b64_to_ab_full(iv_b64)); const data = new Uint8Array(b64_to_ab_full(encryptedData)); const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, data); return new TextDecoder().decode(decrypted); }
+const b64_to_ab = (b64: string) => { const byteString = Buffer.from(b64, "base64").toString("binary"); const len = byteString.length; const bytes = new Uint8Array(len); for (let i = 0; i < len; i++) { bytes[i] = byteString.charCodeAt(i); } return bytes.buffer; };
+const hex_to_ab = (hex: string) => { const typedArray = new Uint8Array(hex.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16))); return typedArray.buffer; };
+async function decrypt(encryptedData: string, iv_b64: string, key_hex: string): Promise<string> { const keyBuffer = hex_to_ab(key_hex); const key = await crypto.subtle.importKey("raw", keyBuffer, { name: "AES-GCM" }, false, ["decrypt"]); const iv = new Uint8Array(b64_to_ab(iv_b64)); const data = new Uint8Array(b64_to_ab(encryptedData)); const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, data); return new TextDecoder().decode(decrypted); }
 const formatAddress = (addr: any): string | null => { if (!addr || !addr.value || addr.value.length === 0) return null; const { name, address } = addr.value[0]; if (!address) return null; return name ? `"${name}" <${address}>` : `<${address}>`; }
 
 serve(async (req) => {
@@ -28,12 +28,10 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // 1. Get the job
     const { data: job, error: fetchError } = await supabaseAdmin.from('email_sync_jobs').select().eq('id', jobId).single();
     if (fetchError || !job) throw new Error("Job not found.");
     if (job.status !== 'processing') return new Response(JSON.stringify({ message: `Job is not in processing state. Current state: ${job.status}` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // 2. Get a batch of UIDs
     const BATCH_SIZE = 10;
     let uids_to_process: number[] = job.uids_to_process || [];
     const batchUids = uids_to_process.slice(0, BATCH_SIZE);
@@ -42,10 +40,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({ message: "Sync completed." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 3. Get credentials and process emails
     const { data: creds } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user.id).single();
     if (!creds) throw new Error("Email account not configured.");
-    const decryptedPassword = await decrypt_full(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
+    const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
     const config = { imap: { user: creds.imap_username, pass: decryptedPassword, host: Deno.env.get('IMAP_HOST')!, port: 993, tls: true, authTimeout: 10000, tlsOptions: { rejectUnauthorized: false } } };
     
     const connection = await imaps.connect(config);
@@ -76,7 +73,6 @@ serve(async (req) => {
         connection.end();
     }
 
-    // 4. Update the job
     const remainingUids = uids_to_process.slice(BATCH_SIZE);
     const newProcessedCount = job.processed_count + processedCountInBatch;
     const newStatus = remainingUids.length === 0 ? 'completed' : 'processing';
