@@ -30,11 +30,15 @@ serve(async (req) => {
     if (!creds) throw new Error("Email account not configured.");
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
 
-    // 2. Get latest UID from DB
-    const { data: latestEmail } = await supabaseAdmin.from('emails').select('uid').eq('user_id', user.id).order('uid', { ascending: false }).limit(1).single();
-    const highestUidInDb = latestEmail?.uid || 0;
+    // 2. Get all UIDs already in our database
+    const { data: existingEmails, error: dbError } = await supabaseAdmin
+      .from('emails')
+      .select('uid')
+      .eq('user_id', user.id);
+    if (dbError) throw dbError;
+    const existingUids = new Set(existingEmails.map(e => e.uid));
 
-    // 3. Connect to IMAP and get list of new UIDs using ImapFlow
+    // 3. Connect to IMAP and get all UIDs from the server
     const client = new ImapFlow({
         host: Deno.env.get('IMAP_HOST')!,
         port: 993,
@@ -44,21 +48,23 @@ serve(async (req) => {
         logger: false
     });
 
-    let allNewUids: number[] = [];
+    let serverUids: number[] = [];
     await client.connect();
     try {
         await client.mailboxOpen('INBOX');
-        // CORRECTED: The result of search is already the array of UIDs. No .map() needed.
-        allNewUids = await client.search({ uid: `${highestUidInDb + 1}:*` });
+        serverUids = await client.search({ all: true });
     } finally {
         await client.logout();
     }
+
+    // 4. Find which UIDs are new
+    const allNewUids = serverUids.filter(uid => !existingUids.has(uid));
 
     if (allNewUids.length === 0) {
         return new Response(JSON.stringify({ message: "No new emails." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 4. Create a new job in the database
+    // 5. Create a new job in the database with the correct UIDs
     const { data: job, error: jobError } = await supabaseAdmin
       .from('email_sync_jobs')
       .insert({
