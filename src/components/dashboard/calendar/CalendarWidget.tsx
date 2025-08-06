@@ -6,9 +6,9 @@ import { supabase } from '@/lib/supabase';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { de } from 'date-fns/locale';
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { AddEventDialog } from './AddEventDialog';
-import type { CalendarEvent, Birthday, DayData } from '@/types/calendar';
+import type { CalendarEvent, Birthday } from '@/types/calendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -59,27 +59,10 @@ export function CalendarWidget() {
     return map;
   }, [data]);
 
-  const DayContent = (props: { date: Date }) => {
-    const dayData = eventsByDay.get(props.date.getDate());
-    const hasEvents = (dayData?.events?.length ?? 0) > 0;
-    const hasBirthdays = (dayData?.birthdays?.length ?? 0) > 0;
-
-    return (
-      <div className="position-relative">
-        {props.date.getDate()}
-        {(hasEvents || hasBirthdays) && (
-          <div className="d-flex position-absolute bottom-0 start-50 translate-middle-x" style={{ gap: '2px' }}>
-            {hasEvents && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--bs-primary)' }} />}
-            {hasBirthdays && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--bs-warning)' }} />}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const DayPopover = ({ dayData }: { dayData: { events: CalendarEvent[], birthdays: Birthday[] } }) => (
-    <Popover id="popover-basic">
+    <Popover id="popover-basic" style={{ maxWidth: '300px' }}>
       <Popover.Body>
+        {dayData.birthdays.length === 0 && dayData.events.length === 0 && <p className="small text-muted mb-0">Keine Einträge für diesen Tag.</p>}
         {dayData.birthdays.map((b, i) => (
           <div key={`b-${i}`} className="d-flex align-items-center small mb-2"><Cake size={14} className="me-2 text-warning" />{b.name} hat Geburtstag!</div>
         ))}
@@ -92,16 +75,50 @@ export function CalendarWidget() {
               )}
             </div>
             <p className="small text-muted mb-1">{format(new Date(event.start_time), 'HH:mm')} Uhr</p>
-            <p className="small mb-1">{event.description}</p>
-            <div className="d-flex align-items-center small text-muted">
-              <Users size={14} className="me-1" />
-              {event.attendees.map(a => a.profiles?.first_name).join(', ')}
-            </div>
+            {event.description && <p className="small mb-1">{event.description}</p>}
+            {event.attendees.length > 0 && (
+              <div className="d-flex align-items-center small text-muted">
+                <Users size={14} className="me-1" />
+                {event.attendees.map(a => a.profiles?.first_name).join(', ')}
+              </div>
+            )}
           </div>
         ))}
       </Popover.Body>
     </Popover>
   );
+
+  const DayContent = (props: { date: Date }) => {
+    const dayData = eventsByDay.get(props.date.getDate());
+    const hasEvents = (dayData?.events?.length ?? 0) > 0;
+    const hasBirthdays = (dayData?.birthdays?.length ?? 0) > 0;
+
+    const content = (
+      <div className="position-relative">
+        {props.date.getDate()}
+        {(hasEvents || hasBirthdays) && (
+          <div className="d-flex position-absolute bottom-0 start-50 translate-middle-x" style={{ gap: '2px' }}>
+            {hasEvents && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--bs-primary)' }} />}
+            {hasBirthdays && <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--bs-warning)' }} />}
+          </div>
+        )}
+      </div>
+    );
+
+    if (hasEvents || hasBirthdays) {
+      return (
+        <OverlayTrigger
+          trigger={['hover', 'focus']}
+          placement="top"
+          overlay={<DayPopover dayData={dayData!} />}
+        >
+          {content}
+        </OverlayTrigger>
+      );
+    }
+
+    return content;
+  };
 
   return (
     <>
