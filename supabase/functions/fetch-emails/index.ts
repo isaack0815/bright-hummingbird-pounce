@@ -106,19 +106,18 @@ serve(async (req) => {
     await client.connect();
     console.log("[fetch-emails] Step 7: IMAP connection successful.");
     try {
-        await client.mailboxOpen('INBOX');
+        const mailbox = await client.mailboxOpen('INBOX');
         console.log("[fetch-emails] Step 8: INBOX opened.");
         
-        const latestMessage = await client.fetchOne('*', { uid: true });
-        highestUidOnServer = latestMessage?.uid || 0;
-        console.log(`[fetch-emails] Step 9: Highest UID on server is ${highestUidOnServer}`);
+        // RELIABLE WAY to get highest UID
+        highestUidOnServer = mailbox.uidNext - 1;
+        console.log(`[fetch-emails] Step 9: Highest UID on server is reliably determined as ${highestUidOnServer} (from uidNext: ${mailbox.uidNext})`);
 
         if (highestUidOnServer > sinceUid) {
             const startUid = sinceUid + 1;
             const endUid = Math.min(startUid + BATCH_SIZE - 1, highestUidOnServer);
             const fetchCriteria = { uid: `${startUid}:${endUid}` };
             
-            // New fetch options: only get envelope (headers) and text body
             const fetchOptions = { 
                 envelope: true, 
                 body: ['TEXT']
@@ -138,12 +137,12 @@ serve(async (req) => {
                     subject: envelope.subject || null, 
                     sent_at: envelope.date || null,
                     body_text: bodyText || null, 
-                    body_html: null, // Explicitly set to null as we are not fetching it
+                    body_html: null,
                 });
             }
             console.log(`[fetch-emails] Step 11: Finished fetch loop. Found ${emailsToInsert.length} new emails.`);
         } else {
-            console.log("[fetch-emails] Step 10: No new emails found on server.");
+            console.log("[fetch-emails] Step 10: No new emails found on server (highest on server is not greater than highest in DB).");
         }
     } finally {
         await client.logout();
