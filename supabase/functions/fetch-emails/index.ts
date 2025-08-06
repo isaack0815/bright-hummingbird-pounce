@@ -9,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to convert Base64 to ArrayBuffer
+// Decryption helpers (unchanged)
 const b64_to_ab = (b64: string) => {
   const byteString = Buffer.from(b64, "base64").toString("binary");
   const len = byteString.length;
@@ -19,31 +19,16 @@ const b64_to_ab = (b64: string) => {
   }
   return bytes.buffer;
 };
-
-// Helper to convert hex string to ArrayBuffer
 const hex_to_ab = (hex: string) => {
   const typedArray = new Uint8Array(hex.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16)));
   return typedArray.buffer;
 };
-
 async function decrypt(encryptedData: string, iv_b64: string, key_hex: string): Promise<string> {
   const keyBuffer = hex_to_ab(key_hex);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyBuffer,
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
+  const key = await crypto.subtle.importKey("raw", keyBuffer, { name: "AES-GCM" }, false, ["decrypt"]);
   const iv = new Uint8Array(b64_to_ab(iv_b64));
   const data = new Uint8Array(b64_to_ab(encryptedData));
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: iv },
-    key,
-    data
-  );
-
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, data);
   return new TextDecoder().decode(decrypted);
 }
 
@@ -53,12 +38,9 @@ serve(async (req) => {
   }
 
   try {
-    const { sinceUid } = await req.json();
-
     const requiredEnv = ['SMTP_HOST', 'APP_ENCRYPTION_KEY'];
-    const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
-    if (missingEnv.length > 0) {
-      throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets: ${missingEnv.join(', ')}`);
+    if (requiredEnv.some(v => !Deno.env.get(v))) {
+      throw new Error(`Server-Konfigurationsfehler: Fehlende Secrets.`);
     }
 
     const supabase = createClient(
@@ -66,7 +48,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
 
@@ -88,46 +69,55 @@ serve(async (req) => {
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY')!;
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, encryptionKey);
 
+    // Get the latest UID from our database
+    const { data: latestEmail, error: latestEmailError } = await supabaseAdmin
+      .from('emails')
+      .select('uid')
+      .eq('user_id', user.id)
+      .order('uid', { ascending: false })
+      .limit(1)
+      .single();
+    if (latestEmailError && latestEmailError.code !== 'PGRST116') throw latestEmailError;
+    const sinceUid = latestEmail?.uid;
+
     const client = new ImapFlow({
         host: Deno.env.get('SMTP_HOST')!,
         port: 993,
         secure: true,
-        auth: {
-            user: creds.imap_username,
-            pass: decryptedPassword,
-        },
-        tls: {
-            rejectUnauthorized: false
-        },
+        auth: { user: creds.imap_username, pass: decryptedPassword },
+        tls: { rejectUnauthorized: false },
         logger: false
     });
 
-    const emails = [];
+    const emailsToInsert = [];
     await client.connect();
-
     try {
         await client.mailboxOpen('INBOX');
-        
         const fetchCriteria = sinceUid ? { uid: `${sinceUid + 1}:*` } : { all: true };
-
         for await (const msg of client.fetch(fetchCriteria, { source: true })) {
             const mail = await simpleParser(msg.source);
-            emails.push({
+            emailsToInsert.push({
+                user_id: user.id,
                 uid: msg.uid,
-                from: mail.from?.text,
-                to: mail.to?.text,
+                mailbox: 'INBOX',
+                from_address: mail.from?.text,
+                to_address: mail.to?.text,
                 subject: mail.subject,
-                date: mail.date,
-                text: mail.text,
-                html: mail.html,
-                attachments: mail.attachments,
+                sent_at: mail.date,
+                body_text: mail.text,
+                body_html: mail.html || null,
             });
         }
     } finally {
         await client.logout();
     }
 
-    return new Response(JSON.stringify({ emails }), {
+    if (emailsToInsert.length > 0) {
+        const { error: insertError } = await supabaseAdmin.from('emails').insert(emailsToInsert);
+        if (insertError) throw insertError;
+    }
+
+    return new Response(JSON.stringify({ newEmails: emailsToInsert.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

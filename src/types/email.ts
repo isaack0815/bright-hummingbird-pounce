@@ -4,12 +4,15 @@ export type EmailAccount = {
 };
 
 export type Email = {
+  id: number;
+  user_id: string;
   uid: number;
-  from: string;
-  to: string;
+  mailbox: string;
+  from_address: string;
+  to_address: string;
   subject: string;
-  date: Date;
-  text: string;
-  html: string | false;
-  attachments: any[];
+  body_text: string;
+  body_html: string | null;
+  sent_at: string;
+  created_at: string;
 };
