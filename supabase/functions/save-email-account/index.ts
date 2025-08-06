@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
-import { ImapFlow } from 'npm:imapflow';
+import imaps from 'npm:imap-simple';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,27 +81,26 @@ serve(async (req) => {
     }
     console.log(`[save-email-account] Step 3: IMAP_HOST found: ${imapHost}`);
 
-    // --- Verbindungstest mit imapflow ---
-    console.log("[save-email-account] Step 4: Starting IMAP connection test...");
-    const client = new ImapFlow({
-        host: imapHost,
-        port: 993,
-        secure: true,
-        auth: {
+    // --- Verbindungstest mit imap-simple ---
+    console.log("[save-email-account] Step 4: Starting IMAP connection test with imap-simple...");
+    const config = {
+        imap: {
             user: imap_username,
-            pass: imap_password,
-        },
-        tls: {
-            rejectUnauthorized: false
-        },
-        logger: false
-    });
-
+            password: imap_password,
+            host: imapHost,
+            port: 993,
+            tls: true,
+            tlsOptions: {
+                rejectUnauthorized: false
+            }
+        }
+    };
+    let connection;
     try {
-        await client.connect();
+        connection = await imaps.connect(config);
         console.log("[save-email-account] Step 4.1: IMAP connection successful.");
-        await client.logout();
-        console.log("[save-email-account] Step 4.2: IMAP logout successful.");
+        await connection.end();
+        console.log("[save-email-account] Step 4.2: IMAP connection ended.");
     } catch (e) {
         console.error("[save-email-account] CRITICAL ERROR: IMAP Connection Test Failed.", e);
         return new Response(JSON.stringify({ error: `Verbindung zum IMAP-Server fehlgeschlagen. Prüfen Sie den IMAP_HOST in den Secrets und Ihre Zugangsdaten. Fehler: ${e.message}` }), { status: 400 });
