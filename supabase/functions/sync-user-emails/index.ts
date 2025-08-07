@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { ImapFlow } from 'npm:imapflow';
+import { ImapFlow } from 'npm:imapflow@1.0.155'; // Pinning version for stability
 import { simpleParser } from 'npm:mailparser';
 import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
-globalThis.Buffer = Buffer;
 
 // Decryption logic
 const b64_to_ab = (b64: string) => { const byteString = Buffer.from(b64, "base64").toString("binary"); const len = byteString.length; const bytes = new Uint8Array(len); for (let i = 0; i < len; i++) { bytes[i] = byteString.charCodeAt(i); } return bytes.buffer; };
