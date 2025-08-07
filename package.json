@@ -48,7 +48,6 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@dyad-sh/react-vite-component-tagger": "^0.0.5",
     "@types/imap": "^0.8.40",
     "@types/jspdf": "^2.0.0",
     "@types/leaflet": "^1.9.12",
