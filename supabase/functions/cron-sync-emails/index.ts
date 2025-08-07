@@ -26,6 +26,8 @@ async function streamToBuffer(stream: ReadableStream): Promise<Buffer> {
 }
 // --- End Helper Functions ---
 
+const BATCH_SIZE = 5; // Process 5 emails per run to avoid timeouts
+
 serve(async (req) => {
   console.log("[CRON-SYNC] Function invoked.");
   if (req.method === 'OPTIONS') {
@@ -81,11 +83,12 @@ serve(async (req) => {
             await client.mailboxOpen(mailbox.path);
             const serverUids = await client.search({ all: true });
             const newUids = serverUids.filter(uid => !(existingUidsByMailbox[mailbox.path]?.has(uid)));
+            const uidsToProcess = newUids.slice(0, BATCH_SIZE);
 
-            if (newUids.length > 0) {
-              console.log(`[CRON-SYNC] Found ${newUids.length} new emails in "${mailbox.path}" for user ${user_id}.`);
-              totalNewEmailsProcessed += newUids.length;
-              const messages = client.fetch(newUids, { source: true, uid: true });
+            if (uidsToProcess.length > 0) {
+              console.log(`[CRON-SYNC] Found ${newUids.length} new emails in "${mailbox.path}". Processing batch of ${uidsToProcess.length}.`);
+              totalNewEmailsProcessed += uidsToProcess.length;
+              const messages = client.fetch(uidsToProcess, { source: true, uid: true });
               for await (const msg of messages) {
                 if (!msg.source) continue;
                 const source = await streamToBuffer(msg.source);
@@ -98,7 +101,7 @@ serve(async (req) => {
                 if (parsed.attachments && parsed.attachments.length > 0) {
                   for (const attachment of parsed.attachments) {
                     if (typeof attachment.content === 'string' || !attachment.filename) continue;
-                    const filePath = `${user_id}/${msg.uid}/${attachment.filename}`;
+                    const filePath = `${user_id}/${insertedEmail.id}/${attachment.filename}`;
                     await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
                     await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
                   }
@@ -114,7 +117,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[CRON-SYNC] Sync finished. Processed a total of ${totalNewEmailsProcessed} new emails.`);
+    console.log(`[CRON-SYNC] Sync finished. Processed a total of ${totalNewEmailsProcessed} new emails in this run.`);
     return new Response(JSON.stringify({ message: `Sync complete. Processed ${totalNewEmailsProcessed} new emails.` }), { headers: corsHeaders });
 
   } catch (e) {
