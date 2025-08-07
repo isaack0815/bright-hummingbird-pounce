@@ -95,7 +95,12 @@ serve(async (_req) => {
     }).eq('id', job.id);
 
     if (!isCompleted && uidsToProcessNow.length > 0) {
-      supabaseAdmin.functions.invoke('process-email-batch', { body: {} }).catch(console.error);
+      supabaseAdmin.functions.invoke('process-email-batch', { 
+        body: {},
+        headers: {
+          'Prefer': 'respond-async'
+        }
+      }).catch(console.error);
     }
 
     return new Response(JSON.stringify({ message: `Processed ${processedInThisRun} emails for job ${job.id}.` }), { headers: corsHeaders });

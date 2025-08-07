@@ -81,15 +81,20 @@ serve(async (req) => {
             jobsCreated++;
             if (!workerInvoked) {
               try {
-                await log('invoking_worker', 'Attempting to invoke process-email-batch.');
-                const { data: invokeData, error: invokeError } = await supabaseAdmin.functions.invoke('process-email-batch', { body: {} });
+                await log('invoking_worker', 'Attempting to invoke process-email-batch asynchronously.');
+                const { error: invokeError } = await supabaseAdmin.functions.invoke('process-email-batch', { 
+                  body: {},
+                  headers: {
+                    'Prefer': 'respond-async'
+                  }
+                });
                 
                 if (invokeError) {
                   await log('worker_invoke_error', `Error invoking worker: ${invokeError.message}`);
                   console.error("Error invoking worker:", invokeError);
                 } else {
                   workerInvoked = true;
-                  await log('worker_invoked', `Worker function process-email-batch was invoked successfully. Response: ${JSON.stringify(invokeData)}`);
+                  await log('worker_invoked', `Worker function process-email-batch was invoked successfully (async).`);
                 }
               } catch (e) {
                   await log('worker_invoke_exception', `Exception during worker invocation: ${e.message}`);
