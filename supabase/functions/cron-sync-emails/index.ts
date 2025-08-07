@@ -6,8 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// This function is designed to be run on a schedule (e.g., every 15 minutes).
 serve(async (req) => {
+  console.log("[CRON-SYNC] Function invoked.");
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -19,20 +20,16 @@ serve(async (req) => {
   
   let isAuthorized = false;
 
-  // 1. Check for Cron Secret (for manual triggers from admin UI)
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
     isAuthorized = true;
     console.log("[CRON-SYNC] Authorized via CRON_SECRET.");
   }
 
-  // 2. Check if the request is coming from pg_net (the cron job)
-  // pg_net has a specific User-Agent. This is a reliable way to identify cron-triggered invocations.
   if (!isAuthorized && userAgent && userAgent.startsWith('pg_net/')) {
     isAuthorized = true;
     console.log("[CRON-SYNC] Authorized via pg_net User-Agent.");
   }
 
-  // 3. If not authorized by secret or pg_net, check for admin user permissions
   if (!isAuthorized && authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const userClient = createClient(
@@ -60,7 +57,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }
 
-  console.log("[CRON-SYNC] Starting scheduled email sync for all users.");
+  console.log("[CRON-SYNC] Authorization successful. Starting scheduled email sync for all users.");
 
   try {
     const supabaseAdmin = createClient(
@@ -73,6 +70,7 @@ serve(async (req) => {
       .select('user_id');
 
     if (accountsError) {
+      console.error("[CRON-SYNC] Error fetching email accounts:", accountsError);
       throw accountsError;
     }
 
@@ -96,7 +94,7 @@ serve(async (req) => {
 
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`[CRON-SYNC] Failed to sync emails for user ${accounts[index].user_id}:`, result.reason);
+        console.error(`[CRON-SYNC] Failed to invoke sync for user ${accounts[index].user_id}:`, result.reason);
       } else {
         console.log(`[CRON-SYNC] Successfully invoked sync for user ${accounts[index].user_id}.`);
       }
