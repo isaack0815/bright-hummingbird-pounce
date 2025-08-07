@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button, Card, Form, Spinner, Placeholder, Alert, Modal, Tabs, Tab, Row, Col } from "react-bootstrap";
-import { supabase } from "@/lib/supabase";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -23,41 +23,36 @@ const settingsSchema = z.object({
   tour_planning_vehicle_group_id: z.coerce.number().optional(),
 });
 
-const fetchSettings = async (): Promise<Setting[]> => {
-  const { data, error } = await supabase.functions.invoke('get-settings');
-  if (error) throw new Error(error.message);
-  return data.settings;
-};
-
-const fetchEmailSecretsStatus = async (): Promise<Record<string, boolean>> => {
-  const { data, error } = await supabase.functions.invoke('get-email-secrets-status');
-  if (error) throw error;
-  return data.status;
-};
-
-const fetchVehicleGroups = async (): Promise<VehicleGroup[]> => {
-    const { data, error } = await supabase.functions.invoke('get-vehicle-groups');
-    if (error) throw new Error(error.message);
-    return data.groups;
-};
-
 const Settings = () => {
+  const supabase = useSupabaseClient();
   const queryClient = useQueryClient();
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; steps: string[] } | null>(null);
 
   const { data: settings, isLoading } = useQuery<Setting[]>({
     queryKey: ['settings'],
-    queryFn: fetchSettings,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('get-settings');
+      if (error) throw new Error(error.message);
+      return data.settings;
+    },
   });
 
   const { data: emailSecretsStatus, isLoading: isLoadingEmailSecrets } = useQuery<Record<string, boolean>>({
     queryKey: ['emailSecretsStatus'],
-    queryFn: fetchEmailSecretsStatus,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('get-email-secrets-status');
+      if (error) throw error;
+      return data.status;
+    },
   });
 
   const { data: vehicleGroups, isLoading: isLoadingVehicleGroups } = useQuery<VehicleGroup[]>({
     queryKey: ['vehicleGroups'],
-    queryFn: fetchVehicleGroups,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('get-vehicle-groups');
+      if (error) throw new Error(error.message);
+      return data.groups;
+    },
   });
 
   const form = useForm<z.infer<typeof settingsSchema>>({
