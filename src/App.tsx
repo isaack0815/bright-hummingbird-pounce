@@ -52,26 +52,26 @@ const AppRoutes = () => {
           <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/dashboard/settings" element={<DashboardSettings />} />
-            <Route path="/fernverkehr" element={<Fernverkehr />} />
-            <Route path="/auftraege" element={<FreightOrderManagement />} />
-            <Route path="/auftraege/neu" element={<FreightOrderForm />} />
-            <Route path="/auftraege/:id/bearbeiten" element={<FreightOrderForm />} />
-            <Route path="/abrechnung/:orderId" element={<BillingDetail />} />
-            <Route path="/rechnungen" element={<InvoiceManagement />} />
-            <Route path="/kunden" element={<CustomerManagement />} />
-            <Route path="/kunden/:id" element={<CustomerDetail />} />
-            <Route path="/touren" element={<TourManagement />} />
-            <Route path="/fahrzeuge" element={<VehicleManagement />} />
-            <Route path="/fahrzeuge/neu" element={<VehicleForm />} />
-            <Route path="/fahrzeuge/:id/bearbeiten" element={<VehicleForm />} />
-            <Route path="/fahrzeug-gruppen" element={<VehicleGroupManagement />} />
-            <Route path="/benutzer" element={<UserManagement />} />
-            <Route path="/benutzer/:id/akte" element={<PersonnelFile />} />
-            <Route path="/profil" element={<Profile />} />
-            <Route path="/einstellungen" element={<Settings />} />
-            <Route path="/einstellungen/rollen" element={<RoleManagement />} />
-            <Route path="/einstellungen/menue" element={<MenuManagement />} />
+            <Route path="/profile/dashboard-settings" element={<DashboardSettings />} />
+            <Route path="/billing" element={<Fernverkehr />} />
+            <Route path="/freight-orders" element={<FreightOrderManagement />} />
+            <Route path="/freight-orders/new" element={<FreightOrderForm />} />
+            <Route path="/freight-orders/edit/:id" element={<FreightOrderForm />} />
+            <Route path="/billing/:orderId" element={<BillingDetail />} />
+            <Route path="/invoices" element={<InvoiceManagement />} />
+            <Route path="/customers" element={<CustomerManagement />} />
+            <Route path="/customers/:id" element={<CustomerDetail />} />
+            <Route path="/tours" element={<TourManagement />} />
+            <Route path="/vehicles" element={<VehicleManagement />} />
+            <Route path="/vehicles/new" element={<VehicleForm />} />
+            <Route path="/vehicles/edit/:id" element={<VehicleForm />} />
+            <Route path="/vehicle-groups" element={<VehicleGroupManagement />} />
+            <Route path="/users" element={<UserManagement />} />
+            <Route path="/users/:id/personnel-file" element={<PersonnelFile />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/roles" element={<RoleManagement />} />
+            <Route path="/settings/menu" element={<MenuManagement />} />
             <Route path="/email" element={<EmailClient />} />
             <Route path="/simple-email" element={<SimpleEmailClient />} />
             <Route path="/access-denied" element={<AccessDenied />} />
