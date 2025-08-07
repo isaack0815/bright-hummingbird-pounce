@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useParams, NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Container, Row, Col, Card, Alert, Tabs, Tab, Table, Badge, Placeholder } from 'react-bootstrap';
+import { Container, Row, Col, Card, Alert, Tabs, Tab, Table } from 'react-bootstrap';
 import { ArrowLeft, BarChart2, FileText, Truck, Euro } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';

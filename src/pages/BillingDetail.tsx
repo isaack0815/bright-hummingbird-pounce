@@ -4,7 +4,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Button, ListGroup, Placeholder, Alert, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
+import { Card, Row, Col, Button, ListGroup, Alert, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
 import { ArrowLeft, Save, PlusCircle, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { FreightOrder } from '@/types/freight';

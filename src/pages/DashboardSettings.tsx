@@ -5,7 +5,7 @@ import { Card, Button, Form, Row, Col, Spinner } from 'react-bootstrap';
 import { Save, ArrowLeft } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { showError, showSuccess } from '@/utils/toast';
-import type { DashboardLayout, DashboardWidget } from '@/types/dashboard';
+import type { DashboardLayout } from '@/types/dashboard';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import type { Layout } from 'react-grid-layout';
 
