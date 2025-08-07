@@ -13,23 +13,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authorization check using a custom header to bypass gateway JWT validation
   const receivedSecret = req.headers.get('X-Cron-Secret');
   const cronSecret = Deno.env.get('CRON_SECRET');
   const userAgent = req.headers.get('User-Agent');
   
-  console.log(`[CRON-SYNC-DEBUG] Received X-Cron-Secret Header: ${receivedSecret ? 'Present' : 'Missing'}`);
-  console.log(`[CRON-SYNC-DEBUG] Value of CRON_SECRET from env: ${cronSecret ? 'Loaded' : '!!! NOT LOADED !!!'}`);
-
   let isAuthorized = false;
 
-  // Primary auth method: Custom secret header
   if (cronSecret && receivedSecret === cronSecret) {
     isAuthorized = true;
     console.log("[CRON-SYNC] Authorized via X-Cron-Secret header.");
   }
 
-  // Fallback for Supabase's internal scheduler (pg_cron)
   if (!isAuthorized && userAgent && userAgent.startsWith('pg_net/')) {
     isAuthorized = true;
     console.log("[CRON-SYNC] Authorized via pg_net User-Agent.");
@@ -64,26 +58,23 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[CRON-SYNC] Found ${accounts.length} accounts to sync.`);
+    console.log(`[CRON-SYNC] Found ${accounts.length} accounts to sync. Initiating invocations...`);
 
-    const syncPromises = accounts.map(account => {
-      console.log(`[CRON-SYNC] Invoking sync for user: ${account.user_id}`);
-      return supabaseAdmin.functions.invoke('sync-user-emails', {
+    // Fire-and-forget: Invoke the sync function for each user but DO NOT await the result.
+    // The cron function can return immediately, while the individual syncs run in the background.
+    accounts.forEach(account => {
+      supabaseAdmin.functions.invoke('sync-user-emails', {
         body: { user_id: account.user_id },
+      }).then(({ error }) => {
+        if (error) {
+          console.error(`[CRON-SYNC] Error invoking sync for user ${account.user_id}:`, error);
+        } else {
+          console.log(`[CRON-SYNC] Successfully invoked sync for user ${account.user_id}.`);
+        }
       });
     });
 
-    const results = await Promise.allSettled(syncPromises);
-
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`[CRON-SYNC] Failed to invoke sync for user ${accounts[index].user_id}:`, result.reason);
-      } else {
-        console.log(`[CRON-SYNC] Successfully invoked sync for user ${accounts[index].user_id}.`);
-      }
-    });
-
-    console.log("[CRON-SYNC] All sync invocations complete.");
+    console.log("[CRON-SYNC] All sync invocations have been initiated.");
 
     return new Response(JSON.stringify({ message: `Sync process initiated for ${accounts.length} users.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
