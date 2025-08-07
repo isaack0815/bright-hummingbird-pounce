@@ -19,6 +19,11 @@ serve(async (req) => {
   const cronSecret = Deno.env.get('CRON_SECRET');
   const userAgent = req.headers.get('User-Agent');
   
+  // --- DEBUG LOGGING ---
+  console.log(`[CRON-SYNC-DEBUG] Received Authorization Header: ${authHeader}`);
+  console.log(`[CRON-SYNC-DEBUG] Value of CRON_SECRET from env: ${cronSecret ? 'Loaded (length: ' + cronSecret.length + ')' : '!!! NOT LOADED !!!'}`);
+  // --- END DEBUG LOGGING ---
+
   let isAuthorized = false;
 
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
