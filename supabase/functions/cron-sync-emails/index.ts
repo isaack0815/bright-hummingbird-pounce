@@ -1,10 +1,9 @@
-// Re-deploy to ensure latest secrets are loaded
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 }
 
 serve(async (req) => {
@@ -14,53 +13,31 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authorization check
-  const authHeader = req.headers.get('Authorization');
+  // Authorization check using a custom header to bypass gateway JWT validation
+  const receivedSecret = req.headers.get('X-Cron-Secret');
   const cronSecret = Deno.env.get('CRON_SECRET');
   const userAgent = req.headers.get('User-Agent');
   
-  // --- DEBUG LOGGING ---
-  console.log(`[CRON-SYNC-DEBUG] Received Authorization Header: ${authHeader}`);
-  console.log(`[CRON-SYNC-DEBUG] Value of CRON_SECRET from env: ${cronSecret ? 'Loaded (length: ' + cronSecret.length + ')' : '!!! NOT LOADED !!!'}`);
-  // --- END DEBUG LOGGING ---
+  console.log(`[CRON-SYNC-DEBUG] Received X-Cron-Secret Header: ${receivedSecret ? 'Present' : 'Missing'}`);
+  console.log(`[CRON-SYNC-DEBUG] Value of CRON_SECRET from env: ${cronSecret ? 'Loaded' : '!!! NOT LOADED !!!'}`);
 
   let isAuthorized = false;
 
-  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+  // Primary auth method: Custom secret header
+  if (cronSecret && receivedSecret === cronSecret) {
     isAuthorized = true;
-    console.log("[CRON-SYNC] Authorized via CRON_SECRET.");
+    console.log("[CRON-SYNC] Authorized via X-Cron-Secret header.");
   }
 
+  // Fallback for Supabase's internal scheduler (pg_cron)
   if (!isAuthorized && userAgent && userAgent.startsWith('pg_net/')) {
     isAuthorized = true;
     console.log("[CRON-SYNC] Authorized via pg_net User-Agent.");
   }
 
-  if (!isAuthorized && authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const userClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
-      if (permError) {
-        console.error("[CRON-SYNC] Error checking permissions:", permError.message);
-      } else if (permissions) {
-        const permissionNames = permissions.map((p: any) => p.permission_name);
-        if (permissionNames.includes('roles.manage') && permissionNames.includes('users.manage')) {
-          isAuthorized = true;
-          console.log("[CRON-SYNC] Authorized via admin user permissions.");
-        }
-      }
-    } catch (e) {
-      console.error("[CRON-SYNC] Error during user permission check:", e.message);
-    }
-  }
-
   if (!isAuthorized) {
     console.warn("[CRON-SYNC] Unauthorized access attempt.");
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
   }
 
   console.log("[CRON-SYNC] Authorization successful. Starting scheduled email sync for all users.");
