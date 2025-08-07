@@ -33,19 +33,26 @@ serve(async (req) => {
 
   try {
     // 1. Fetch credentials
-    const { data: creds } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user_id).single();
+    console.log(`[SYNC-USER] [${user_id}] Step 1: Fetching credentials...`);
+    const { data: creds, error: credsError } = await supabaseAdmin.from('email_accounts').select('imap_username, encrypted_imap_password, iv').eq('user_id', user_id).single();
+    if (credsError) throw new Error(`Failed to fetch credentials: ${credsError.message}`);
     if (!creds) throw new Error("Email account not configured.");
+    console.log(`[SYNC-USER] [${user_id}] Step 1.1: Credentials found for ${creds.imap_username}.`);
     const decryptedPassword = await decrypt(creds.encrypted_imap_password, creds.iv, Deno.env.get('APP_ENCRYPTION_KEY')!);
+    console.log(`[SYNC-USER] [${user_id}] Step 1.2: Password decrypted.`);
 
     // 2. Fetch existing UIDs from DB for this user
+    console.log(`[SYNC-USER] [${user_id}] Step 2: Fetching existing email UIDs from DB...`);
     const { data: existingEmails } = await supabaseAdmin.from('emails').select('uid, mailbox').eq('user_id', user_id);
     const existingUidsByMailbox = (existingEmails || []).reduce((acc, email) => {
       if (!acc[email.mailbox]) acc[email.mailbox] = new Set();
       acc[email.mailbox].add(email.uid);
       return acc;
     }, {} as Record<string, Set<number>>);
+    console.log(`[SYNC-USER] [${user_id}] Step 2.1: Found existing UIDs for ${Object.keys(existingUidsByMailbox).length} mailboxes.`);
 
     // 3. Connect to IMAP and find new emails
+    console.log(`[SYNC-USER] [${user_id}] Step 3: Connecting to IMAP server...`);
     const client = new ImapFlow({
         host: Deno.env.get('IMAP_HOST')!,
         port: 993,
@@ -56,10 +63,12 @@ serve(async (req) => {
     });
 
     await client.connect();
+    console.log(`[SYNC-USER] [${user_id}] Step 3.1: IMAP connection successful.`);
     let totalNewEmails = 0;
 
     try {
       const mailboxes = await client.list();
+      console.log(`[SYNC-USER] [${user_id}] Step 3.2: Found ${mailboxes.length} mailboxes.`);
       for (const mailbox of mailboxes) {
         if (mailbox.flags.has('\\Noselect')) continue;
         
@@ -68,11 +77,15 @@ serve(async (req) => {
         const existingUids = existingUidsByMailbox[mailbox.path] || new Set();
         const newUids = serverUids.filter(uid => !existingUids.has(uid));
 
-        if (newUids.length === 0) continue;
-        console.log(`[SYNC-USER] Found ${newUids.length} new emails in ${mailbox.path} for user ${user_id}`);
+        if (newUids.length === 0) {
+          console.log(`[SYNC-USER] [${user_id}] No new emails in mailbox "${mailbox.path}".`);
+          continue;
+        }
+        console.log(`[SYNC-USER] [${user_id}] Found ${newUids.length} new emails in "${mailbox.path}".`);
         totalNewEmails += newUids.length;
 
         // 4. Fetch and save new emails
+        console.log(`[SYNC-USER] [${user_id}] Step 4: Fetching new email content...`);
         const messages = client.fetch(newUids, { source: true, uid: true });
         for await (const msg of messages) {
           if (!msg.source) continue;
@@ -83,22 +96,26 @@ serve(async (req) => {
           const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin.from('emails').insert(emailData).select('id').single();
           
           if (insertEmailError) {
-            console.error(`[SYNC-USER] Failed to insert email UID ${msg.uid} for user ${user_id}:`, insertEmailError);
+            console.error(`[SYNC-USER] [${user_id}] Failed to insert email UID ${msg.uid}:`, insertEmailError);
             continue;
           }
+          console.log(`[SYNC-USER] [${user_id}] Successfully inserted email UID ${msg.uid} with DB ID ${insertedEmail.id}.`);
 
           if (parsed.attachments && parsed.attachments.length > 0) {
+            console.log(`[SYNC-USER] [${user_id}] Found ${parsed.attachments.length} attachments for email UID ${msg.uid}.`);
             for (const attachment of parsed.attachments) {
               if (typeof attachment.content === 'string' || !attachment.filename) continue;
               const filePath = `${user_id}/${msg.uid}/${attachment.filename}`;
               await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
               await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
+              console.log(`[SYNC-USER] [${user_id}] Uploaded attachment: ${attachment.filename}`);
             }
           }
         }
       }
     } finally {
       await client.logout();
+      console.log(`[SYNC-USER] [${user_id}] Step 5: IMAP client logged out.`);
     }
 
     console.log(`[SYNC-USER] Sync completed for user ${user_id}. Processed ${totalNewEmails} new emails.`);
