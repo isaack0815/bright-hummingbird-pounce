@@ -30,7 +30,7 @@ const Profile = lazy(() => import('@/pages/Profile'));
 const PersonnelFile = lazy(() => import('@/pages/PersonnelFile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const EmailClient = lazy(() => import('@/pages/EmailClient'));
-const EmailServiceTest = lazy(() => import('@/pages/EmailServiceTest'));
+// const EmailServiceTest = lazy(() => import('@/pages/EmailServiceTest')); // This is not a component
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const AppRoutes = () => {
@@ -68,7 +68,7 @@ const AppRoutes = () => {
             <Route path="/einstellungen/rollen" element={<RoleManagement />} />
             <Route path="/einstellungen/menue" element={<MenuManagement />} />
             <Route path="/email" element={<EmailClient />} />
-            <Route path="/email-service-test" element={<EmailServiceTest />} />
+            {/* <Route path="/email-service-test" element={<EmailServiceTest />} /> */}
             <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<NotFound />} />

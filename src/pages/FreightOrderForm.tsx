@@ -47,6 +47,8 @@ const formSchema = z.object({
   cargoItems: z.array(cargoItemSchema).optional(),
 });
 
+type FormSchemaType = z.infer<typeof formSchema>;
+
 const fetchCustomers = async (): Promise<Customer[]> => {
   const { data, error } = await supabase.functions.invoke('get-customers');
   if (error) throw new Error(error.message);
@@ -97,7 +99,7 @@ const FreightOrderForm = () => {
     enabled: isEditMode,
   });
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormSchemaType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: 'Angelegt',
@@ -131,14 +133,14 @@ const FreightOrderForm = () => {
   }, [existingOrder, isEditMode, form]);
 
   const mutation = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>): Promise<FreightOrder> => {
+    mutationFn: async (values: FormSchemaType): Promise<FreightOrder> => {
       const cleanedOrderData = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
       );
       
-      const { stops, cargoItems, ...orderData } = cleanedOrderData;
+      const { stops, cargoItems, ...orderData } = cleanedOrderData as FormSchemaType;
 
-      const cleanedStops = Array.isArray(stops) ? stops.map(stop => ({
+      const cleanedStops = Array.isArray(stops) ? stops.map((stop: z.infer<typeof stopSchema>) => ({
         ...stop,
         stop_date: stop.stop_date || null,
         time_start: stop.time_start || null,
@@ -309,11 +311,17 @@ const FreightOrderForm = () => {
                       <Card.Body className="d-flex flex-column gap-3">
                           <Form.Group>
                               <Form.Label>Kunde</Form.Label>
-                              <CustomerCombobox
-                                  customers={customers || []}
-                                  value={form.watch('customer_id')}
-                                  onChange={(value) => form.setValue('customer_id', value)}
-                                  onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                              <Controller
+                                name="customer_id"
+                                control={form.control}
+                                render={({ field }) => (
+                                  <CustomerCombobox
+                                      customers={customers || []}
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                                  />
+                                )}
                               />
                           </Form.Group>
                           <Form.Group><Form.Label>Externe Auftragsnummer</Form.Label><Form.Control {...form.register("external_order_number")} /></Form.Group>

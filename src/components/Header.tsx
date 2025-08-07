@@ -44,7 +44,7 @@ const buildTree = (items: MenuItem[]): TreeMenuItem[] => {
 
 const Header = () => {
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
 
   const { data: menuItems, isLoading: isLoadingMenu } = useQuery<MenuItem[]>({
     queryKey: ['menuItems'],
@@ -107,7 +107,7 @@ const Header = () => {
             {isLoadingMenu ? <Spinner animation="border" size="sm" /> : renderMenuItems(menuTree)}
           </Nav>
           <Nav>
-            <NavDropdown title={<User />} id="user-dropdown" align="end" renderMenuOnMount popperConfig={{ strategy: 'fixed' }}>
+            <NavDropdown title={<User />} id="user-dropdown" align="end" renderMenuOnMount>
               <NavDropdown.Item as={NavLink} to="/profile">
                 <User className="me-2 h-4 w-4" /> Mein Profil
               </NavDropdown.Item>

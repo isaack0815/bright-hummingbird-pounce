@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as Imap from 'imap';
-import { simpleParser, ParsedMail } from 'mailparser';
+import { simpleParser } from 'mailparser';
 import { EventEmitter } from 'events';
 
 // Typdefinitionen
@@ -125,7 +125,7 @@ export class EmailService extends EventEmitter {
         resolve();
       });
 
-      imap.once('error', (err) => {
+      imap.once('error', (err: Error) => {
         reject(err);
       });
 
@@ -213,7 +213,7 @@ export class EmailService extends EventEmitter {
                   cc_address: this.extractEmail(parsed.cc),
                   bcc_address: this.extractEmail(parsed.bcc),
                   body_text: parsed.text,
-                  body_html: parsed.html,
+                  body_html: parsed.html ? parsed.html : undefined,
                   date_received: parsed.date?.toISOString() || new Date().toISOString(),
                   is_read: attributes.flags.includes('\\Seen'),
                   has_attachments: (parsed.attachments?.length || 0) > 0,
@@ -246,7 +246,7 @@ export class EmailService extends EventEmitter {
         });
       });
 
-      imap.once('error', (err) => {
+      imap.once('error', (err: Error) => {
         reject(err);
       });
 
@@ -420,14 +420,14 @@ export class EmailService extends EventEmitter {
             return;
           }
 
-          imap.on('mail', async (numNewMsgs) => {
+          imap.on('mail', async (numNewMsgs: number) => {
             console.log(`${numNewMsgs} neue E-Mails empfangen für Konto ${accountId}`);
             await this.fetchEmailsForAccount(accountId);
           });
         });
       });
 
-      imap.once('error', (err) => {
+      imap.once('error', (err: Error) => {
         console.error('IMAP-Verbindungsfehler:', err);
         this.emit('connectionError', { accountId, error: err });
       });
@@ -454,7 +454,7 @@ export class EmailService extends EventEmitter {
 
   // Alle Verbindungen schließen
   disconnect(): void {
-    for (const [accountId, imap] of this.activeConnections) {
+    for (const [, imap] of this.activeConnections) {
       imap.end();
     }
     this.activeConnections.clear();

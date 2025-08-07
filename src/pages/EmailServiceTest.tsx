@@ -1,4 +1,4 @@
-import { EmailService, EmailManager, EmailAccount, EmailMessage } from './email-service';
+import { EmailService, EmailManager, EmailAccount, EmailMessage } from '@/lib/email-service';
 
 // Beispiel für die Verwendung des E-Mail-Services
 export class EmailServiceExample {
@@ -165,7 +165,7 @@ export class EmailRouteHandlers {
 
       res.status(201).json({ success: true, account });
     } catch (error) {
-      res.status(400).json({ success: false, error: error.message });
+      res.status(400).json({ success: false, error: (error as Error).message });
     }
   }
 
@@ -177,7 +177,7 @@ export class EmailRouteHandlers {
       
       res.json({ success: true, accounts });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
 
@@ -191,7 +191,7 @@ export class EmailRouteHandlers {
       
       res.json({ success: true, emails });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
 
@@ -203,7 +203,7 @@ export class EmailRouteHandlers {
       
       res.json({ success: true, count: emails.length });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
 
@@ -215,7 +215,7 @@ export class EmailRouteHandlers {
       
       res.json({ success: true, dashboard });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
 
@@ -234,7 +234,7 @@ export class EmailRouteHandlers {
       
       res.json({ success: true, emails });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
 
@@ -248,7 +248,7 @@ export class EmailRouteHandlers {
       
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
 }
