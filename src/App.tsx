@@ -7,6 +7,8 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import Layout from '@/components/Layout';
 import { Spinner } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { supabase } from '@/lib/supabase';
 
 const Login = lazy(() => import('@/pages/Login'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -80,14 +82,16 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <ErrorProvider>
-      <ErrorBoundary>
-        <AuthProvider>
-          <Toaster position="bottom-right" />
-          <AppRoutes />
-        </AuthProvider>
-      </ErrorBoundary>
-    </ErrorProvider>
+    <SessionContextProvider supabaseClient={supabase}>
+      <ErrorProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <Toaster position="bottom-right" />
+            <AppRoutes />
+          </AuthProvider>
+        </ErrorBoundary>
+      </ErrorProvider>
+    </SessionContextProvider>
   );
 }
 
