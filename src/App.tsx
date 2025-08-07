@@ -9,6 +9,7 @@ import { Spinner } from 'react-bootstrap';
 import { Toaster } from 'react-hot-toast';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 import { supabase } from '@/lib/supabase';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const Login = lazy(() => import('@/pages/Login'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -34,6 +35,8 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const EmailClient = lazy(() => import('@/pages/EmailClient'));
 // const EmailServiceTest = lazy(() => import('@/pages/EmailServiceTest')); // This is not a component
 const NotFound = lazy(() => import('@/pages/NotFound'));
+
+const queryClient = new QueryClient();
 
 const AppRoutes = () => {
   const { isLoading, session } = useAuth();
@@ -82,16 +85,18 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <SessionContextProvider supabaseClient={supabase}>
-      <ErrorProvider>
-        <ErrorBoundary>
-          <AuthProvider>
-            <Toaster position="bottom-right" />
-            <AppRoutes />
-          </AuthProvider>
-        </ErrorBoundary>
-      </ErrorProvider>
-    </SessionContextProvider>
+    <QueryClientProvider client={queryClient}>
+      <SessionContextProvider supabaseClient={supabase}>
+        <ErrorProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+              <Toaster position="bottom-right" />
+              <AppRoutes />
+            </AuthProvider>
+          </ErrorBoundary>
+        </ErrorProvider>
+      </SessionContextProvider>
+    </QueryClientProvider>
   );
 }
 
