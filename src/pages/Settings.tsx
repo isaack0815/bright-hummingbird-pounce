@@ -151,20 +151,6 @@ const Settings = () => {
     },
   });
 
-  const testSingleEmailSyncMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('test-single-email-sync');
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data: any) => {
-      showSuccess(data.message || "Test-Synchronisation erfolgreich abgeschlossen.");
-    },
-    onError: (err: any) => {
-      showError(err.data?.error || err.message || "Fehler bei der Test-Synchronisation.");
-    },
-  });
-
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateSettingsMutation.mutate(values);
   };
@@ -349,20 +335,6 @@ const Settings = () => {
                 >
                   <RefreshCw className="me-2" size={16} />
                   {syncAllEmailsMutation.isPending ? <><Spinner as="span" size="sm" className="me-2" />Wird synchronisiert...</> : "Alle E-Mails jetzt synchronisieren"}
-                </Button>
-                <hr className="my-4" />
-                <h4 className="h6">Einzel-Konto Test-Synchronisation (ChatGPT-Skript)</h4>
-                <p className="small text-muted">
-                  Führt eine einmalige Synchronisation für das in den Secrets (`IMAP_USER`, `IMAP_PASS`) hinterlegte Konto durch. Läuft bei vielen E-Mails eventuell in einen Timeout.
-                </p>
-                <Button 
-                  type="button" 
-                  variant="outline-danger" 
-                  onClick={() => testSingleEmailSyncMutation.mutate()}
-                  disabled={testSingleEmailSyncMutation.isPending}
-                >
-                  <Terminal className="me-2" size={16} />
-                  {testSingleEmailSyncMutation.isPending ? <><Spinner as="span" size="sm" className="me-2" />Teste...</> : "Test-Sync starten"}
                 </Button>
               </Card.Body>
             </Card>

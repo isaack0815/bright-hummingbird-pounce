@@ -19,13 +19,18 @@ serve(async (req) => {
 
   const receivedSecret = req.headers.get('X-Cron-Secret');
   const cronSecret = Deno.env.get('CRON_SECRET');
-  if (!cronSecret || receivedSecret !== cronSecret) {
+  const authHeader = req.headers.get('Authorization');
+
+  // Authorize if it's a valid cron job OR a request from an authenticated user
+  if ((!cronSecret || receivedSecret !== cronSecret) && !authHeader) {
     await log('error', 'Unauthorized attempt to run cron job.');
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
   }
 
+  const triggerSource = authHeader ? 'manual_user' : 'cron_secret';
+
   try {
-    await log('started', 'Cron job planner started.');
+    await log('started', `Cron job planner started. Triggered by: ${triggerSource}`);
 
     const { data: accounts, error: accountsError } = await supabaseAdmin.from('email_accounts').select('user_id');
     if (accountsError) throw accountsError;
