@@ -38,17 +38,15 @@ serve(async (_req) => {
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
     if (!encryptionKey) throw new Error("APP_ENCRYPTION_KEY secret is not set.");
 
-    const { data: job, error: jobError } = await supabaseAdmin.from('email_sync_jobs').select('*').eq('status', 'pending').limit(1).single();
+    const { data: job, error: jobError } = await supabaseAdmin.from('email_sync_jobs').select('*').eq('status', 'pending').order('created_at', { ascending: true }).limit(1).single();
     if (jobError || !job) {
+      console.log('[WORKER] No pending jobs found. Shutting down.');
       return new Response(JSON.stringify({ message: "No pending jobs." }), { headers: corsHeaders });
     }
     jobId = job.id;
+    console.log(`[WORKER] Picked up job ${jobId} for user ${job.user_id}.`);
 
     await supabaseAdmin.from('email_sync_jobs').update({ status: 'processing' }).eq('id', job.id);
-
-    if (!job.mailbox) {
-      throw new Error(`Job ${job.id} is missing a mailbox path.`);
-    }
 
     const { data: account, error: accountError } = await supabaseAdmin.from('email_accounts').select('*').eq('user_id', job.user_id).single();
     if (accountError || !account) throw new Error(`Account for user ${job.user_id} not found.`);
@@ -57,19 +55,43 @@ serve(async (_req) => {
     const client = new ImapFlow({ host: Deno.env.get('IMAP_HOST')!, port: 993, secure: true, auth: { user: account.imap_username, pass: decryptedPassword }, tls: { rejectUnauthorized: false }, logger: false });
 
     let processedInThisRun = 0;
+    let uidsToProcessNow: number[] = [];
+    let currentUids: number[] = [];
+
     try {
       await client.connect();
-      const uids = Array.isArray(job.uids_to_process) ? job.uids_to_process : JSON.parse(job.uids_to_process || '[]');
-      const uidsToProcessNow = uids.slice(job.processed_count, job.processed_count + BATCH_SIZE);
+      // For now, we only sync INBOX. This could be extended to loop through mailboxes.
+      const mailboxPath = 'INBOX';
+      await client.mailboxOpen(mailboxPath);
+
+      // If UIDs are not determined yet, this is the first run for this job.
+      if (!job.uids_to_process || (job.uids_to_process as any).length === 0) {
+        console.log(`[WORKER] Job ${jobId}: First run. Discovering new emails.`);
+        const { data: existingEmails } = await supabaseAdmin.from('emails').select('uid').eq('user_id', account.user_id).eq('mailbox', mailboxPath);
+        const existingUids = new Set((existingEmails || []).map(e => e.uid));
+        const serverUids = await client.search({ all: true });
+        currentUids = serverUids.filter(uid => !existingUids.has(uid));
+        
+        await supabaseAdmin.from('email_sync_jobs').update({
+          uids_to_process: currentUids,
+          total_count: currentUids.length,
+          mailbox: mailboxPath
+        }).eq('id', job.id);
+        console.log(`[WORKER] Job ${jobId}: Found ${currentUids.length} new emails.`);
+      } else {
+        currentUids = Array.isArray(job.uids_to_process) ? job.uids_to_process : JSON.parse(job.uids_to_process || '[]');
+      }
+
+      uidsToProcessNow = currentUids.slice(job.processed_count, job.processed_count + BATCH_SIZE);
 
       if (uidsToProcessNow.length > 0) {
-        await client.mailboxOpen(job.mailbox);
+        console.log(`[WORKER] Job ${jobId}: Processing batch of ${uidsToProcessNow.length} emails.`);
         const messages = client.fetch(uidsToProcessNow, { source: true, uid: true });
         for await (const msg of messages) {
             if (!msg.source) continue;
             const source = await streamToBuffer(msg.source);
             const parsed = await simpleParser(source);
-            const emailData = { user_id: job.user_id, uid: msg.uid, mailbox: job.mailbox, from_address: formatAddress(parsed.from), to_address: formatAddress(parsed.to), subject: parsed.subject, sent_at: parsed.date, body_text: parsed.text, body_html: parsed.html };
+            const emailData = { user_id: job.user_id, uid: msg.uid, mailbox: mailboxPath, from_address: formatAddress(parsed.from), to_address: formatAddress(parsed.to), subject: parsed.subject, sent_at: parsed.date, body_text: parsed.text, body_html: parsed.html };
             const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin.from('emails').insert(emailData).select('id').single();
             if (insertEmailError) { console.error(`[WORKER] Failed to insert email UID ${msg.uid}:`, insertEmailError); continue; }
             if (parsed.attachments && parsed.attachments.length > 0) {
@@ -84,23 +106,38 @@ serve(async (_req) => {
         }
       }
     } finally {
-      await client.logout();
+      if (client.state !== 'disconnected') await client.logout();
     }
 
     const newProcessedCount = job.processed_count + processedInThisRun;
-    const isCompleted = newProcessedCount >= job.total_count;
+    const totalCount = currentUids.length > 0 ? currentUids.length : job.total_count;
+    const isCompleted = newProcessedCount >= totalCount;
+
     await supabaseAdmin.from('email_sync_jobs').update({
       status: isCompleted ? 'completed' : 'pending',
       processed_count: newProcessedCount,
     }).eq('id', job.id);
+    console.log(`[WORKER] Job ${jobId}: Updated processed count to ${newProcessedCount}. Completed: ${isCompleted}`);
 
-    if (!isCompleted && uidsToProcessNow.length > 0) {
+    // If there's more work to do (either in this job or another one), re-invoke the worker.
+    if (!isCompleted || uidsToProcessNow.length > 0) {
+      console.log(`[WORKER] Job ${jobId}: Not finished. Re-invoking worker for next batch.`);
       supabaseAdmin.functions.invoke('process-email-batch', { 
         body: {},
-        headers: {
-          'Prefer': 'respond-async'
-        }
+        headers: { 'Prefer': 'respond-async' }
       }).catch(console.error);
+    } else {
+        // This job is done, check if there are other pending jobs and kick off the next one.
+        const { data: nextJob } = await supabaseAdmin.from('email_sync_jobs').select('id').eq('status', 'pending').limit(1).single();
+        if (nextJob) {
+            console.log(`[WORKER] Current job finished. Found another pending job ${nextJob.id}. Re-invoking worker.`);
+            supabaseAdmin.functions.invoke('process-email-batch', { 
+                body: {},
+                headers: { 'Prefer': 'respond-async' }
+            }).catch(console.error);
+        } else {
+            console.log('[WORKER] All jobs completed.');
+        }
     }
 
     return new Response(JSON.stringify({ message: `Processed ${processedInThisRun} emails for job ${job.id}.` }), { headers: corsHeaders });
@@ -108,6 +145,7 @@ serve(async (_req) => {
     if (jobId) {
       await supabaseAdmin.from('email_sync_jobs').update({ status: 'failed', error_message: e.message }).eq('id', jobId);
     }
+    console.error(`[WORKER] CRITICAL FAILURE on job ${jobId}:`, e);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }
 });
