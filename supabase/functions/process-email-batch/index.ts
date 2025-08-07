@@ -52,7 +52,7 @@ serve(async (_req) => {
     if (accountError || !account) throw new Error(`Account for user ${job.user_id} not found.`);
 
     const decryptedPassword = await decrypt(account.encrypted_imap_password, account.iv, encryptionKey);
-    const client = new ImapFlow({ host: Deno.env.get('IMAP_HOST')!, port: 993, secure: true, auth: { user: account.imap_username, pass: decryptedPassword }, tls: { rejectUnauthorized: false }, logger: false });
+    const client = new ImapFlow({ host: Deno.env.get('IMAP_HOST')!, port: 993, secure: true, auth: { user: account.imap_username, pass: decryptedPassword }, tls: { rejectUnauthorized: false }, logger: true });
 
     let processedInThisRun = 0;
     let uidsToProcessNow: number[] = [];

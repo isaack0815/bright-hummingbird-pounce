@@ -26,16 +26,17 @@ const SimpleEmailClient = () => {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('fetch-mailbox');
+      const { data, error } = await supabase.functions.invoke('cron-sync-emails');
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      showSuccess(data.message);
-      queryClient.invalidateQueries({ queryKey: ['userEmailsSimple'] });
+      showSuccess(data.message || "E-Mail-Synchronisation für alle Konten wurde erfolgreich angestoßen.");
+      // We don't invalidate immediately, as the background job needs time to run.
+      // The user can manually refresh later.
     },
     onError: (err: any) => {
-      showError(err.data?.error || err.message || "Fehler bei der Synchronisation.");
+      showError(err.data?.error || err.message || "Fehler beim Anstoßen der E-Mail-Synchronisation.");
     }
   });
 
@@ -58,10 +59,16 @@ const SimpleEmailClient = () => {
     <Container fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h2">E-Mail Client (Simple)</h1>
-        <Button variant="outline-secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
-          <RefreshCw size={16} className={syncMutation.isPending ? 'animate-spin' : ''} />
-          <span className="ms-2">{syncMutation.isPending ? 'Synchronisiere...' : 'Posteingang synchronisieren'}</span>
-        </Button>
+        <div className="d-flex gap-2">
+          <Button variant="secondary" onClick={() => queryClient.invalidateQueries({ queryKey: ['userEmailsSimple'] })}>
+            <RefreshCw size={16} />
+            <span className="ms-2">Liste aktualisieren</span>
+          </Button>
+          <Button variant="outline-secondary" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending}>
+            <RefreshCw size={16} className={syncMutation.isPending ? 'animate-spin' : ''} />
+            <span className="ms-2">{syncMutation.isPending ? 'Synchronisiere...' : 'Neue E-Mails abrufen'}</span>
+          </Button>
+        </div>
       </div>
 
       {queryError && <Alert variant="danger"><Alert.Heading>Fehler beim Laden der E-Mails</Alert.Heading><p>{queryError.message}</p></Alert>}
