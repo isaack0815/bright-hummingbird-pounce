@@ -99,7 +99,7 @@ async function fetchAndStoreEmails() {
     console.log(`[test-single-email-sync] Neue E-Mails: ${newUids.length}`);
 
     const messages = client.fetch(newUids, { source: true, uid: true });
-    let savedCount = 0;
+    const emailsToInsert = [];
 
     for await (const msg of messages) {
       if (!msg.source) continue;
@@ -117,15 +117,22 @@ async function fetchAndStoreEmails() {
         body_text: parsed.text,
         body_html: parsed.html,
       };
-
-      const { error } = await supabase.from('emails').insert(email);
+      emailsToInsert.push(email);
+    }
+    
+    let savedCount = 0;
+    if (emailsToInsert.length > 0) {
+      console.log(`[test-single-email-sync] Versuche, ${emailsToInsert.length} E-Mails in einem Batch zu speichern...`);
+      const { error } = await supabase.from('emails').insert(emailsToInsert);
       if (error) {
-        console.error(`[test-single-email-sync] Fehler beim Speichern von UID ${msg.uid}:`, error.message);
+        console.error(`[test-single-email-sync] Fehler beim Speichern von E-Mails im Batch:`, error.message);
+        throw new Error(`Fehler beim Speichern von E-Mails: ${error.message}`);
       } else {
-        console.log(`[test-single-email-sync] E-Mail UID ${msg.uid} gespeichert.`);
-        savedCount++;
+        savedCount = emailsToInsert.length;
+        console.log(`[test-single-email-sync] ${savedCount} E-Mails erfolgreich gespeichert.`);
       }
     }
+
     return `IMAP-Verbindung geschlossen. ${savedCount} neue E-Mails gespeichert.`;
   } finally {
     if (client.state !== 'disconnected') {
