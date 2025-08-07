@@ -15,15 +15,24 @@ serve(async (req) => {
   // Authorization check
   const authHeader = req.headers.get('Authorization');
   const cronSecret = Deno.env.get('CRON_SECRET');
+  const userAgent = req.headers.get('User-Agent');
+  
   let isAuthorized = false;
 
-  // 1. Check for Cron Secret
+  // 1. Check for Cron Secret (for manual triggers from admin UI)
   if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
     isAuthorized = true;
     console.log("[CRON-SYNC] Authorized via CRON_SECRET.");
   }
 
-  // 2. If not authorized by secret, check for admin user permissions
+  // 2. Check if the request is coming from pg_net (the cron job)
+  // pg_net has a specific User-Agent. This is a reliable way to identify cron-triggered invocations.
+  if (!isAuthorized && userAgent && userAgent.startsWith('pg_net/')) {
+    isAuthorized = true;
+    console.log("[CRON-SYNC] Authorized via pg_net User-Agent.");
+  }
+
+  // 3. If not authorized by secret or pg_net, check for admin user permissions
   if (!isAuthorized && authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const userClient = createClient(
@@ -36,7 +45,6 @@ serve(async (req) => {
         console.error("[CRON-SYNC] Error checking permissions:", permError.message);
       } else if (permissions) {
         const permissionNames = permissions.map((p: any) => p.permission_name);
-        // Using a combination of permissions that indicates a super admin
         if (permissionNames.includes('roles.manage') && permissionNames.includes('users.manage')) {
           isAuthorized = true;
           console.log("[CRON-SYNC] Authorized via admin user permissions.");
@@ -60,7 +68,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // 1. Find all users with a configured email account
     const { data: accounts, error: accountsError } = await supabaseAdmin
       .from('email_accounts')
       .select('user_id');
@@ -78,7 +85,6 @@ serve(async (req) => {
 
     console.log(`[CRON-SYNC] Found ${accounts.length} accounts to sync.`);
 
-    // 2. Invoke the sync function for each user individually
     const syncPromises = accounts.map(account => {
       console.log(`[CRON-SYNC] Invoking sync for user: ${account.user_id}`);
       return supabaseAdmin.functions.invoke('sync-user-emails', {
@@ -86,7 +92,6 @@ serve(async (req) => {
       });
     });
 
-    // We use Promise.allSettled to ensure that one failed sync doesn't stop others.
     const results = await Promise.allSettled(syncPromises);
 
     results.forEach((result, index) => {
