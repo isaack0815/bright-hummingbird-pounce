@@ -1,137 +1,94 @@
-import { Toaster } from "react-hot-toast";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ErrorProvider } from './contexts/ErrorContext';
-import ErrorBoundary from './components/ErrorBoundary';
-import { supabase } from './lib/supabase';
-import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ErrorProvider } from '@/contexts/ErrorContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import Layout from '@/components/Layout';
+import { Spinner } from 'react-bootstrap';
+import { Toaster } from 'react-hot-toast';
 
-import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from "./pages/Dashboard";
-import UserManagement from './pages/UserManagement';
-import RoleManagement from './pages/RoleManagement';
-import MenuManagement from './pages/MenuManagement';
-import CustomerManagement from './pages/CustomerManagement';
-import CustomerDetail from './pages/CustomerDetail';
-import FreightOrderManagement from './pages/FreightOrderManagement';
-import FreightOrderForm from './pages/FreightOrderForm';
-import VehicleManagement from './pages/VehicleManagement';
-import VehicleForm from './pages/VehicleForm';
-import Profile from './pages/Profile';
-import Settings from './pages/Settings';
-import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/ProtectedRoute";
-import AccessDenied from "./pages/AccessDenied";
-import Fernverkehr from "./pages/Fernverkehr";
-import BillingDetail from "./pages/BillingDetail";
-import InvoiceManagement from "./pages/InvoiceManagement";
-import DashboardSettings from "./pages/DashboardSettings";
-import TourManagement from "./pages/TourManagement";
-import VehicleGroupManagement from "./pages/VehicleGroupManagement";
-import PersonnelFile from "./pages/PersonnelFile";
-import EmailClient from "./pages/EmailClient";
-
-const queryClient = new QueryClient();
+const Login = lazy(() => import('@/pages/Login'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const RoleManagement = lazy(() => import('@/pages/RoleManagement'));
+const AccessDenied = lazy(() => import('@/pages/AccessDenied'));
+const MenuManagement = lazy(() => import('@/pages/MenuManagement'));
+const FreightOrderManagement = lazy(() => import('@/pages/FreightOrderManagement'));
+const FreightOrderForm = lazy(() => import('@/pages/FreightOrderForm'));
+const CustomerManagement = lazy(() => import('@/pages/CustomerManagement'));
+const Fernverkehr = lazy(() => import('@/pages/Fernverkehr'));
+const BillingDetail = lazy(() => import('@/pages/BillingDetail'));
+const InvoiceManagement = lazy(() => import('@/pages/InvoiceManagement'));
+const DashboardSettings = lazy(() => import('@/pages/DashboardSettings'));
+const VehicleManagement = lazy(() => import('@/pages/VehicleManagement'));
+const VehicleForm = lazy(() => import('@/pages/VehicleForm'));
+const VehicleGroupManagement = lazy(() => import('@/pages/VehicleGroupManagement'));
+const TourManagement = lazy(() => import('@/pages/TourManagement'));
+const CustomerDetail = lazy(() => import('@/pages/CustomerDetail'));
+const UserManagement = lazy(() => import('@/pages/UserManagement'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const PersonnelFile = lazy(() => import('@/pages/PersonnelFile'));
+const Settings = lazy(() => import('@/pages/Settings'));
+const EmailClient = lazy(() => import('@/pages/EmailClient'));
+const EmailServiceTest = lazy(() => import('@/pages/EmailServiceTest'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const AppRoutes = () => {
-  const { session, isLoading } = useAuth();
+  const { isLoading, session } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="d-flex align-items-center justify-content-center vh-100 bg-light">
-        <p className="text-dark">Sitzung wird geladen...</p>
-      </div>
-    );
+    return <div className="vh-100 d-flex justify-content-center align-items-center"><Spinner animation="border" /></div>;
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-        
-        <Route path="/" element={session ? <Layout /> : <Navigate to="/login" />} >
-          <Route index element={<Dashboard />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="profile/dashboard-settings" element={<DashboardSettings />} />
-          
-          <Route element={<ProtectedRoute requiredPermission="users.manage" />}>
-            <Route path="users" element={<UserManagement />} />
+    <Router>
+      <Suspense fallback={<div className="vh-100 d-flex justify-content-center align-items-center"><Spinner animation="border" /></div>}>
+        <Routes>
+          <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard/settings" element={<DashboardSettings />} />
+            <Route path="/fernverkehr" element={<Fernverkehr />} />
+            <Route path="/auftraege" element={<FreightOrderManagement />} />
+            <Route path="/auftraege/neu" element={<FreightOrderForm />} />
+            <Route path="/auftraege/:id/bearbeiten" element={<FreightOrderForm />} />
+            <Route path="/abrechnung/:orderId" element={<BillingDetail />} />
+            <Route path="/rechnungen" element={<InvoiceManagement />} />
+            <Route path="/kunden" element={<CustomerManagement />} />
+            <Route path="/kunden/:id" element={<CustomerDetail />} />
+            <Route path="/touren" element={<TourManagement />} />
+            <Route path="/fahrzeuge" element={<VehicleManagement />} />
+            <Route path="/fahrzeuge/neu" element={<VehicleForm />} />
+            <Route path="/fahrzeuge/:id/bearbeiten" element={<VehicleForm />} />
+            <Route path="/fahrzeug-gruppen" element={<VehicleGroupManagement />} />
+            <Route path="/benutzer" element={<UserManagement />} />
+            <Route path="/benutzer/:id/akte" element={<PersonnelFile />} />
+            <Route path="/profil" element={<Profile />} />
+            <Route path="/einstellungen" element={<Settings />} />
+            <Route path="/einstellungen/rollen" element={<RoleManagement />} />
+            <Route path="/einstellungen/menue" element={<MenuManagement />} />
+            <Route path="/email" element={<EmailClient />} />
+            <Route path="/email-service-test" element={<EmailServiceTest />} />
+            <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="personnel_files.manage" />}>
-            <Route path="users/:id/personnel-file" element={<PersonnelFile />} />
-          </Route>
-          
-          <Route element={<ProtectedRoute requiredPermission="roles.manage" />}>
-            <Route path="roles" element={<RoleManagement />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="menus.manage" />}>
-            <Route path="menus" element={<MenuManagement />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="settings.manage" />}>
-            <Route path="settings" element={<Settings />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="customers.manage" />}>
-            <Route path="customers" element={<CustomerManagement />} />
-            <Route path="customers/:id" element={<CustomerDetail />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="vehicles.manage" />}>
-            <Route path="vehicles" element={<VehicleManagement />} />
-            <Route path="vehicles/new" element={<VehicleForm />} />
-            <Route path="vehicles/edit/:id" element={<VehicleForm />} />
-            <Route path="vehicle-groups" element={<VehicleGroupManagement />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="freight_orders.manage" />}>
-            <Route path="freight-orders" element={<FreightOrderManagement />} />
-            <Route path="freight-orders/new" element={<FreightOrderForm />} />
-            <Route path="freight-orders/edit/:id" element={<FreightOrderForm />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="tours.manage" />}>
-            <Route path="tours" element={<TourManagement />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr" />}>
-            <Route path="fernverkehr" element={<Fernverkehr />} />
-            <Route path="billing/:id" element={<BillingDetail />} />
-            <Route path="invoices" element={<InvoiceManagement />} />
-          </Route>
-
-          <Route element={<ProtectedRoute requiredPermission="email.access" />}>
-            <Route path="email" element={<EmailClient />} />
-          </Route>
-
-          <Route path="access-denied" element={<AccessDenied />} />
-        </Route>
-
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
-  );
-}
-
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ErrorProvider>
-        <ErrorBoundary>
-          <SessionContextProvider supabaseClient={supabase}>
-            <AuthProvider>
-              <Toaster position="bottom-right" />
-              <AppRoutes />
-            </AuthProvider>
-          </SessionContextProvider>
-        </ErrorBoundary>
-      </ErrorProvider>
-    </QueryClientProvider>
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </Router>
   );
 };
+
+function App() {
+  return (
+    <ErrorProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <Toaster position="bottom-right" />
+          <AppRoutes />
+        </AuthProvider>
+      </ErrorBoundary>
+    </ErrorProvider>
+  );
+}
 
 export default App;
