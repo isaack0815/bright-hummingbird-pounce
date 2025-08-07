@@ -382,7 +382,7 @@ const Settings = () => {
         <Modal.Body>
           <Alert variant={testResult?.success ? 'success' : 'danger'}>
             {testResult?.message}
-          </Aler>
+          </Alert>
           <div className="small bg-dark text-white font-monospace p-3 rounded" style={{ maxHeight: '200px', overflowY: 'auto' }}>
             <h5 className="h6">Protokoll:</h5>
             <ul className="list-unstyled mb-0">
