@@ -96,7 +96,7 @@ const CustomerDetail = () => {
                   <tbody>
                     {billedOrders.map(order => (
                       <tr key={order.id}>
-                        <td className="fw-medium"><NavLink to={`/billing/${order.id}`}>{order.order_number}</NavLink></td>
+                        <td className="fw-medium"><NavLink to={`/fernverkehr/${order.id}`}>{order.order_number}</NavLink></td>
                         <td>{order.lex_invoice_id || '-'}</td>
                         <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
                         <td>{order.price ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(order.price) : '-'}</td>

@@ -53,11 +53,11 @@ const AppRoutes = () => {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/profile/dashboard-settings" element={<DashboardSettings />} />
-            <Route path="/billing" element={<Fernverkehr />} />
+            <Route path="/fernverkehr" element={<Fernverkehr />} />
             <Route path="/freight-orders" element={<FreightOrderManagement />} />
             <Route path="/freight-orders/new" element={<FreightOrderForm />} />
             <Route path="/freight-orders/edit/:id" element={<FreightOrderForm />} />
-            <Route path="/billing/:orderId" element={<BillingDetail />} />
+            <Route path="/fernverkehr/:orderId" element={<BillingDetail />} />
             <Route path="/invoices" element={<InvoiceManagement />} />
             <Route path="/customers" element={<CustomerManagement />} />
             <Route path="/customers/:id" element={<CustomerDetail />} />
@@ -70,8 +70,8 @@ const AppRoutes = () => {
             <Route path="/users/:id/personnel-file" element={<PersonnelFile />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/settings/roles" element={<RoleManagement />} />
-            <Route path="/settings/menu" element={<MenuManagement />} />
+            <Route path="/roles" element={<RoleManagement />} />
+            <Route path="/menus" element={<MenuManagement />} />
             <Route path="/email" element={<EmailClient />} />
             <Route path="/simple-email" element={<SimpleEmailClient />} />
             <Route path="/access-denied" element={<AccessDenied />} />

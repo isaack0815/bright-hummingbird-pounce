@@ -59,7 +59,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
   };
 
   const handleEditClick = (orderId: number) => {
-    const path = isBillingContext ? `/billing/${orderId}` : `/freight-orders/edit/${orderId}`;
+    const path = isBillingContext ? `/fernverkehr/${orderId}` : `/freight-orders/edit/${orderId}`;
     navigate(path);
   };
 
