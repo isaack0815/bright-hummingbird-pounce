@@ -17,24 +17,34 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  
+  const log = async (status: string, details: string, jobId: number | null = null) => {
+    await supabaseAdmin.from('email_sync_cron_logs').insert({ status, details, job_id: jobId });
+  };
+
   const receivedSecret = req.headers.get('X-Cron-Secret');
   const cronSecret = Deno.env.get('CRON_SECRET');
   if (!cronSecret || receivedSecret !== cronSecret) {
+    await log('error', 'Unauthorized attempt to run cron job.');
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
   }
 
   try {
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    await log('started', 'Cron job started.');
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
     if (!encryptionKey) throw new Error("APP_ENCRYPTION_KEY secret is not set.");
 
     const { data: accounts, error: accountsError } = await supabaseAdmin.from('email_accounts').select('*');
     if (accountsError) throw accountsError;
     if (!accounts || accounts.length === 0) {
+      await log('completed', 'No accounts to sync.');
       return new Response(JSON.stringify({ message: "No accounts to sync." }), { headers: corsHeaders });
     }
 
     let jobsCreated = 0;
+    let workerInvoked = false;
+
     for (const account of accounts) {
       const { data: existingJob } = await supabaseAdmin.from('email_sync_jobs').select('id').eq('user_id', account.user_id).in('status', ['pending', 'processing']).limit(1).single();
       if (existingJob) {
@@ -57,24 +67,34 @@ serve(async (req) => {
           const newUids = serverUids.filter(uid => !existingUids.has(uid));
 
           if (newUids.length > 0) {
-            await supabaseAdmin.from('email_sync_jobs').insert({
+            const { data: newJob, error: insertError } = await supabaseAdmin.from('email_sync_jobs').insert({
               user_id: account.user_id,
               status: 'pending',
+              mailbox: mailbox.path,
               uids_to_process: newUids,
               total_count: newUids.length,
-            });
+            }).select('id').single();
+
+            if (insertError) throw insertError;
+
+            await log('job_created', `Created job for user ${account.user_id} in mailbox ${mailbox.path} with ${newUids.length} emails.`, newJob.id);
             jobsCreated++;
-            // Asynchronously trigger the worker function without waiting for it
-            supabaseAdmin.functions.invoke('process-email-batch', { body: {} }).catch(console.error);
+            if (!workerInvoked) {
+              supabaseAdmin.functions.invoke('process-email-batch', { body: {} }).catch(console.error);
+              workerInvoked = true;
+              await log('worker_invoked', 'Worker function process-email-batch was invoked.');
+            }
           }
         }
       } finally {
         await client.logout();
       }
     }
-
+    
+    await log('completed', `Cron run finished. Created ${jobsCreated} new sync jobs.`);
     return new Response(JSON.stringify({ message: `Created ${jobsCreated} new sync jobs.` }), { headers: corsHeaders });
   } catch (e) {
+    await log('error', `Cron job failed: ${e.message}`);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }
 });

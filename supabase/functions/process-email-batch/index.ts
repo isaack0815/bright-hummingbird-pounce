@@ -31,8 +31,10 @@ serve(async (_req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  let jobId: number | null = null;
+
   try {
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const encryptionKey = Deno.env.get('APP_ENCRYPTION_KEY');
     if (!encryptionKey) throw new Error("APP_ENCRYPTION_KEY secret is not set.");
 
@@ -40,8 +42,13 @@ serve(async (_req) => {
     if (jobError || !job) {
       return new Response(JSON.stringify({ message: "No pending jobs." }), { headers: corsHeaders });
     }
+    jobId = job.id;
 
     await supabaseAdmin.from('email_sync_jobs').update({ status: 'processing' }).eq('id', job.id);
+
+    if (!job.mailbox) {
+      throw new Error(`Job ${job.id} is missing a mailbox path.`);
+    }
 
     const { data: account, error: accountError } = await supabaseAdmin.from('email_accounts').select('*').eq('user_id', job.user_id).single();
     if (accountError || !account) throw new Error(`Account for user ${job.user_id} not found.`);
@@ -52,31 +59,28 @@ serve(async (_req) => {
     let processedInThisRun = 0;
     try {
       await client.connect();
-      const uidsToProcessNow = job.uids_to_process.slice(job.processed_count, job.processed_count + BATCH_SIZE);
+      const uids = Array.isArray(job.uids_to_process) ? job.uids_to_process : JSON.parse(job.uids_to_process || '[]');
+      const uidsToProcessNow = uids.slice(job.processed_count, job.processed_count + BATCH_SIZE);
 
       if (uidsToProcessNow.length > 0) {
-        const mailboxes = await client.list();
-        for (const mailbox of mailboxes) {
-            if (mailbox.flags.has('\\Noselect')) continue;
-            await client.mailboxOpen(mailbox.path);
-            const messages = client.fetch(uidsToProcessNow, { source: true, uid: true });
-            for await (const msg of messages) {
-                if (!msg.source) continue;
-                const source = await streamToBuffer(msg.source);
-                const parsed = await simpleParser(source);
-                const emailData = { user_id: job.user_id, uid: msg.uid, mailbox: mailbox.path, from_address: formatAddress(parsed.from), to_address: formatAddress(parsed.to), subject: parsed.subject, sent_at: parsed.date, body_text: parsed.text, body_html: parsed.html };
-                const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin.from('emails').insert(emailData).select('id').single();
-                if (insertEmailError) { console.error(`[WORKER] Failed to insert email UID ${msg.uid}:`, insertEmailError); continue; }
-                if (parsed.attachments && parsed.attachments.length > 0) {
-                    for (const attachment of parsed.attachments) {
-                        if (typeof attachment.content === 'string' || !attachment.filename) continue;
-                        const filePath = `${job.user_id}/${insertedEmail.id}/${attachment.filename}`;
-                        await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
-                        await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
-                    }
+        await client.mailboxOpen(job.mailbox);
+        const messages = client.fetch(uidsToProcessNow, { source: true, uid: true });
+        for await (const msg of messages) {
+            if (!msg.source) continue;
+            const source = await streamToBuffer(msg.source);
+            const parsed = await simpleParser(source);
+            const emailData = { user_id: job.user_id, uid: msg.uid, mailbox: job.mailbox, from_address: formatAddress(parsed.from), to_address: formatAddress(parsed.to), subject: parsed.subject, sent_at: parsed.date, body_text: parsed.text, body_html: parsed.html };
+            const { data: insertedEmail, error: insertEmailError } = await supabaseAdmin.from('emails').insert(emailData).select('id').single();
+            if (insertEmailError) { console.error(`[WORKER] Failed to insert email UID ${msg.uid}:`, insertEmailError); continue; }
+            if (parsed.attachments && parsed.attachments.length > 0) {
+                for (const attachment of parsed.attachments) {
+                    if (typeof attachment.content === 'string' || !attachment.filename) continue;
+                    const filePath = `${job.user_id}/${insertedEmail.id}/${attachment.filename}`;
+                    await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
+                    await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
                 }
-                processedInThisRun++;
             }
+            processedInThisRun++;
         }
       }
     } finally {
@@ -90,19 +94,14 @@ serve(async (_req) => {
       processed_count: newProcessedCount,
     }).eq('id', job.id);
 
-    if (!isCompleted) {
-      // Re-invoke self for the next batch
+    if (!isCompleted && uidsToProcessNow.length > 0) {
       supabaseAdmin.functions.invoke('process-email-batch', { body: {} }).catch(console.error);
     }
 
     return new Response(JSON.stringify({ message: `Processed ${processedInThisRun} emails for job ${job.id}.` }), { headers: corsHeaders });
   } catch (e) {
-    console.error("[WORKER] CATASTROPHIC ERROR:", e);
-    // Attempt to mark the job as failed
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const { data: job } = await supabaseAdmin.from('email_sync_jobs').select('id').eq('status', 'processing').limit(1).single();
-    if (job) {
-      await supabaseAdmin.from('email_sync_jobs').update({ status: 'failed', error_message: e.message }).eq('id', job.id);
+    if (jobId) {
+      await supabaseAdmin.from('email_sync_jobs').update({ status: 'failed', error_message: e.message }).eq('id', jobId);
     }
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }
