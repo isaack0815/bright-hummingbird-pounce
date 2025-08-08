@@ -13,20 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Check for required SMTP secrets
-    const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
-    const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
-    if (missingEnv.length > 0) {
-      throw new Error(`Server configuration error: Missing required SMTP secrets: ${missingEnv.join(', ')}`);
-    }
-
-    // 2. Create Supabase admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 3. Get data from request body
     const { fileId, recipientEmail, subject, messageBody } = await req.json();
     if (!fileId || !recipientEmail || !subject) {
       return new Response(JSON.stringify({ error: 'File ID, recipient email, and subject are required' }), { 
@@ -35,7 +26,6 @@ serve(async (req) => {
       });
     }
 
-    // 4. Fetch file details from the database
     const { data: file, error: fileError } = await supabaseAdmin
       .from('order_files')
       .select('file_path, file_name, file_type')
@@ -43,26 +33,33 @@ serve(async (req) => {
       .single();
     if (fileError || !file) throw new Error(fileError?.message || 'File not found.');
 
-    // 5. Download the file from storage
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from('order-files')
       .download(file.file_path);
     if (downloadError) throw downloadError;
     const fileContent = await fileData.arrayBuffer();
 
-    // 6. Set up Nodemailer transporter
+    // Set up Nodemailer transporter
+    const smtpHost = Deno.env.get('SMTP_HOST');
+    const smtpPort = Deno.env.get('SMTP_PORT');
+    const smtpUser = Deno.env.get('SMTP_USER');
+    const smtpPass = Deno.env.get('SMTP_PASS');
+    const smtpSecure = Deno.env.get('SMTP_SECURE');
+    const fromEmail = Deno.env.get('SMTP_FROM_EMAIL');
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
+        throw new Error(`Server configuration error: Missing one or more required SMTP secrets. Please check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL in your Supabase project settings.`);
+    }
+
     const transporter = nodemailer.createTransport({
-      host: Deno.env.get('SMTP_HOST')!,
-      port: Number(Deno.env.get('SMTP_PORT')!),
-      secure: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
+      host: smtpHost,
+      port: Number(smtpPort),
+      secure: smtpSecure?.toLowerCase() === 'ssl' || smtpSecure?.toLowerCase() === 'tls',
       auth: {
-        user: Deno.env.get('SMTP_USER')!,
-        pass: Deno.env.get('SMTP_PASS')!,
+        user: smtpUser,
+        pass: smtpPass,
       },
     });
-
-    // 7. Send the email
-    const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com';
     
     await transporter.sendMail({
       from: fromEmail,
