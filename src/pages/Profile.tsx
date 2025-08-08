@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
@@ -41,6 +42,7 @@ const fetchUserProfile = async () => {
 
 const Profile = () => {
   const queryClient = useQueryClient();
+  const supabaseClient = useSupabaseClient();
   const { data: userProfile, isLoading } = useQuery({
     queryKey: ['userProfile'],
     queryFn: fetchUserProfile,
@@ -71,7 +73,7 @@ const Profile = () => {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: z.infer<typeof profileSchema>) => {
-      const { error } = await supabase.functions.invoke('update-my-profile', {
+      const { error } = await supabaseClient.functions.invoke('update-my-profile', {
         body: {
           firstName: values.firstName,
           lastName: values.lastName,
