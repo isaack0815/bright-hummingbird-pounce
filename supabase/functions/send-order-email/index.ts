@@ -62,11 +62,14 @@ serve(async (req) => {
     const smtpSecure = Deno.env.get('SMTP_SECURE');
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
+    console.log(`[send-order-email] DEBUG: Reading SMTP_HOST: ${smtpHost}`);
+    console.log(`[send-order-email] DEBUG: Reading SMTP_PORT: ${smtpPort}`);
+
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
         throw new Error(`Server configuration error: Missing one or more required SMTP secrets. Please check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL in your Supabase project settings.`);
     }
 
-    const transporter = nodemailer.createTransport({
+    const transportOptions = {
       host: smtpHost,
       port: Number(smtpPort),
       secure: smtpSecure?.toLowerCase() === 'ssl' || smtpSecure?.toLowerCase() === 'tls',
@@ -74,7 +77,11 @@ serve(async (req) => {
         user: smtpUser,
         pass: smtpPass,
       },
-    });
+    };
+
+    console.log(`[send-order-email] DEBUG: Nodemailer config: ${JSON.stringify({ ...transportOptions, auth: { user: transportOptions.auth.user, pass: 'REDACTED' } })}`);
+
+    const transporter = nodemailer.createTransport(transportOptions);
 
     const companyName = settingsMap.get('company_name') ?? 'Your Company'
     const signature = settingsMap.get('email_signature') ?? `<p>Mit freundlichen Grüßen,<br/>${companyName}</p>`

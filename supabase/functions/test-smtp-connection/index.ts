@@ -22,12 +22,19 @@ serve(async (req) => {
     const smtpSecure = Deno.env.get('SMTP_SECURE');
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
+    steps.push(`[DEBUG] Reading SMTP_HOST: ${smtpHost}`);
+    steps.push(`[DEBUG] Reading SMTP_PORT: ${smtpPort}`);
+    steps.push(`[DEBUG] Reading SMTP_USER: ${smtpUser ? 'Present' : 'MISSING'}`);
+    steps.push(`[DEBUG] Reading SMTP_PASS: ${smtpPass ? 'Present' : 'MISSING'}`);
+    steps.push(`[DEBUG] Reading SMTP_SECURE: ${smtpSecure}`);
+    steps.push(`[DEBUG] Reading SMTP_FROM_EMAIL: ${fromEmail}`);
+
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
         throw new Error(`Server configuration error: Missing one or more required SMTP secrets. Please check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL in your Supabase project settings.`);
     }
     steps.push("All required secrets are present.");
 
-    const transporter = nodemailer.createTransport({
+    const transportOptions = {
       host: smtpHost,
       port: Number(smtpPort),
       secure: smtpSecure?.toLowerCase() === 'ssl' || smtpSecure?.toLowerCase() === 'tls',
@@ -35,7 +42,11 @@ serve(async (req) => {
         user: smtpUser,
         pass: smtpPass,
       },
-    });
+    };
+
+    steps.push(`[DEBUG] Nodemailer config: ${JSON.stringify({ ...transportOptions, auth: { user: transportOptions.auth.user, pass: 'REDACTED' } })}`);
+
+    const transporter = nodemailer.createTransport(transportOptions);
     steps.push("Nodemailer transporter created.");
 
     steps.push("Verifying SMTP connection...");
