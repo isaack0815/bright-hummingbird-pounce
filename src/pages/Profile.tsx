@@ -8,7 +8,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const profileSchema = z.object({
@@ -43,7 +42,6 @@ const fetchUserProfile = async () => {
 
 const Profile = () => {
   const queryClient = useQueryClient();
-  const supabaseClient = useSupabaseClient();
   const { session } = useAuth();
 
   const { data: userProfile, isLoading } = useQuery({
@@ -78,18 +76,33 @@ const Profile = () => {
     mutationFn: async (values: z.infer<typeof profileSchema>) => {
       if (!session) throw new Error("Nicht authentifiziert. Bitte neu anmelden.");
 
-      const { error } = await supabaseClient.functions.invoke('update-my-profile', {
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-my-profile`;
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: {
+        body: JSON.stringify({
           firstName: values.firstName,
           lastName: values.lastName,
           username: values.username,
           email_signature: values.email_signature,
-        },
+        }),
       });
-      if (error) throw error;
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Server-Fehler: ${response.status}`);
+      }
+      
+      if (data.error) {
+          throw new Error(data.error);
+      }
+      return data;
     },
     onSuccess: () => {
       showSuccess("Profil erfolgreich aktualisiert!");
