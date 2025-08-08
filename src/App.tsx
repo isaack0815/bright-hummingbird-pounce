@@ -34,6 +34,7 @@ const PersonnelFile = lazy(() => import('@/pages/PersonnelFile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const EmailClient = lazy(() => import('@/pages/EmailClient'));
 const SimpleEmailClient = lazy(() => import('@/pages/SimpleEmailClient'));
+const FileManager = lazy(() => import('@/pages/FileManager'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -74,6 +75,7 @@ const AppRoutes = () => {
             <Route path="/menus" element={<MenuManagement />} />
             <Route path="/email" element={<EmailClient />} />
             <Route path="/simple-email" element={<SimpleEmailClient />} />
+            <Route path="/file-manager" element={<ProtectedRoute requiredPermission="files.manage"><FileManager /></ProtectedRoute>} />
             <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<NotFound />} />
