@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Button, Table, Form, Spinner } from 'react-bootstrap';
-import { Download, Trash2, Edit, Upload, File as FileIcon } from 'lucide-react';
+import { Card, Button, Table, Form, Spinner, Row, Col, ListGroup, Badge } from 'react-bootstrap';
+import { Download, Trash2, Edit, Upload, File as FileIcon, Folder } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,9 +26,10 @@ const fetchOrders = async () => {
 const FileManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [selectedOrderIdForUpload, setSelectedOrderIdForUpload] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [fileToReassign, setFileToReassign] = useState<OrderFileWithDetails | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -48,18 +49,18 @@ const FileManager = () => {
   });
 
   const handleUpload = async () => {
-    if (!selectedFile || !selectedOrderId || !user) {
+    if (!selectedFile || !selectedOrderIdForUpload || !user) {
       showError("Bitte wählen Sie eine Datei und einen Auftrag aus.");
       return;
     }
     setUploading(true);
     try {
-      const filePath = `${selectedOrderId}/${uuidv4()}-${selectedFile.name}`;
+      const filePath = `${selectedOrderIdForUpload}/${uuidv4()}-${selectedFile.name}`;
       const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, selectedFile);
       if (uploadError) throw uploadError;
 
       await supabase.from('order_files').insert({
-        order_id: selectedOrderId,
+        order_id: selectedOrderIdForUpload,
         user_id: user.id,
         file_path: filePath,
         file_name: selectedFile.name,
@@ -68,7 +69,7 @@ const FileManager = () => {
       showSuccess("Datei erfolgreich hochgeladen!");
       queryClient.invalidateQueries({ queryKey: ['allOrderFiles'] });
       setSelectedFile(null);
-      setSelectedOrderId(null);
+      setSelectedOrderIdForUpload(null);
     } catch (err: any) {
       showError(err.message || "Fehler beim Hochladen.");
     } finally {
@@ -76,13 +77,30 @@ const FileManager = () => {
     }
   };
 
-  const filteredFiles = useMemo(() => {
-    if (!files) return [];
-    return files.filter(file =>
-      file.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      file.order_number.toLowerCase().includes(searchTerm.toLowerCase())
+  const ordersWithFiles = useMemo(() => {
+    if (!files) return new Map<number, { order_number: string, files: OrderFileWithDetails[] }>();
+    return files.reduce((acc, file) => {
+      if (!acc.has(file.order_id)) {
+        acc.set(file.order_id, { order_number: file.order_number, files: [] });
+      }
+      acc.get(file.order_id)!.files.push(file);
+      return acc;
+    }, new Map<number, { order_number: string, files: OrderFileWithDetails[] }>());
+  }, [files]);
+
+  const filteredOrders = useMemo(() => {
+    const orderEntries = Array.from(ordersWithFiles.entries());
+    if (!searchTerm) return orderEntries;
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    return orderEntries.filter(([, data]) =>
+      data.order_number.toLowerCase().includes(lowerCaseSearch)
     );
-  }, [files, searchTerm]);
+  }, [ordersWithFiles, searchTerm]);
+
+  const selectedFiles = useMemo(() => {
+    if (!selectedOrderId) return [];
+    return ordersWithFiles.get(selectedOrderId)?.files || [];
+  }, [selectedOrderId, ordersWithFiles]);
 
   const orderOptions = orders?.map((o: { id: number, order_number: string }) => ({
     value: o.id,
@@ -97,39 +115,68 @@ const FileManager = () => {
         <Card.Body>
           <div className="row g-3 align-items-end">
             <div className="col-md-5"><Form.Group><Form.Label>Datei auswählen</Form.Label><Form.Control type="file" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSelectedFile(e.target.files?.[0] || null)} /></Form.Group></div>
-            <div className="col-md-5"><Form.Group><Form.Label>Auftrag zuordnen</Form.Label><Select options={orderOptions} isLoading={isLoadingOrders} onChange={(opt) => setSelectedOrderId(opt?.value || null)} placeholder="Auftrag auswählen..." isClearable /></Form.Group></div>
-            <div className="col-md-2"><Button onClick={handleUpload} disabled={uploading || !selectedFile || !selectedOrderId} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></div>
+            <div className="col-md-5"><Form.Group><Form.Label>Auftrag zuordnen</Form.Label><Select options={orderOptions} isLoading={isLoadingOrders} onChange={(opt) => setSelectedOrderIdForUpload(opt?.value || null)} placeholder="Auftrag auswählen..." isClearable /></Form.Group></div>
+            <div className="col-md-2"><Button onClick={handleUpload} disabled={uploading || !selectedFile || !selectedOrderIdForUpload} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></div>
           </div>
         </Card.Body>
       </Card>
 
-      <Card>
-        <Card.Header>
-          <Card.Title>Alle Dateien</Card.Title>
-          <Form.Control placeholder="Suchen..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ maxWidth: '300px' }} />
-        </Card.Header>
-        <Card.Body>
-          {isLoading ? <TablePlaceholder /> : (
-            <Table responsive hover>
-              <thead><tr><th>Dateiname</th><th>Auftrag</th><th>Hochgeladen von</th><th>Datum</th><th className="text-end">Aktionen</th></tr></thead>
-              <tbody>
-                {filteredFiles.map(file => (
-                  <tr key={file.id}>
-                    <td className="fw-medium"><FileIcon size={16} className="me-2" />{file.file_name}</td>
-                    <td>{file.order_number}</td>
-                    <td>{`${file.first_name || ''} ${file.last_name || ''}`.trim()}</td>
-                    <td>{new Date(file.created_at).toLocaleString('de-DE')}</td>
-                    <td className="text-end">
-                      <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file)}><Edit size={16} /></Button>
-                      <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file.id)}><Trash2 size={16} /></Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
-        </Card.Body>
-      </Card>
+      <Row>
+        <Col md={4}>
+          <Card>
+            <Card.Header>
+              <Card.Title>Auftragsordner</Card.Title>
+              <Form.Control placeholder="Ordner suchen..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} size="sm" />
+            </Card.Header>
+            <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {isLoading ? <div className="p-3 text-center"><Spinner size="sm" /></div> : (
+                filteredOrders.map(([orderId, data]) => (
+                  <ListGroup.Item key={orderId} action active={orderId === selectedOrderId} onClick={() => setSelectedOrderId(orderId)}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div className="d-flex align-items-center">
+                        <Folder size={16} className="me-2" />
+                        <span className="fw-medium">{data.order_number}</span>
+                      </div>
+                      <Badge pill bg="secondary">{data.files.length}</Badge>
+                    </div>
+                  </ListGroup.Item>
+                ))
+              )}
+            </ListGroup>
+          </Card>
+        </Col>
+        <Col md={8}>
+          <Card>
+            <Card.Header>
+              <Card.Title>
+                {selectedOrderId ? `Dateien für Auftrag ${ordersWithFiles.get(selectedOrderId)?.order_number}` : 'Dateien'}
+              </Card.Title>
+            </Card.Header>
+            <Card.Body>
+              {isLoading ? <TablePlaceholder /> : !selectedOrderId ? (
+                <div className="text-center text-muted py-5">Bitte wählen Sie links einen Ordner aus.</div>
+              ) : (
+                <Table responsive hover>
+                  <thead><tr><th>Dateiname</th><th>Hochgeladen von</th><th>Datum</th><th className="text-end">Aktionen</th></tr></thead>
+                  <tbody>
+                    {selectedFiles.map(file => (
+                      <tr key={file.id}>
+                        <td className="fw-medium"><FileIcon size={16} className="me-2" />{file.file_name}</td>
+                        <td>{`${file.first_name || ''} ${file.last_name || ''}`.trim()}</td>
+                        <td>{new Date(file.created_at).toLocaleString('de-DE')}</td>
+                        <td className="text-end">
+                          <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file)}><Edit size={16} /></Button>
+                          <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file.id)}><Trash2 size={16} /></Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
       <ReassignFileDialog show={!!fileToReassign} onHide={() => setFileToReassign(null)} file={fileToReassign} />
     </>
   );
