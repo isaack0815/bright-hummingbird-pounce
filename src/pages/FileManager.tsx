@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Button, Table, Form, Spinner, Row, Col, ListGroup, Badge } from 'react-bootstrap';
-import { Upload, File as FileIcon, Folder, Edit, Trash2 } from 'lucide-react';
+import { Upload, File as FileIcon, Folder, Edit, Trash2, Download, Mail } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import Select from 'react-select';
 import { ReassignFileDialog } from '@/components/file-manager/ReassignFileDialog';
+import { SendFileDialog } from '@/components/file-manager/SendFileDialog';
 import type { OrderFileWithDetails } from '@/types/files';
 import TablePlaceholder from '@/components/TablePlaceholder';
 
@@ -29,6 +30,7 @@ const FileManager = () => {
   const [selectedOrderIdForUpload, setSelectedOrderIdForUpload] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [fileToReassign, setFileToReassign] = useState<OrderFileWithDetails | null>(null);
+  const [fileToSend, setFileToSend] = useState<OrderFileWithDetails | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [draggedOverOrderId, setDraggedOverOrderId] = useState<number | null>(null);
   const { user } = useAuth();
@@ -82,9 +84,20 @@ const FileManager = () => {
       handleFileUpload(selectedFile, selectedOrderIdForUpload);
       setSelectedFile(null);
       setSelectedOrderIdForUpload(null);
-      // Consider resetting the file input visually if needed
     } else {
       showError("Bitte wählen Sie eine Datei und einen Auftrag aus.");
+    }
+  };
+
+  const handleDownload = async (file: OrderFileWithDetails) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-download-url', {
+        body: { filePath: file.file_path },
+      });
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (err: any) {
+      showError(err.data?.error || "Fehler beim Herunterladen.");
     }
   };
 
@@ -201,6 +214,8 @@ const FileManager = () => {
                         <td>{`${file.first_name || ''} ${file.last_name || ''}`.trim()}</td>
                         <td>{new Date(file.created_at).toLocaleString('de-DE')}</td>
                         <td className="text-end">
+                          <Button variant="ghost" size="sm" onClick={() => handleDownload(file)}><Download size={16} /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => setFileToSend(file)}><Mail size={16} /></Button>
                           <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file)}><Edit size={16} /></Button>
                           <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file.id)}><Trash2 size={16} /></Button>
                         </td>
@@ -214,6 +229,7 @@ const FileManager = () => {
         </Col>
       </Row>
       <ReassignFileDialog show={!!fileToReassign} onHide={() => setFileToReassign(null)} file={fileToReassign} />
+      <SendFileDialog show={!!fileToSend} onHide={() => setFileToSend(null)} file={fileToSend} />
     </>
   );
 };
