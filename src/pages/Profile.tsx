@@ -14,6 +14,7 @@ const profileSchema = z.object({
   lastName: z.string().min(1, "Nachname ist erforderlich."),
   username: z.string().min(3, "Benutzername muss mind. 3 Zeichen haben.").regex(/^[a-zA-Z0-9_]+$/, "Nur Buchstaben, Zahlen und Unterstriche."),
   email: z.string().email(),
+  email_signature: z.string().optional(),
 });
 
 const fetchUserProfile = async () => {
@@ -23,7 +24,7 @@ const fetchUserProfile = async () => {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('first_name, last_name, username')
+    .select('first_name, last_name, username, email_signature')
     .eq('id', user.id)
     .maybeSingle();
   
@@ -34,6 +35,7 @@ const fetchUserProfile = async () => {
     firstName: profile?.first_name,
     lastName: profile?.last_name,
     username: profile?.username,
+    email_signature: profile?.email_signature,
   };
 };
 
@@ -51,6 +53,7 @@ const Profile = () => {
       lastName: "",
       username: "",
       email: "",
+      email_signature: "",
     },
   });
 
@@ -61,6 +64,7 @@ const Profile = () => {
         lastName: userProfile.lastName || "",
         username: userProfile.username || "",
         email: userProfile.email || "",
+        email_signature: userProfile.email_signature || "",
       });
     }
   }, [userProfile, form]);
@@ -72,6 +76,7 @@ const Profile = () => {
           firstName: values.firstName,
           lastName: values.lastName,
           username: values.username,
+          email_signature: values.email_signature,
         },
       });
       if (error) throw error;
@@ -127,6 +132,10 @@ const Profile = () => {
                     <Form.Label>Benutzername</Form.Label>
                     <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
                     <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
+                  </Form.Group>
+                  <Form.Group className="mb-3" controlId="profileSignature">
+                    <Form.Label>E-Mail Signatur (HTML)</Form.Label>
+                    <Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen,<br/>Max Mustermann</p>" {...form.register("email_signature")} />
                   </Form.Group>
                   <Button type="submit" disabled={updateProfileMutation.isPending}>
                     {updateProfileMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}

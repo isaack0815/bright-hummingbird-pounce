@@ -13,6 +13,14 @@ serve(async (req) => {
   }
 
   try {
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error(userError?.message || "User not authenticated");
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -25,6 +33,13 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('email_signature')
+      .eq('id', user.id)
+      .single();
+    if (profileError && profileError.code !== 'PGRST116') throw profileError;
 
     const { data: file, error: fileError } = await supabaseAdmin
       .from('order_files')
@@ -46,14 +61,11 @@ serve(async (req) => {
     const smtpSecure = Deno.env.get('SMTP_SECURE');
     const fromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
-    console.log(`[send-order-file-email] DEBUG: Reading SMTP_HOST: ${smtpHost}`);
-    console.log(`[send-order-file-email] DEBUG: Reading SMTP_PORT: ${smtpPort}`);
-
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
-        throw new Error(`Server configuration error: Missing one or more required SMTP secrets. Please check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL in your Supabase project settings.`);
+        throw new Error(`Server configuration error: Missing one or more required SMTP secrets.`);
     }
 
-    const transportOptions = {
+    const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: Number(smtpPort),
       secure: smtpSecure?.toLowerCase() === 'ssl' || smtpSecure?.toLowerCase() === 'tls',
@@ -61,17 +73,16 @@ serve(async (req) => {
         user: smtpUser,
         pass: smtpPass,
       },
-    };
+    });
     
-    console.log(`[send-order-file-email] DEBUG: Nodemailer config: ${JSON.stringify({ ...transportOptions, auth: { user: transportOptions.auth.user, pass: 'REDACTED' } })}`);
+    const userSignature = profile?.email_signature || '';
+    const finalMessageBody = `${messageBody || '<p>Anbei erhalten Sie die angeforderte Datei.</p>'}<br/><br/>${userSignature}`;
 
-    const transporter = nodemailer.createTransport(transportOptions);
-    
     await transporter.sendMail({
       from: fromEmail,
       to: recipientEmail,
       subject: subject,
-      html: messageBody || '<p>Anbei erhalten Sie die angeforderte Datei.</p>',
+      html: finalMessageBody,
       attachments: [
         {
           filename: file.file_name,
