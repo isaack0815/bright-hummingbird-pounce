@@ -12,9 +12,15 @@ serve(async (req) => {
   }
 
   try {
+    console.log("[update-my-profile] Function invoked. Awaiting request body...");
+    const body = await req.json();
+    console.log("[update-my-profile] Request body received:", body);
+
     const authHeader = req.headers.get('Authorization');
+    console.log("[update-my-profile] Authorization header:", authHeader ? `${authHeader.substring(0, 15)}...` : "MISSING");
+
     if (!authHeader) {
-      throw new Error("Authorization header is missing. The request could not be authenticated.");
+      throw new Error("Authorization header is missing. The request could not be authenticated. Please ensure the client is sending the 'Authorization: Bearer <TOKEN>' header.");
     }
 
     // Step 1: Authenticate the user with their token
@@ -24,16 +30,20 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
+    console.log("[update-my-profile] Attempting to get user from token...");
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError) {
+      console.error("[update-my-profile] Error getting user:", userError);
       throw new Error(`Authentication error: ${userError.message}`);
     }
     if (!user) {
+      console.error("[update-my-profile] User object is null after getUser call.");
       throw new Error("Authentication failed: Could not retrieve user from the provided token.");
     }
+    console.log(`[update-my-profile] User authenticated successfully: ${user.id}`);
 
-    const { firstName, lastName, username, email_signature } = await req.json()
+    const { firstName, lastName, username, email_signature } = body;
 
     if (!firstName || !lastName || !username) {
       return new Response(JSON.stringify({ error: 'First name, last name, and username are required' }), {
@@ -47,6 +57,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    console.log("[update-my-profile] Admin client created. Updating user metadata...");
 
     // Update user metadata in auth.users
     const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -54,12 +65,14 @@ serve(async (req) => {
       { user_metadata: { first_name: firstName, last_name: lastName, username } }
     )
     if (updateUserError) throw updateUserError
+    console.log("[update-my-profile] User metadata updated. Upserting profile...");
 
     // Upsert the public.profiles table
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({ id: user.id, first_name: firstName, last_name: lastName, username, email_signature })
     if (profileError) throw profileError
+    console.log("[update-my-profile] Profile upserted successfully.");
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -67,7 +80,7 @@ serve(async (req) => {
     })
 
   } catch (e) {
-    console.error("[update-my-profile] Error:", e.message);
+    console.error("[update-my-profile] CRITICAL ERROR:", e.message);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

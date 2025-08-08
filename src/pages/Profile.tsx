@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
@@ -43,6 +44,8 @@ const fetchUserProfile = async () => {
 const Profile = () => {
   const queryClient = useQueryClient();
   const supabaseClient = useSupabaseClient();
+  const { session } = useAuth();
+
   const { data: userProfile, isLoading } = useQuery({
     queryKey: ['userProfile'],
     queryFn: fetchUserProfile,
@@ -73,7 +76,12 @@ const Profile = () => {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: z.infer<typeof profileSchema>) => {
+      if (!session) throw new Error("Nicht authentifiziert. Bitte neu anmelden.");
+
       const { error } = await supabaseClient.functions.invoke('update-my-profile', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: {
           firstName: values.firstName,
           lastName: values.lastName,
