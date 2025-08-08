@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Button, Table, Form, Spinner, Row, Col, ListGroup, Badge } from 'react-bootstrap';
-import { Download, Trash2, Edit, Upload, File as FileIcon, Folder } from 'lucide-react';
+import { Upload, File as FileIcon, Folder, Edit, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,6 +30,7 @@ const FileManager = () => {
   const [uploading, setUploading] = useState(false);
   const [fileToReassign, setFileToReassign] = useState<OrderFileWithDetails | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [draggedOverOrderId, setDraggedOverOrderId] = useState<number | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -48,32 +49,54 @@ const FileManager = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Löschen."),
   });
 
-  const handleUpload = async () => {
-    if (!selectedFile || !selectedOrderIdForUpload || !user) {
-      showError("Bitte wählen Sie eine Datei und einen Auftrag aus.");
+  const handleFileUpload = async (file: File, orderId: number) => {
+    if (!file || !orderId || !user) {
+      showError("Datei oder Auftrag ungültig.");
       return;
     }
     setUploading(true);
     try {
-      const filePath = `${selectedOrderIdForUpload}/${uuidv4()}-${selectedFile.name}`;
-      const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, selectedFile);
+      const filePath = `${orderId}/${uuidv4()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file);
       if (uploadError) throw uploadError;
 
       await supabase.from('order_files').insert({
-        order_id: selectedOrderIdForUpload,
+        order_id: orderId,
         user_id: user.id,
         file_path: filePath,
-        file_name: selectedFile.name,
-        file_type: selectedFile.type,
+        file_name: file.name,
+        file_type: file.type,
       });
-      showSuccess("Datei erfolgreich hochgeladen!");
+      const orderNumber = ordersWithFiles.get(orderId)?.order_number || '';
+      showSuccess(`Datei "${file.name}" erfolgreich in Auftrag ${orderNumber} hochgeladen!`);
       queryClient.invalidateQueries({ queryKey: ['allOrderFiles'] });
-      setSelectedFile(null);
-      setSelectedOrderIdForUpload(null);
     } catch (err: any) {
       showError(err.message || "Fehler beim Hochladen.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleManualUpload = () => {
+    if (selectedFile && selectedOrderIdForUpload) {
+      handleFileUpload(selectedFile, selectedOrderIdForUpload);
+      setSelectedFile(null);
+      setSelectedOrderIdForUpload(null);
+      // Consider resetting the file input visually if needed
+    } else {
+      showError("Bitte wählen Sie eine Datei und einen Auftrag aus.");
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDragEnter = (e: React.DragEvent, orderId: number) => { e.preventDefault(); setDraggedOverOrderId(orderId); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setDraggedOverOrderId(null); };
+  const handleDrop = (e: React.DragEvent, orderId: number) => {
+    e.preventDefault();
+    setDraggedOverOrderId(null);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileUpload(e.dataTransfer.files[0], orderId);
+      e.dataTransfer.clearData();
     }
   };
 
@@ -116,7 +139,7 @@ const FileManager = () => {
           <div className="row g-3 align-items-end">
             <div className="col-md-5"><Form.Group><Form.Label>Datei auswählen</Form.Label><Form.Control type="file" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSelectedFile(e.target.files?.[0] || null)} /></Form.Group></div>
             <div className="col-md-5"><Form.Group><Form.Label>Auftrag zuordnen</Form.Label><Select options={orderOptions} isLoading={isLoadingOrders} onChange={(opt) => setSelectedOrderIdForUpload(opt?.value || null)} placeholder="Auftrag auswählen..." isClearable /></Form.Group></div>
-            <div className="col-md-2"><Button onClick={handleUpload} disabled={uploading || !selectedFile || !selectedOrderIdForUpload} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></div>
+            <div className="col-md-2"><Button onClick={handleManualUpload} disabled={uploading || !selectedFile || !selectedOrderIdForUpload} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></div>
           </div>
         </Card.Body>
       </Card>
@@ -131,7 +154,20 @@ const FileManager = () => {
             <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               {isLoading ? <div className="p-3 text-center"><Spinner size="sm" /></div> : (
                 filteredOrders.map(([orderId, data]) => (
-                  <ListGroup.Item key={orderId} action active={orderId === selectedOrderId} onClick={() => setSelectedOrderId(orderId)}>
+                  <ListGroup.Item 
+                    key={orderId} 
+                    action 
+                    active={orderId === selectedOrderId} 
+                    onClick={() => setSelectedOrderId(orderId)}
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, orderId)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, orderId)}
+                    style={{
+                        transition: 'background-color 0.2s ease-in-out',
+                        backgroundColor: draggedOverOrderId === orderId ? '#cfe2ff' : '',
+                    }}
+                  >
                     <div className="d-flex justify-content-between align-items-center">
                       <div className="d-flex align-items-center">
                         <Folder size={16} className="me-2" />
