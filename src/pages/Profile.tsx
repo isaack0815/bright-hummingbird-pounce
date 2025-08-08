@@ -42,7 +42,7 @@ const fetchUserProfile = async () => {
 
 const Profile = () => {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { user } = useAuth();
 
   const { data: userProfile, isLoading } = useQuery({
     queryKey: ['userProfile'],
@@ -74,35 +74,20 @@ const Profile = () => {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: z.infer<typeof profileSchema>) => {
-      if (!session) throw new Error("Nicht authentifiziert. Bitte neu anmelden.");
+      if (!user) throw new Error("Nicht authentifiziert. Bitte neu anmelden.");
 
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-my-profile`;
-      
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          firstName: values.firstName,
-          lastName: values.lastName,
-          username: values.username,
-          email_signature: values.email_signature,
-        }),
+      const { error } = await supabase.rpc('update_my_profile_details', {
+        p_user_id: user.id,
+        p_first_name: values.firstName,
+        p_last_name: values.lastName,
+        p_username: values.username,
+        p_email_signature: values.email_signature || ''
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server-Fehler: ${response.status}`);
+      if (error) {
+        console.error("RPC Error:", error);
+        throw error;
       }
-      
-      if (data.error) {
-          throw new Error(data.error);
-      }
-      return data;
     },
     onSuccess: () => {
       showSuccess("Profil erfolgreich aktualisiert!");
