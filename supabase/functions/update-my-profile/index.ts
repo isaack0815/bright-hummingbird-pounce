@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0' // Use a specific, stable version
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,39 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[update-my-profile] Function invoked. Awaiting request body...");
-    const body = await req.json();
-    console.log("[update-my-profile] Request body received:", body);
-
-    const authHeader = req.headers.get('Authorization');
-    console.log("[update-my-profile] Authorization header:", authHeader ? `${authHeader.substring(0, 15)}...` : "MISSING");
-
-    if (!authHeader) {
-      throw new Error("Authorization header is missing. The request could not be authenticated. Please ensure the client is sending the 'Authorization: Bearer <TOKEN>' header.");
-    }
-
-    // Step 1: Authenticate the user with their token
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    console.log("[update-my-profile] Attempting to get user from token...");
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError) {
-      console.error("[update-my-profile] Error getting user:", userError);
-      throw new Error(`Authentication error: ${userError.message}`);
+    if (userError || !user) {
+      throw new Error("Authentication failed.");
     }
-    if (!user) {
-      console.error("[update-my-profile] User object is null after getUser call.");
-      throw new Error("Authentication failed: Could not retrieve user from the provided token.");
-    }
-    console.log(`[update-my-profile] User authenticated successfully: ${user.id}`);
 
-    const { firstName, lastName, username, email_signature } = body;
-
+    const { firstName, lastName, username, email_signature } = await req.json();
     if (!firstName || !lastName || !username) {
       return new Response(JSON.stringify({ error: 'First name, last name, and username are required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -52,27 +31,18 @@ serve(async (req) => {
       })
     }
 
-    // Step 2: Use an admin client for the updates for robustness
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-    console.log("[update-my-profile] Admin client created. Updating user metadata...");
+    const { error: rpcError } = await supabase.rpc('update_my_profile_details', {
+      p_user_id: user.id,
+      p_first_name: firstName,
+      p_last_name: lastName,
+      p_username: username,
+      p_email_signature: email_signature || ''
+    });
 
-    // Update user metadata in auth.users
-    const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(
-      user.id,
-      { user_metadata: { first_name: firstName, last_name: lastName, username } }
-    )
-    if (updateUserError) throw updateUserError
-    console.log("[update-my-profile] User metadata updated. Upserting profile...");
-
-    // Upsert the public.profiles table
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .upsert({ id: user.id, first_name: firstName, last_name: lastName, username, email_signature })
-    if (profileError) throw profileError
-    console.log("[update-my-profile] Profile upserted successfully.");
+    if (rpcError) {
+      console.error("RPC Error:", rpcError);
+      throw rpcError;
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
