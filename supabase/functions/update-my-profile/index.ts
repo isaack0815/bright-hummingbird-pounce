@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0' // Use a specific, stable version
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,17 +12,26 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client with the user's auth token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error("Authorization header is missing. The request could not be authenticated.");
+    }
+
+    // Step 1: Authenticate the user with their token
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      { global: { headers: { Authorization: authHeader } } }
     )
 
-    // Get the user from the token
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError) throw userError
-    if (!user) throw new Error("User not found")
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError) {
+      throw new Error(`Authentication error: ${userError.message}`);
+    }
+    if (!user) {
+      throw new Error("Authentication failed: Could not retrieve user from the provided token.");
+    }
 
     const { firstName, lastName, username, email_signature } = await req.json()
 
@@ -33,24 +42,32 @@ serve(async (req) => {
       })
     }
 
+    // Step 2: Use an admin client for the updates for robustness
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     // Update user metadata in auth.users
-    const { data: updatedUser, error: updateUserError } = await supabase.auth.updateUser({
-      data: { first_name: firstName, last_name: lastName, username }
-    })
+    const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(
+      user.id,
+      { user_metadata: { first_name: firstName, last_name: lastName, username } }
+    )
     if (updateUserError) throw updateUserError
 
-    // Upsert the public.profiles table to create a profile if it doesn't exist
-    const { error: profileError } = await supabase
+    // Upsert the public.profiles table
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({ id: user.id, first_name: firstName, last_name: lastName, username, email_signature })
     if (profileError) throw profileError
 
-    return new Response(JSON.stringify({ user: updatedUser.user }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (e) {
+    console.error("[update-my-profile] Error:", e.message);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
