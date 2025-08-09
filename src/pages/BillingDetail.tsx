@@ -43,13 +43,13 @@ const fetchBillingDetails = async (id: string): Promise<BillingOrder> => {
 };
 
 const BillingDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { orderId } = useParams<{ orderId: string }>();
   const queryClient = useQueryClient();
 
   const { data: order, isLoading, error } = useQuery({
-    queryKey: ['billingDetail', id],
-    queryFn: () => fetchBillingDetails(id!),
-    enabled: !!id,
+    queryKey: ['billingDetail', orderId],
+    queryFn: () => fetchBillingDetails(orderId!),
+    enabled: !!orderId,
   });
 
   const form = useForm<z.infer<typeof billingSchema>>({
@@ -99,7 +99,7 @@ const BillingDetail = () => {
     },
     onSuccess: (data) => {
       showSuccess(data.message || "Rechnungsentwurf erfolgreich in Lexoffice erstellt!");
-      queryClient.invalidateQueries({ queryKey: ['billingDetail', id] });
+      queryClient.invalidateQueries({ queryKey: ['billingDetail', orderId] });
       queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
     },
     onError: (err: any) => {
