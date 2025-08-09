@@ -10,6 +10,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { EmailAccountForm } from '@/components/user/EmailAccountForm';
+import { GarnishmentsTab } from '@/components/user/GarnishmentsTab';
 
 const formSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
@@ -106,6 +107,11 @@ const PersonnelFile = () => {
                 <Col md={4}><Form.Group><Form.Label>Anfahrt (km)</Form.Label><Form.Control type="number" {...form.register("commuteKm")} /></Form.Group></Col>
                 <Col md={4}><Form.Group><Form.Label>Aktuelle Stunden / Woche</Form.Label><Form.Control type="number" step="0.01" {...form.register("hoursPerWeek")} /></Form.Group></Col>
               </Row>
+            </Tab>
+            <Tab eventKey="garnishments" title="Pfändungen">
+                <div className="pt-3">
+                    <GarnishmentsTab userId={id!} />
+                </div>
             </Tab>
             <Tab eventKey="history" title="Stundenhistorie">
               <div className="pt-3">
