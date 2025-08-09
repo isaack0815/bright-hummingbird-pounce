@@ -54,11 +54,11 @@ const AppRoutes = () => {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/profile/dashboard-settings" element={<DashboardSettings />} />
-            <Route path="/fernverkehr" element={<Fernverkehr />} />
+            <Route path="/fernverkehr" element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr"><Fernverkehr /></ProtectedRoute>} />
             <Route path="/freight-orders" element={<FreightOrderManagement />} />
             <Route path="/freight-orders/new" element={<FreightOrderForm />} />
             <Route path="/freight-orders/edit/:id" element={<FreightOrderForm />} />
-            <Route path="/fernverkehr/:orderId" element={<BillingDetail />} />
+            <Route path="/fernverkehr/:orderId" element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr"><BillingDetail /></ProtectedRoute>} />
             <Route path="/invoices" element={<InvoiceManagement />} />
             <Route path="/customers" element={<CustomerManagement />} />
             <Route path="/customers/:id" element={<CustomerDetail />} />
