@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Button, Placeholder, Accordion, Table, Badge } from 'react-bootstrap';
+import { Card, Button, Placeholder, Accordion, Table, Badge, Row, Col } from 'react-bootstrap';
 import { PlusCircle, CreditCard } from 'lucide-react';
 import { AddGarnishmentDialog } from './AddGarnishmentDialog';
 import { AddGarnishmentPaymentDialog } from './AddGarnishmentPaymentDialog';
@@ -59,9 +59,9 @@ export const GarnishmentsTab = ({ userId }: { userId: string }) => {
             </Accordion.Header>
             <Accordion.Body>
               <Row className="mb-3">
-                <Col><strong>Gesamtbetrag:</strong> {Number(garnishment.total_amount).toFixed(2)} €</Col>
-                <Col><strong>Bezahlt:</strong> {Number(garnishment.paid_amount).toFixed(2)} €</Col>
-                <Col><strong>Restbetrag:</strong> {Number(garnishment.remaining_amount).toFixed(2)} €</Col>
+                <Col><strong>Gesamtbetrag:</strong> {(Number(garnishment.total_amount) || 0).toFixed(2)} €</Col>
+                <Col><strong>Bezahlt:</strong> {(Number(garnishment.paid_amount) || 0).toFixed(2)} €</Col>
+                <Col><strong>Restbetrag:</strong> {(Number(garnishment.remaining_amount) || 0).toFixed(2)} €</Col>
               </Row>
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <h6>Zahlungshistorie</h6>
@@ -75,7 +75,7 @@ export const GarnishmentsTab = ({ userId }: { userId: string }) => {
                   {garnishment.payments.map(payment => (
                     <tr key={payment.id}>
                       <td>{new Date(payment.payment_date).toLocaleDateString('de-DE')}</td>
-                      <td>{Number(payment.amount).toFixed(2)} €</td>
+                      <td>{(Number(payment.amount) || 0).toFixed(2)} €</td>
                       <td>{payment.notes}</td>
                     </tr>
                   ))}
