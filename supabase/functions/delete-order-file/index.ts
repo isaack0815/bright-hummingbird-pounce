@@ -12,6 +12,24 @@ serve(async (req) => {
   }
 
   try {
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
+
+    const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
+    if (permError) throw permError;
+    
+    const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
+    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+    const hasBillingPermission = permissionNames.includes('Abrechnung Fernverkehr');
+    const hasFilePermission = permissionNames.includes('files.manage');
+
+    if (!isSuperAdmin && !hasBillingPermission && !hasFilePermission) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

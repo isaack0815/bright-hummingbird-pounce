@@ -22,9 +22,10 @@ serve(async (req) => {
     if (permError) throw permError;
     
     const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
+    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
     const hasPermission = permissionNames.includes('Abrechnung Fernverkehr');
 
-    if (!hasPermission) {
+    if (!isSuperAdmin && !hasPermission) {
         return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
     }
 
