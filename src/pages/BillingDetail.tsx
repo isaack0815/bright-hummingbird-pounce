@@ -66,6 +66,7 @@ const BillingDetail = () => {
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadingCMR, setUploadingCMR] = useState(false);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: order, isLoading, error } = useQuery({
     queryKey: ['billingDetail', orderId],
@@ -201,6 +202,32 @@ const BillingDetail = () => {
     }
   });
 
+  const handleDownloadInvoice = async () => {
+    if (!order?.lex_invoice_id) return;
+    setIsDownloading(true);
+    try {
+        const { data, error } = await supabase.functions.invoke('get-lexoffice-invoice-pdf', {
+            body: { invoiceId: order.lex_invoice_id },
+            responseType: 'blob'
+        });
+        if (error) throw error;
+
+        const url = window.URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rechnung-${order.order_number}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+    } catch (err: any) {
+        showError(err.data?.error || err.message || "Fehler beim Herunterladen der Rechnung.");
+    } finally {
+        setIsDownloading(false);
+    }
+  };
+
   const watchedLineItems = form.watch('line_items');
   const watchedTotalDiscount = form.watch('total_discount');
   const watchedTotalDiscountType = form.watch('total_discount_type');
@@ -273,6 +300,63 @@ const BillingDetail = () => {
             </Button>
         )}
       </div>
+
+      {order && order.is_billed && order.is_external && (
+        <Card className="mb-4">
+            <Card.Header className="bg-info text-white d-flex justify-content-between align-items-center">
+                <Card.Title className="mb-0">Externe Abrechnungsdetails</Card.Title>
+                {order.lex_invoice_id && (
+                    <Button variant="light" size="sm" onClick={handleDownloadInvoice} disabled={isDownloading}>
+                        {isDownloading ? <Spinner size="sm" /> : <Download size={16} />}
+                        <span className="ms-2">Rechnung herunterladen</span>
+                    </Button>
+                )}
+            </Card.Header>
+            <Card.Body>
+                <Row className="g-4">
+                    <Col md={6}>
+                        <h6>Zahlungsfristen</h6>
+                        <InputGroup className="mb-3">
+                            <InputGroup.Text>Rechnungseingang</InputGroup.Text>
+                            <Form.Control type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
+                            <Button onClick={() => updateReceiptDateMutation.mutate(receiptDate)} disabled={!receiptDate || updateReceiptDateMutation.isPending}>
+                                {updateReceiptDateMutation.isPending ? <Spinner size="sm" /> : 'Speichern'}
+                            </Button>
+                        </InputGroup>
+                        <p className="small"><strong>Zahlungsfrist:</strong> {order.payment_term_days || '-'} Tage</p>
+                        <p className="small"><strong>Zahlungsziel:</strong> {paymentDueDate}</p>
+                    </Col>
+                    <Col md={6}>
+                        <h6>Dokumente</h6>
+                        <div className="d-flex flex-column gap-3">
+                            <div>
+                                <Form.Label>CMR-Dokument</Form.Label>
+                                {existingCmr ? (
+                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted">{existingCmr.file_name}</span><Button variant="link" size="sm"><Download /></Button></div>
+                                ) : (
+                                    <InputGroup>
+                                        <Form.Control type="file" onChange={e => setCmrFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
+                                        <Button onClick={() => cmrFile && handleFileUpload(cmrFile, 'CMR')} disabled={!cmrFile || uploadingCMR}>{uploadingCMR ? <Spinner size="sm" /> : <FileUp />}</Button>
+                                    </InputGroup>
+                                )}
+                            </div>
+                            <div>
+                                <Form.Label>Eingangsrechnung</Form.Label>
+                                {existingInvoice ? (
+                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted">{existingInvoice.file_name}</span><Button variant="link" size="sm"><Download /></Button></div>
+                                ) : (
+                                    <InputGroup>
+                                        <Form.Control type="file" onChange={e => setInvoiceFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
+                                        <Button onClick={() => invoiceFile && handleFileUpload(invoiceFile, 'Invoice')} disabled={!invoiceFile || uploadingInvoice}>{uploadingInvoice ? <Spinner size="sm" /> : <FileUp />}</Button>
+                                    </InputGroup>
+                                )}
+                            </div>
+                        </div>
+                    </Col>
+                </Row>
+            </Card.Body>
+        </Card>
+      )}
 
       <Form id="billing-form" onSubmit={form.handleSubmit((v) => updateBillingMutation.mutate(v))}>
         <Row className="g-4">
@@ -354,55 +438,6 @@ const BillingDetail = () => {
             </Col>
         </Row>
       </Form>
-
-      {order && order.is_billed && order.is_external && (
-        <Card className="mt-4">
-            <Card.Header><Card.Title>Externe Abrechnungsdetails</Card.Title></Card.Header>
-            <Card.Body>
-                <Row className="g-4">
-                    <Col md={6}>
-                        <h6>Zahlungsfristen</h6>
-                        <InputGroup className="mb-3">
-                            <InputGroup.Text>Rechnungseingang</InputGroup.Text>
-                            <Form.Control type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
-                            <Button onClick={() => updateReceiptDateMutation.mutate(receiptDate)} disabled={!receiptDate || updateReceiptDateMutation.isPending}>
-                                {updateReceiptDateMutation.isPending ? <Spinner size="sm" /> : 'Speichern'}
-                            </Button>
-                        </InputGroup>
-                        <p className="small"><strong>Zahlungsfrist:</strong> {order.payment_term_days || '-'} Tage</p>
-                        <p className="small"><strong>Zahlungsziel:</strong> {paymentDueDate}</p>
-                    </Col>
-                    <Col md={6}>
-                        <h6>Dokumente</h6>
-                        <div className="d-flex flex-column gap-3">
-                            <div>
-                                <Form.Label>CMR-Dokument</Form.Label>
-                                {existingCmr ? (
-                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted">{existingCmr.file_name}</span><Button variant="link" size="sm"><Download /></Button></div>
-                                ) : (
-                                    <InputGroup>
-                                        <Form.Control type="file" onChange={e => setCmrFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
-                                        <Button onClick={() => cmrFile && handleFileUpload(cmrFile, 'CMR')} disabled={!cmrFile || uploadingCMR}>{uploadingCMR ? <Spinner size="sm" /> : <FileUp />}</Button>
-                                    </InputGroup>
-                                )}
-                            </div>
-                            <div>
-                                <Form.Label>Eingangsrechnung</Form.Label>
-                                {existingInvoice ? (
-                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted">{existingInvoice.file_name}</span><Button variant="link" size="sm"><Download /></Button></div>
-                                ) : (
-                                    <InputGroup>
-                                        <Form.Control type="file" onChange={e => setInvoiceFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
-                                        <Button onClick={() => invoiceFile && handleFileUpload(invoiceFile, 'Invoice')} disabled={!invoiceFile || uploadingInvoice}>{uploadingInvoice ? <Spinner size="sm" /> : <FileUp />}</Button>
-                                    </InputGroup>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                </Row>
-            </Card.Body>
-        </Card>
-      )}
     </>
   );
 };
