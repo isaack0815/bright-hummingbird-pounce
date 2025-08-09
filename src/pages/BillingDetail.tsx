@@ -47,13 +47,11 @@ const fetchBillingDetails = async (id: string): Promise<BillingOrder> => {
 };
 
 const fetchExternalFiles = async (orderId: string) => {
-    const { data, error } = await supabase
-        .from('order_files')
-        .select('id, file_name, file_path')
-        .eq('order_id', orderId)
-        .in('file_name', [`CMR_${orderId}.pdf`, `Eingangsrechnung_${orderId}.pdf`]);
+    const { data, error } = await supabase.functions.invoke('get-external-billing-files', {
+        body: { orderId: parseInt(orderId, 10) }
+    });
     if (error) throw error;
-    return data;
+    return data.files;
 }
 
 const BillingDetail = () => {
