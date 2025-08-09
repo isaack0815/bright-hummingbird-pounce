@@ -50,9 +50,13 @@ export const GarnishmentsTab = ({ userId }: { userId: string }) => {
           <Accordion.Item eventKey={String(index)} key={garnishment.id}>
             <Accordion.Header>
               <div className="d-flex w-100 justify-content-between align-items-center pe-3">
-                <div>
+                <div className="flex-grow-1">
                   <strong>{garnishment.creditor}</strong>
-                  <small className="text-muted d-block">{garnishment.description}</small>
+                  <small className="text-muted d-block">{garnishment.description || 'Keine Beschreibung'}</small>
+                </div>
+                <div className="text-end mx-4">
+                    <small className="d-block">Offen: <strong>{(Number(garnishment.remaining_amount) || 0).toFixed(2)} €</strong></small>
+                    <small className="text-muted d-block">Gesamt: {(Number(garnishment.total_amount) || 0).toFixed(2)} €</small>
                 </div>
                 <Badge bg={garnishment.status === 'open' ? 'warning' : 'success'}>{garnishment.status === 'open' ? 'Offen' : 'Abgeschlossen'}</Badge>
               </div>
