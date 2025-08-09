@@ -127,7 +127,7 @@ const BillingDetail = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern des Datums.")
   });
 
-  const handleFileUpload = async (file: File, type: 'CMR' | 'Invoice') => {
+  const handleFileUpload = async (file: File, type: 'CMR' | 'Eingangsrechnung') => {
     if (!file || !orderId || !user) return;
     const setLoading = type === 'CMR' ? setUploadingCMR : setUploadingInvoice;
     setLoading(true);
@@ -306,7 +306,7 @@ const BillingDetail = () => {
   }, [receiptDate, order?.payment_term_days]);
 
   const existingCmr = externalFiles?.find(f => f.file_name.startsWith('CMR_'));
-  const existingInvoice = externalFiles?.find(f => f.file_name.startsWith('Eingangsrechnung_'));
+  const existingInvoice = externalFiles?.find(f => f.file_name.startsWith('Eingangsrechnung_') || f.file_name.startsWith('Invoice_'));
 
   if (isLoading) return <p>Lade Abrechnungsdetails...</p>;
   if (error) return <Alert variant="danger">Fehler: {error.message}</Alert>;
@@ -373,7 +373,7 @@ const BillingDetail = () => {
                                 ) : (
                                     <InputGroup>
                                         <Form.Control type="file" onChange={e => setInvoiceFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
-                                        <Button onClick={() => invoiceFile && handleFileUpload(invoiceFile, 'Invoice')} disabled={!invoiceFile || uploadingInvoice}>{uploadingInvoice ? <Spinner size="sm" /> : <FileUp />}</Button>
+                                        <Button onClick={() => invoiceFile && handleFileUpload(invoiceFile, 'Eingangsrechnung')} disabled={!invoiceFile || uploadingInvoice}>{uploadingInvoice ? <Spinner size="sm" /> : <FileUp />}</Button>
                                     </InputGroup>
                                 )}
                             </div>

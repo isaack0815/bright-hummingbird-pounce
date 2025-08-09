@@ -45,7 +45,7 @@ serve(async (req) => {
       .from('order_files')
       .select('id, file_name, file_path')
       .eq('order_id', orderId)
-      .in('file_name', [`CMR_${orderId}.pdf`, `Eingangsrechnung_${orderId}.pdf`]);
+      .in('file_name', [`CMR_${orderId}.pdf`, `Eingangsrechnung_${orderId}.pdf`, `Invoice_${orderId}.pdf`]); // Look for old and new names
 
     if (error) throw error;
 
