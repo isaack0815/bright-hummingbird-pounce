@@ -111,7 +111,7 @@ const BillingDetail = () => {
         total_discount_type: (order.total_discount_type as 'fixed' | 'percentage') || 'fixed',
         line_items: order.line_items && order.line_items.length > 0 ? order.line_items : [defaultLineItem],
       });
-      setReceiptDate(order.external_invoice_receipt_date || '');
+      setReceiptDate(order.external_invoice_receipt_date || format(new Date(), 'yyyy-MM-dd'));
     }
   }, [order, form]);
 
@@ -154,6 +154,34 @@ const BillingDetail = () => {
         showError(err.message || "Fehler beim Upload.");
     } finally {
         setLoading(false);
+    }
+  };
+
+  const deleteFileMutation = useMutation({
+    mutationFn: async (fileId: number) => {
+        const { error } = await supabase.functions.invoke('delete-order-file', {
+            body: { fileId }
+        });
+        if (error) throw error;
+    },
+    onSuccess: () => {
+        showSuccess("Datei erfolgreich gelöscht.");
+        queryClient.invalidateQueries({ queryKey: ['externalBillingFiles', orderId] });
+    },
+    onError: (err: any) => {
+        showError(err.message || "Fehler beim Löschen der Datei.");
+    }
+  });
+
+  const handleDownload = async (filePath: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-download-url', {
+        body: { filePath },
+      });
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (err: any) {
+      showError(err.data?.error || "Fehler beim Herunterladen.");
     }
   };
 
@@ -332,7 +360,7 @@ const BillingDetail = () => {
                             <div>
                                 <Form.Label>CMR-Dokument</Form.Label>
                                 {existingCmr ? (
-                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted">{existingCmr.file_name}</span><Button variant="link" size="sm"><Download /></Button></div>
+                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted flex-grow-1 text-truncate">{existingCmr.file_name}</span><Button variant="link" size="sm" onClick={() => handleDownload(existingCmr.file_path)}><Download size={16} /></Button><Button variant="link" size="sm" className="text-danger" onClick={() => deleteFileMutation.mutate(existingCmr.id)}><Trash2 size={16} /></Button></div>
                                 ) : (
                                     <InputGroup>
                                         <Form.Control type="file" onChange={e => setCmrFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
@@ -343,7 +371,7 @@ const BillingDetail = () => {
                             <div>
                                 <Form.Label>Eingangsrechnung</Form.Label>
                                 {existingInvoice ? (
-                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted">{existingInvoice.file_name}</span><Button variant="link" size="sm"><Download /></Button></div>
+                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted flex-grow-1 text-truncate">{existingInvoice.file_name}</span><Button variant="link" size="sm" onClick={() => handleDownload(existingInvoice.file_path)}><Download size={16} /></Button><Button variant="link" size="sm" className="text-danger" onClick={() => deleteFileMutation.mutate(existingInvoice.id)}><Trash2 size={16} /></Button></div>
                                 ) : (
                                     <InputGroup>
                                         <Form.Control type="file" onChange={e => setInvoiceFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
