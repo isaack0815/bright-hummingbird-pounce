@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Spinner, Badge } from 'react-bootstrap';
+import { Card, Spinner } from 'react-bootstrap';
 import { DayPicker, DayModifiers } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { de } from 'date-fns/locale';
@@ -93,9 +93,9 @@ export const RosterCalendar = ({ workGroupId, currentMonth, onMonthChange, roste
         <div className="flex-grow-1 small" style={{overflowY: 'auto', maxHeight: '70px'}}>
           {dayEntries?.map(entry => (
             <div key={entry.id} className="mb-1">
-              <Badge bg="primary" className="w-100 text-start text-truncate">
+              <div className="btn btn-primary btn-sm w-100 text-start text-truncate" style={{ pointerEvents: 'none' }}>
                 {entry.profiles.first_name?.charAt(0)}. {entry.profiles.last_name}: {entry.tours?.name || 'Frei'}
-              </Badge>
+              </div>
             </div>
           ))}
         </div>
@@ -132,6 +132,10 @@ export const RosterCalendar = ({ workGroupId, currentMonth, onMonthChange, roste
             onMonthChange={onMonthChange}
             showOutsideDays
             onDayClick={handleDayClick}
+            classNames={{
+              table: 'table table-bordered',
+              head_cell: 'text-center',
+            }}
             components={{
               DayContent: DayContent,
               IconLeft: () => <ChevronLeft size={16} />,
