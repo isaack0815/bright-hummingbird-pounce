@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { id, name, description } = await req.json()
+    const { id, name, description, userIds } = await req.json()
 
     if (!id || !name) {
       return new Response(JSON.stringify({ error: 'Group ID and name are required' }), {
@@ -26,16 +26,16 @@ serve(async (req) => {
       })
     }
 
-    const { data, error } = await supabase
-      .from('work_groups')
-      .update({ name, description })
-      .eq('id', id)
-      .select()
-      .single()
+    const { error } = await supabase.rpc('update_work_group_with_members', {
+      p_group_id: id,
+      p_name: name,
+      p_description: description,
+      p_user_ids: userIds || [],
+    })
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ group: data }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

@@ -20,12 +20,22 @@ serve(async (req) => {
 
     const { data, error } = await supabase
       .from('work_groups')
-      .select('*')
+      .select(`
+        *,
+        members:user_work_groups(
+          profiles(id, first_name, last_name)
+        )
+      `)
       .order('name');
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ groups: data }), {
+    const groupsWithCleanedMembers = data.map(group => ({
+      ...group,
+      members: group.members.map((m: any) => m.profiles).filter(Boolean)
+    }));
+
+    return new Response(JSON.stringify({ groups: groupsWithCleanedMembers }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

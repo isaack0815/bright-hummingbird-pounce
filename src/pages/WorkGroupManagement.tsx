@@ -59,13 +59,14 @@ const WorkGroupManagement = () => {
       <Card>
         <Card.Body>
           {isLoading ? (
-            <TablePlaceholder cols={3} />
+            <TablePlaceholder cols={4} />
           ) : (
             <Table responsive hover>
               <thead>
                 <tr>
                   <th>Name</th>
                   <th>Beschreibung</th>
+                  <th>Mitglieder</th>
                   <th className="text-end">Aktionen</th>
                 </tr>
               </thead>
@@ -74,6 +75,7 @@ const WorkGroupManagement = () => {
                   <tr key={group.id}>
                     <td className="fw-medium">{group.name}</td>
                     <td>{group.description}</td>
+                    <td>{group.members.length}</td>
                     <td className="text-end">
                       <Button variant="ghost" size="sm" onClick={() => handleEditClick(group)}><Edit size={16} /></Button>
                       <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(group.id)}><Trash2 size={16} /></Button>
