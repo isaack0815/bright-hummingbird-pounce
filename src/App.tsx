@@ -36,6 +36,7 @@ const EmailClient = lazy(() => import('@/pages/EmailClient'));
 const SimpleEmailClient = lazy(() => import('@/pages/SimpleEmailClient'));
 const FileManager = lazy(() => import('@/pages/FileManager'));
 const WorkGroupManagement = lazy(() => import('@/pages/WorkGroupManagement'));
+const DutyRoster = lazy(() => import('@/pages/DutyRoster'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -74,6 +75,7 @@ const AppRoutes = () => {
             <Route path="/settings" element={<Settings />} />
             <Route path="/roles" element={<RoleManagement />} />
             <Route path="/work-groups" element={<ProtectedRoute requiredPermission="users.manage"><WorkGroupManagement /></ProtectedRoute>} />
+            <Route path="/duty-roster" element={<ProtectedRoute requiredPermission="roster.manage"><DutyRoster /></ProtectedRoute>} />
             <Route path="/menus" element={<MenuManagement />} />
             <Route path="/email" element={<EmailClient />} />
             <Route path="/simple-email" element={<SimpleEmailClient />} />
