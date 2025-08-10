@@ -67,10 +67,10 @@ export function CreateRosterDialog({ show, onHide }: CreateRosterDialogProps) {
               {workGroups?.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
             </Form.Select>
           </Form.Group>
-          <Row>
-            <Col><Form.Group className="mb-3"><Form.Label>Startdatum</Form.Label><Form.Control type="date" {...form.register("start_date")} isInvalid={!!form.formState.errors.start_date} /></Form.Group></Col>
-            <Col><Form.Group className="mb-3"><Form.Label>Enddatum</Form.Label><Form.Control type="date" {...form.register("end_date")} isInvalid={!!form.formState.errors.end_date} /></Form.Group></Col>
-          </Row>
+          <div className="row">
+            <div className="col"><Form.Group className="mb-3"><Form.Label>Startdatum</Form.Label><Form.Control type="date" {...form.register("start_date")} isInvalid={!!form.formState.errors.start_date} /></Form.Group></div>
+            <div className="col"><Form.Group className="mb-3"><Form.Label>Enddatum</Form.Label><Form.Control type="date" {...form.register("end_date")} isInvalid={!!form.formState.errors.end_date} /></Form.Group></div>
+          </div>
           {form.formState.errors.end_date && <p className="text-danger small">{form.formState.errors.end_date.message}</p>}
         </Modal.Body>
         <Modal.Footer>
