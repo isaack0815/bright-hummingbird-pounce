@@ -18,24 +18,53 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    const { data, error } = await supabase
+    // 1. Get all work groups with their member IDs
+    const { data: groups, error: groupsError } = await supabase
       .from('work_groups')
       .select(`
         *,
-        members:user_work_groups(
-          profiles(id, first_name, last_name)
-        )
+        user_work_groups(user_id)
       `)
       .order('name');
 
-    if (error) throw error
+    if (groupsError) throw groupsError;
+    if (!groups) {
+        return new Response(JSON.stringify({ groups: [] }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
 
-    const groupsWithCleanedMembers = data.map(group => ({
-      ...group,
-      members: group.members.map((m: any) => m.profiles).filter(Boolean)
-    }));
+    // 2. Collect all unique user IDs from all groups
+    const userIds = [...new Set(groups.flatMap(g => g.user_work_groups.map((m: any) => m.user_id)))];
 
-    return new Response(JSON.stringify({ groups: groupsWithCleanedMembers }), {
+    if (userIds.length === 0) {
+        const groupsWithEmptyMembers = groups.map(({ user_work_groups, ...rest }) => ({ ...rest, members: [] }));
+        return new Response(JSON.stringify({ groups: groupsWithEmptyMembers }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
+
+    // 3. Fetch all required profiles in one go
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIds);
+    if (profilesError) throw profilesError;
+
+    const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+    // 4. Manually join the profiles to the groups
+    const groupsWithMembers = groups.map(group => {
+      const members = group.user_work_groups
+        .map((m: any) => profilesMap.get(m.user_id))
+        .filter(Boolean);
+      const { user_work_groups, ...restOfGroup } = group;
+      return { ...restOfGroup, members };
+    });
+
+    return new Response(JSON.stringify({ groups: groupsWithMembers }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
