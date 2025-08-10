@@ -6,7 +6,7 @@ import { PlusCircle } from 'lucide-react';
 import { CreateRosterDialog } from '@/components/roster/CreateRosterDialog';
 import { RosterCalendar } from '@/components/roster/RosterCalendar';
 import type { WorkGroup } from '@/types/workgroup';
-import { startOfMonth, endOfMonth, isWithinInterval, format } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -33,8 +33,8 @@ const DutyRoster = () => {
     if (!selectedGroup || !Array.isArray(selectedGroup.duty_rosters)) return null;
     const monthStart = startOfMonth(currentMonth);
     return selectedGroup.duty_rosters.find((r: any) => {
-      const rosterStart = new Date(r.start_date);
-      const rosterEnd = new Date(r.end_date);
+      const rosterStart = parseISO(r.start_date);
+      const rosterEnd = parseISO(r.end_date);
       return isWithinInterval(monthStart, { start: rosterStart, end: rosterEnd });
     });
   }, [selectedGroup, currentMonth]);
