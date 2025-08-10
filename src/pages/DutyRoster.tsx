@@ -41,14 +41,16 @@ const DutyRoster = () => {
                     <div key={group.id}>
                       <ListGroup.Item className="fw-bold bg-light">{group.name}</ListGroup.Item>
                       {Array.isArray(group.duty_rosters) && group.duty_rosters.map((roster: any) => (
-                        <ListGroup.Item 
-                          key={roster.id} 
-                          action 
-                          active={roster.id === selectedRosterId}
-                          onClick={() => setSelectedRosterId(roster.id)}
-                        >
-                          {new Date(roster.start_date).toLocaleDateString()} - {new Date(roster.end_date).toLocaleDateString()}
-                        </ListGroup.Item>
+                        roster && (
+                          <ListGroup.Item 
+                            key={roster.id} 
+                            action 
+                            active={roster.id === selectedRosterId}
+                            onClick={() => setSelectedRosterId(roster.id)}
+                          >
+                            {new Date(roster.start_date).toLocaleDateString()} - {new Date(roster.end_date).toLocaleDateString()}
+                          </ListGroup.Item>
+                        )
                       ))}
                     </div>
                   ))}

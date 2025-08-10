@@ -106,7 +106,7 @@ export const RosterGrid = ({ rosterId }: { rosterId: number }) => {
     <Card>
       <Card.Header className="d-flex justify-content-between align-items-center">
         <div>
-          <Card.Title>{roster.work_groups.name}</Card.Title>
+          <Card.Title>{roster.work_groups?.name}</Card.Title>
           <Card.Text className="text-muted small mb-0">
             {format(new Date(roster.start_date), 'dd.MM.yyyy')} - {format(new Date(roster.end_date), 'dd.MM.yyyy')}
           </Card.Text>
