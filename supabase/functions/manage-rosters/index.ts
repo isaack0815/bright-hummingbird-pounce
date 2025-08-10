@@ -25,9 +25,10 @@ serve(async (req) => {
         if (!work_group_id || !start_date || !end_date) {
             return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
         }
+        // Use upsert to prevent race conditions where the user might click "create" twice.
         const { data, error } = await supabase
           .from('duty_rosters')
-          .insert({ work_group_id, start_date, end_date })
+          .upsert({ work_group_id, start_date, end_date }, { onConflict: 'work_group_id,start_date' })
           .select('id')
           .single();
         if (error) throw error;
@@ -42,6 +43,24 @@ serve(async (req) => {
         const { error } = await supabase.from('duty_rosters').delete().eq('id', rosterId);
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      case 'update-entries': {
+        const { rosterId, entries } = payload;
+        if (!rosterId || !entries) {
+            return new Response(JSON.stringify({ error: 'Roster ID and entries are required' }), { status: 400 });
+        }
+        await supabase.from('duty_roster_entries').delete().eq('roster_id', rosterId);
+        if (entries.length > 0) {
+            const entriesToInsert = entries.map((entry: any) => ({
+                roster_id: rosterId,
+                user_id: entry.user_id,
+                tour_id: entry.tour_id,
+                duty_date: entry.duty_date,
+            }));
+            await supabase.from('duty_roster_entries').insert(entriesToInsert);
+        }
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
       case 'update-entries-for-day': {
