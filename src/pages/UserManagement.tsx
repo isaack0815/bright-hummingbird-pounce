@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, Button, Table, Badge } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit, FileText } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, FileText, Users } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ type User = {
   last_name?: string | null;
   username?: string | null;
   roles: { id: number; name: string }[];
+  work_groups: { id: number; name: string }[];
 };
 
 const fetchUsers = async (): Promise<User[]> => {
@@ -77,10 +78,16 @@ const UserManagement = () => {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <h1 className="h2">Nutzerverwaltung</h1>
-        <Button onClick={() => setIsAddUserDialogOpen(true)}>
-          <PlusCircle className="me-2" size={16} />
-          Nutzer hinzufügen
-        </Button>
+        <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => navigate('/work-groups')}>
+                <Users className="me-2" size={16} />
+                Arbeitsgruppen verwalten
+            </Button>
+            <Button onClick={() => setIsAddUserDialogOpen(true)}>
+                <PlusCircle className="me-2" size={16} />
+                Nutzer hinzufügen
+            </Button>
+        </div>
       </div>
       <Card>
         <Card.Header>
@@ -89,7 +96,7 @@ const UserManagement = () => {
         </Card.Header>
         <Card.Body>
           {isLoading ? (
-            <TablePlaceholder cols={6} />
+            <TablePlaceholder cols={7} />
           ) : users && users.length > 0 ? (
             <Table responsive hover>
               <thead>
@@ -97,7 +104,8 @@ const UserManagement = () => {
                   <th>Name</th>
                   <th>Benutzername</th>
                   <th>Email</th>
-                  <th>Gruppen</th>
+                  <th>Berechtigung</th>
+                  <th>Arbeitsgruppen</th>
                   <th>Erstellt am</th>
                   <th className="text-end">Aktionen</th>
                 </tr>
@@ -114,6 +122,15 @@ const UserManagement = () => {
                       <div className="d-flex gap-1 flex-wrap">
                         {user.roles.length > 0 ? (
                           user.roles.map(role => <Badge key={role.id} bg="secondary">{role.name}</Badge>)
+                        ) : (
+                          <span className="text-muted">-</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
+                        {user.work_groups.length > 0 ? (
+                          user.work_groups.map(group => <Badge key={group.id} bg="info">{group.name}</Badge>)
                         ) : (
                           <span className="text-muted">-</span>
                         )}

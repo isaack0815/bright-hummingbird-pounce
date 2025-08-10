@@ -47,6 +47,24 @@ serve(async (_req) => {
       }
     }
 
+    const { data: userWorkGroups, error: userWorkGroupsError } = await supabaseAdmin
+      .from('user_work_groups')
+      .select('user_id, work_groups(id, name)')
+      .in('user_id', userIds);
+    if (userWorkGroupsError) throw userWorkGroupsError;
+
+    const userWorkGroupsMap = new Map<string, {id: number, name: string}[]>();
+    if (userWorkGroups) {
+      for (const uwg of userWorkGroups) {
+        if (!userWorkGroupsMap.has(uwg.user_id)) {
+            userWorkGroupsMap.set(uwg.user_id, []);
+        }
+        if (uwg.work_groups) {
+          userWorkGroupsMap.get(uwg.user_id)!.push(uwg.work_groups as {id: number, name: string});
+        }
+      }
+    }
+
     const { data: workHours, error: workHoursError } = await supabaseAdmin
       .from('work_hours_history')
       .select('user_id, hours_per_week')
@@ -73,6 +91,7 @@ serve(async (_req) => {
         last_name: profile?.last_name,
         username: profile?.username,
         roles: userRolesMap.get(user.id) || [],
+        work_groups: userWorkGroupsMap.get(user.id) || [],
         vacation_days_per_year: profile?.vacation_days_per_year,
         commute_km: profile?.commute_km,
         hours_per_week: latestWorkHoursMap.get(user.id) || null,

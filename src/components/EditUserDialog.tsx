@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { WorkGroup } from "@/types/workgroup";
 
 type Role = {
   id: number;
@@ -19,6 +20,7 @@ type User = {
   last_name?: string | null;
   username?: string | null;
   roles: Role[];
+  work_groups: { id: number; name: string }[];
 };
 
 const formSchema = z.object({
@@ -26,6 +28,7 @@ const formSchema = z.object({
   lastName: z.string().min(1, { message: "Nachname ist erforderlich." }),
   username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
   roleIds: z.array(z.number()).optional(),
+  workGroupIds: z.array(z.number()).optional(),
 });
 
 type EditUserDialogProps = {
@@ -40,6 +43,12 @@ const fetchRoles = async (): Promise<Role[]> => {
   return data.roles;
 };
 
+const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
+  const { data, error } = await supabase.functions.invoke('get-work-groups');
+  if (error) throw new Error(error.message);
+  return data.groups;
+};
+
 export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
@@ -47,6 +56,12 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
   const { data: allRoles, isLoading: isLoadingRoles } = useQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: fetchRoles,
+    enabled: show,
+  });
+
+  const { data: allWorkGroups, isLoading: isLoadingWorkGroups } = useQuery<WorkGroup[]>({
+    queryKey: ['workGroups'],
+    queryFn: fetchWorkGroups,
     enabled: show,
   });
 
@@ -61,6 +76,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
         lastName: user.last_name || "",
         username: user.username || "",
         roleIds: user.roles.map(role => role.id),
+        workGroupIds: user.work_groups.map(group => group.id),
       });
     }
   }, [user, form, show]);
@@ -105,18 +121,32 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
             <Col md={6}><Form.Group><Form.Label>Email</Form.Label><Form.Control type="email" value={user.email} disabled /></Form.Group></Col>
           </Row>
           <hr />
-          <h5 className="h6">Gruppen</h5>
-          {isLoadingRoles ? <p>Gruppen werden geladen...</p> : (
-            <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-              {allRoles?.map((role) => (
-                <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} defaultChecked={user.roles.some(userRole => userRole.id === role.id)} />
-              ))}
-            </div>
-          )}
+          <Row>
+            <Col md={6}>
+              <h5 className="h6">Berechtigungsgruppen</h5>
+              {isLoadingRoles ? <p>Gruppen werden geladen...</p> : (
+                <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {allRoles?.map((role) => (
+                    <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} defaultChecked={user.roles.some(userRole => userRole.id === role.id)} />
+                  ))}
+                </div>
+              )}
+            </Col>
+            <Col md={6}>
+              <h5 className="h6">Arbeitsgruppen</h5>
+              {isLoadingWorkGroups ? <p>Arbeitsgruppen werden geladen...</p> : (
+                <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {allWorkGroups?.map((group) => (
+                    <Form.Check type="checkbox" id={`work-group-${group.id}`} key={group.id} label={group.name} {...form.register("workGroupIds")} value={group.id} defaultChecked={user.work_groups.some(userGroup => userGroup.id === group.id)} />
+                  ))}
+                </div>
+              )}
+            </Col>
+          </Row>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
-          <Button type="submit" disabled={isSubmitting || isLoadingRoles}>
+          <Button type="submit" disabled={isSubmitting || isLoadingRoles || isLoadingWorkGroups}>
             {isSubmitting ? <Spinner as="span" size="sm" /> : "Änderungen speichern"}
           </Button>
         </Modal.Footer>

@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const body = await req.json()
     console.log("[update-user] Step 1: Received request body:", body);
-    const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate } = body;
+    const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate, workGroupIds } = body;
 
     if (!userId) {
       console.error("[update-user] Error: User ID is missing.");
@@ -94,6 +94,21 @@ serve(async (req) => {
         }));
         await supabaseAdmin.from('user_roles').insert(rolesToInsert)
         console.log("[update-user] Step 6.2: New roles inserted.");
+      }
+    }
+
+    // 5. Update user work groups, ONLY if workGroupIds are provided
+    if (workGroupIds !== undefined) {
+      console.log(`[update-user] Step 7: Updating user work groups. Received group IDs: ${workGroupIds}`);
+      await supabaseAdmin.from('user_work_groups').delete().eq('user_id', userId)
+      console.log("[update-user] Step 7.1: Existing work groups deleted.");
+      if (workGroupIds && workGroupIds.length > 0) {
+        const groupsToInsert = workGroupIds.map((groupId: number) => ({
+          user_id: userId,
+          work_group_id: groupId,
+        }));
+        await supabaseAdmin.from('user_work_groups').insert(groupsToInsert)
+        console.log("[update-user] Step 7.2: New work groups inserted.");
       }
     }
 
