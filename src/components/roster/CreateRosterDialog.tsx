@@ -41,7 +41,9 @@ export function CreateRosterDialog({ show, onHide }: CreateRosterDialogProps) {
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const { error } = await supabase.functions.invoke('create-roster', { body: values });
+      const { error } = await supabase.functions.invoke('manage-rosters', {
+        body: { action: 'create', ...values },
+      });
       if (error) throw error;
     },
     onSuccess: () => {
