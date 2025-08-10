@@ -40,7 +40,7 @@ const DutyRoster = () => {
                   {groups?.map((group: any) => (
                     <div key={group.id}>
                       <ListGroup.Item className="fw-bold bg-light">{group.name}</ListGroup.Item>
-                      {group.duty_rosters.map((roster: any) => (
+                      {Array.isArray(group.duty_rosters) && group.duty_rosters.map((roster: any) => (
                         <ListGroup.Item 
                           key={roster.id} 
                           action 

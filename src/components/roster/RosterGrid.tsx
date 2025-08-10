@@ -97,7 +97,7 @@ export const RosterGrid = ({ rosterId }: { rosterId: number }) => {
   }, [roster]);
 
   const tourOptions = tours?.map(tour => ({ value: tour.id, label: tour.name })) || [];
-  const users = roster?.work_groups.user_work_groups.map((ug: any) => ug.profiles) || [];
+  const users = roster?.work_groups?.user_work_groups?.map((ug: any) => ug.profiles).filter(Boolean) || [];
 
   if (isLoading) return <div className="text-center p-5"><Spinner /></div>;
   if (!roster) return <p>Dienstplan nicht gefunden.</p>;
