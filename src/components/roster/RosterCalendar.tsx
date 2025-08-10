@@ -119,6 +119,7 @@ export const RosterCalendar = ({ workGroupId, currentMonth, onMonthChange, roste
         <Card.Body>
           {isLoading && <div className="text-center"><Spinner /></div>}
           <style>{`
+            .rdp { width: 100%; }
             .rdp-day { height: 120px; align-items: flex-start; }
             .rdp-caption_label { font-weight: bold; }
             .rdp-day_selected { background-color: var(--bs-primary-bg-subtle) !important; }
