@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Spinner, Badge } from 'react-bootstrap';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker, DayModifiers } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { de } from 'date-fns/locale';
 import { format } from 'date-fns';
@@ -17,6 +17,19 @@ const fetchRosterDetailsForMonth = async (workGroupId: number, year: number, mon
   return data;
 };
 
+// German holidays for 2024 (nationwide)
+const holidays2024 = [
+  new Date(2024, 0, 1),  // New Year's Day
+  new Date(2024, 2, 29), // Good Friday
+  new Date(2024, 3, 1),  // Easter Monday
+  new Date(2024, 4, 1),  // Labour Day
+  new Date(2024, 4, 9),  // Ascension Day
+  new Date(2024, 4, 20), // Whit Monday
+  new Date(2024, 9, 3),  // Day of German Unity
+  new Date(2024, 11, 25),// Christmas Day
+  new Date(2024, 11, 26),// 2nd Day of Christmas
+];
+
 type RosterEntry = {
   id: number;
   duty_date: string;
@@ -29,8 +42,7 @@ type RosterEntry = {
 
 type Member = { id: string; first_name: string | null; last_name: string | null };
 
-export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+export const RosterCalendar = ({ workGroupId, currentMonth, onMonthChange, rosterId }: { workGroupId: number, currentMonth: Date, onMonthChange: (date: Date) => void, rosterId: number | null }) => {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -39,7 +51,7 @@ export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
     queryFn: () => fetchRosterDetailsForMonth(workGroupId, currentMonth.getFullYear(), currentMonth.getMonth()),
   });
 
-  const { entriesByDay, members, rosterIdForSelectedDay } = useMemo(() => {
+  const { entriesByDay, members } = useMemo(() => {
     const map = new Map<string, RosterEntry[]>();
     if (data?.entries) {
       for (const entry of data.entries) {
@@ -51,18 +63,8 @@ export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
       }
     }
     const members = data?.members || [];
-    let rosterId = null;
-    if (selectedDay) {
-        const dayEntries = map.get(format(selectedDay, 'yyyy-MM-dd'));
-        if (dayEntries && dayEntries.length > 0) {
-            rosterId = dayEntries[0].roster_id;
-        } else {
-            // If no entries, find a roster that covers this day
-            const { data: roster } = {data: null} // This part is complex, for now we can only edit days with existing entries
-        }
-    }
-    return { entriesByDay: map, members, rosterIdForSelectedDay: rosterId };
-  }, [data, selectedDay]);
+    return { entriesByDay: map, members };
+  }, [data]);
 
   const initialAssignmentsForSelectedDay = useMemo(() => {
     const assignments: Record<string, number | null> = {};
@@ -101,6 +103,16 @@ export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
     );
   };
 
+  const modifiers: DayModifiers = {
+    weekends: { dayOfWeek: [0, 6] },
+    holidays: holidays2024,
+  };
+
+  const modifiersClassNames = {
+    weekends: 'day-weekend',
+    holidays: 'day-holiday',
+  };
+
   return (
     <>
       <Card>
@@ -110,11 +122,13 @@ export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
             .rdp-day { height: 120px; align-items: flex-start; }
             .rdp-caption_label { font-weight: bold; }
             .rdp-day_selected { background-color: var(--bs-primary-bg-subtle) !important; }
+            .day-weekend { color: var(--bs-danger); }
+            .day-holiday { background-color: var(--bs-warning-bg-subtle); }
           `}</style>
           <DayPicker
             locale={de}
             month={currentMonth}
-            onMonthChange={setCurrentMonth}
+            onMonthChange={onMonthChange}
             showOutsideDays
             onDayClick={handleDayClick}
             components={{
@@ -122,6 +136,8 @@ export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
               IconLeft: () => <ChevronLeft size={16} />,
               IconRight: () => <ChevronRight size={16} />,
             }}
+            modifiers={modifiers}
+            modifiersClassNames={modifiersClassNames}
             formatters={{
               formatCaption: (date) => format(date, 'MMMM yyyy', { locale: de }),
             }}
@@ -132,7 +148,7 @@ export const RosterCalendar = ({ workGroupId }: { workGroupId: number }) => {
         show={isModalOpen}
         onHide={() => setIsModalOpen(false)}
         date={selectedDay}
-        rosterId={rosterIdForSelectedDay}
+        rosterId={rosterId}
         members={members}
         initialAssignments={initialAssignmentsForSelectedDay}
       />

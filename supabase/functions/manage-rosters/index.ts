@@ -44,20 +44,29 @@ serve(async (req) => {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
 
-      case 'update-entries': {
-        const { rosterId, entries } = payload;
-        if (!rosterId || !entries) {
-            return new Response(JSON.stringify({ error: 'Roster ID and entries are required' }), { status: 400 });
+      case 'update-entries-for-day': {
+        const { rosterId, date, assignments } = payload;
+        if (!rosterId || !date || !assignments) {
+            return new Response(JSON.stringify({ error: 'Roster ID, date, and assignments are required' }), { status: 400 });
         }
-        await supabase.from('duty_roster_entries').delete().eq('roster_id', rosterId);
-        if (entries.length > 0) {
-            const entriesToInsert = entries.map((entry: any) => ({
+        // Delete existing entries for this roster and date
+        const { error: deleteError } = await supabase
+          .from('duty_roster_entries')
+          .delete()
+          .eq('roster_id', rosterId)
+          .eq('duty_date', date);
+        if (deleteError) throw deleteError;
+
+        // Insert new entries if any
+        if (assignments.length > 0) {
+            const entriesToInsert = assignments.map((entry: any) => ({
                 roster_id: rosterId,
                 user_id: entry.user_id,
                 tour_id: entry.tour_id,
-                duty_date: entry.duty_date,
+                duty_date: date,
             }));
-            await supabase.from('duty_roster_entries').insert(entriesToInsert);
+            const { error: insertError } = await supabase.from('duty_roster_entries').insert(entriesToInsert);
+            if (insertError) throw insertError;
         }
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }

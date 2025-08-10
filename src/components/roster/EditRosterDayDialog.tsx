@@ -52,8 +52,9 @@ export const EditRosterDayDialog = ({ show, onHide, date, rosterId, members, ini
           tour_id: tourId,
         }));
 
-      const { error } = await supabase.functions.invoke('update-roster-entries-for-day', {
+      const { error } = await supabase.functions.invoke('manage-rosters', {
         body: {
+          action: 'update-entries-for-day',
           rosterId,
           date: format(date, 'yyyy-MM-dd'),
           assignments: entries,
@@ -109,7 +110,7 @@ export const EditRosterDayDialog = ({ show, onHide, date, rosterId, members, ini
       <Modal.Footer>
         <Button variant="secondary" onClick={onHide}>Abbrechen</Button>
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || !rosterId}>
-          {mutation.isPending ? <Spinner size="sm" /> : 'Speichern'}
+          {mutation.isPending ? <Spinner as="span" size="sm" /> : 'Speichern'}
         </Button>
       </Modal.Footer>
     </Modal>
