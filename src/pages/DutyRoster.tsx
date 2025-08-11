@@ -4,8 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Container, Card, Button, Spinner, Form } from 'react-bootstrap';
 import { PlusCircle } from 'lucide-react';
 import { CreateRosterDialog } from '@/components/roster/CreateRosterDialog';
-import { RosterCalendar } from '@/components/roster/RosterCalendar';
-import type { WorkGroup } from '@/types/workgroup';
+import { RosterGrid } from '@/components/roster/RosterGrid';
 import { startOfMonth, endOfMonth, isWithinInterval, format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { showSuccess, showError } from '@/utils/toast';
@@ -82,10 +81,8 @@ const DutyRoster = () => {
         
         {selectedGroupId ? (
           rosterForCurrentMonth ? (
-            <RosterCalendar 
+            <RosterGrid 
               workGroupId={selectedGroupId} 
-              currentMonth={currentMonth} 
-              onMonthChange={setCurrentMonth} 
               rosterId={rosterForCurrentMonth.id}
             />
           ) : (
