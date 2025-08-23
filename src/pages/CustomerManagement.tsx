@@ -27,7 +27,9 @@ export type Customer = {
 };
 
 const fetchCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase.functions.invoke('get-customers');
+  const { data, error } = await supabase.functions.invoke('manage-customers', {
+    body: { action: 'get' }
+  });
   if (error) throw new Error(error.message);
   return data.customers;
 };
@@ -47,7 +49,9 @@ const CustomerManagement = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const { error } = await supabase.functions.invoke('delete-customer', { body: { id } });
+      const { error } = await supabase.functions.invoke('manage-customers', { 
+        body: { action: 'delete', payload: { id } } 
+      });
       if (error) throw error;
     },
     onSuccess: () => {
