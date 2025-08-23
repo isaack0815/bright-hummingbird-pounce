@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import { Container, Card, Button, Form, Row, Col, Table, Spinner, Alert, InputGroup, Modal } from 'react-bootstrap';
-import { Save } from 'lucide-react';
+import { Save, Trash2 } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { showError, showSuccess } from '@/utils/toast';
@@ -33,7 +33,9 @@ const fetchCustomers = async (): Promise<Customer[]> => {
 };
 
 const fetchTemplates = async (customerId: number): Promise<Template[]> => {
-  const { data, error } = await supabase.functions.invoke('get-import-templates', { body: { customerId } });
+  const { data, error } = await supabase.functions.invoke('manage-import-templates', {
+    body: { action: 'get', payload: { customerId } },
+  });
   if (error) throw error;
   return data.templates;
 };
@@ -44,6 +46,7 @@ const OrderImport = () => {
   const [rows, setRows] = useState<any[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string[]>>({});
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
@@ -125,7 +128,16 @@ const OrderImport = () => {
   const saveTemplateMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomerId || !newTemplateName) throw new Error("Kunden-ID oder Vorlagenname fehlt.");
-      const { error } = await supabase.functions.invoke('save-import-template', { body: { customerId: selectedCustomerId, templateName: newTemplateName, mapping } });
+      const { error } = await supabase.functions.invoke('manage-import-templates', { 
+        body: { 
+          action: 'save', 
+          payload: { 
+            customerId: selectedCustomerId, 
+            templateName: newTemplateName, 
+            mapping 
+          } 
+        } 
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -133,6 +145,22 @@ const OrderImport = () => {
       queryClient.invalidateQueries({ queryKey: ['importTemplates', selectedCustomerId] });
       setShowSaveTemplateModal(false);
       setNewTemplateName("");
+    },
+    onError: (err: any) => showError(err.data?.error || err.message),
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (templateId: number) => {
+      const { error } = await supabase.functions.invoke('manage-import-templates', {
+        body: { action: 'delete', payload: { templateId } },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Vorlage gelöscht!");
+      queryClient.invalidateQueries({ queryKey: ['importTemplates', selectedCustomerId] });
+      setSelectedTemplateId(null);
+      setMapping({});
     },
     onError: (err: any) => showError(err.data?.error || err.message),
   });
@@ -158,11 +186,28 @@ const OrderImport = () => {
             <Card>
               <Card.Header><Card.Title as="h6">2. Spalten zuordnen</Card.Title></Card.Header>
               <Card.Body>
-                <Form.Group className="mb-3"><Form.Label>Vorlage anwenden</Form.Label>
-                  <Select options={templates?.map(t => ({ value: t.id, label: t.template_name }))} isClearable placeholder="Vorlage auswählen..." onChange={(opt) => {
-                      const selectedTemplate = templates?.find(t => t.id === opt?.value);
-                      if (selectedTemplate) setMapping(selectedTemplate.mapping);
-                  }} />
+                <Form.Group className="mb-3">
+                  <Form.Label>Vorlage anwenden</Form.Label>
+                  <InputGroup>
+                    <Select 
+                      className="flex-grow-1"
+                      options={templates?.map(t => ({ value: t.id, label: t.template_name }))} 
+                      isClearable 
+                      placeholder="Vorlage auswählen..." 
+                      value={templates?.map(t => ({ value: t.id, label: t.template_name })).find(o => o.value === selectedTemplateId) || null}
+                      onChange={(opt) => {
+                        const selectedTemplate = templates?.find(t => t.id === opt?.value);
+                        setSelectedTemplateId(opt?.value || null);
+                        if (selectedTemplate) setMapping(selectedTemplate.mapping);
+                        else setMapping({});
+                      }} 
+                    />
+                    {selectedTemplateId && (
+                      <Button variant="outline-danger" onClick={() => deleteTemplateMutation.mutate(selectedTemplateId)} disabled={deleteTemplateMutation.isPending}>
+                        <Trash2 size={16} />
+                      </Button>
+                    )}
+                  </InputGroup>
                 </Form.Group>
                 <hr />
                 {IMPORT_FIELDS.map(field => (
