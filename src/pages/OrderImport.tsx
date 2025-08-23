@@ -9,6 +9,7 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Customer } from '@/pages/CustomerManagement';
 import Select from 'react-select';
+import { SampleDataPreview } from '@/components/import/SampleDataPreview';
 
 const IMPORT_FIELDS = [
   { key: 'external_order_number', label: 'Externe Auftragsnr.', required: false },
@@ -183,9 +184,16 @@ const OrderImport = () => {
           <Card className="mb-4">
             <Card.Header><Card.Title as="h6">1. Datei & Kunde auswählen</Card.Title></Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3"><Form.Label>XLSX-Datei</Form.Label><Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} /></Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>XLSX-Datei</Form.Label>
+                <Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
+              </Form.Group>
+              {!file && <SampleDataPreview />}
               {file && (
-                <Form.Group><Form.Label>Kunde</Form.Label><CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} /></Form.Group>
+                <Form.Group>
+                  <Form.Label>Kunde</Form.Label>
+                  <CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} />
+                </Form.Group>
               )}
             </Card.Body>
           </Card>
