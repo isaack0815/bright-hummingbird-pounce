@@ -23,15 +23,36 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'File ID is required' }), { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data: logs, error: logsError } = await supabase
       .from('file_activity_logs')
-      .select('*, profiles(first_name, last_name)')
+      .select('id, created_at, action, details, user_id')
       .eq('file_id', fileId)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (logsError) throw logsError;
+    if (!logs) {
+        return new Response(JSON.stringify({ history: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
 
-    return new Response(JSON.stringify({ history: data }), {
+    const userIds = [...new Set(logs.map(log => log.user_id))];
+    if (userIds.length === 0) {
+        return new Response(JSON.stringify({ history: logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
+
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .in('id', userIds);
+    if (profilesError) throw profilesError;
+
+    const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+    const historyWithProfiles = logs.map(log => ({
+      ...log,
+      profiles: profilesMap.get(log.user_id) || null
+    }));
+
+    return new Response(JSON.stringify({ history: historyWithProfiles }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
