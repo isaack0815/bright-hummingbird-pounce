@@ -23,6 +23,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'File ID is required' }), { status: 400 });
     }
 
+    // Step 1: Fetch logs
     const { data: logs, error: logsError } = await supabase
       .from('file_activity_logs')
       .select('id, created_at, action, details, user_id')
@@ -30,23 +31,26 @@ serve(async (req) => {
       .order('created_at', { ascending: false });
 
     if (logsError) throw logsError;
-    if (!logs) {
+    if (!logs || logs.length === 0) {
         return new Response(JSON.stringify({ history: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
+    // Step 2: Collect user IDs
     const userIds = [...new Set(logs.map(log => log.user_id))];
     if (userIds.length === 0) {
-        return new Response(JSON.stringify({ history: logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        const historyWithoutProfiles = logs.map(log => ({ ...log, profiles: null }));
+        return new Response(JSON.stringify({ history: historyWithoutProfiles }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
+    // Step 3: Fetch profiles for those user IDs
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, first_name, last_name')
       .in('id', userIds);
     if (profilesError) throw profilesError;
 
+    // Step 4: Combine the data
     const profilesMap = new Map(profiles.map(p => [p.id, p]));
-
     const historyWithProfiles = logs.map(log => ({
       ...log,
       profiles: profilesMap.get(log.user_id) || null
