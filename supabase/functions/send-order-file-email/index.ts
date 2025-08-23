@@ -110,12 +110,17 @@ serve(async (req) => {
         details: {
             recipient: recipientEmail,
             subject: subject,
+            messageId: info.messageId
         }
     });
     console.log(`[send-order-file-email] Step 9.1: Activity logged successfully.`);
 
     console.log("--- [send-order-file-email] Function finished successfully ---");
-    return new Response(JSON.stringify({ success: true, message: `Email with attachment sent to ${recipientEmail}` }), {
+    return new Response(JSON.stringify({ 
+        success: true, 
+        message: `E-Mail an ${recipientEmail} übergeben. Message-ID: ${info.messageId}`,
+        messageId: info.messageId 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

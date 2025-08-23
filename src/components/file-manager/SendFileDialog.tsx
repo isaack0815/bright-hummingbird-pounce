@@ -40,21 +40,22 @@ export const SendFileDialog = ({ file, show, onHide }: SendFileDialogProps) => {
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!file) return;
-      const { error } = await supabase.functions.invoke('send-order-file-email', {
+      const { data, error } = await supabase.functions.invoke('send-order-file-email', {
         body: {
           fileId: file.id,
           ...values,
         },
       });
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      showSuccess("E-Mail erfolgreich versendet!");
+    onSuccess: (data) => {
+      showSuccess(data.message || "E-Mail erfolgreich versendet!");
       onHide();
       form.reset();
     },
     onError: (err: any) => {
-      showError(err.message || "Fehler beim Senden der E-Mail.");
+      showError(err.data?.error || err.message || "Fehler beim Senden der E-Mail.");
     },
   });
 
