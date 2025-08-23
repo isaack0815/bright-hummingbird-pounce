@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import { Container, Card, Button, Form, Row, Col, Table, Spinner, Alert } from 'react-bootstrap';
-import { ArrowRight } from 'lucide-react';
+import { Container, Card, Button, Form, Row, Col, Table, Spinner, Alert, InputGroup, Modal } from 'react-bootstrap';
+import { Save } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Customer } from '@/pages/CustomerManagement';
+import Select from 'react-select';
 
-// Define the fields we want to import into our system
 const IMPORT_FIELDS = [
   { key: 'external_order_number', label: 'Externe Auftragsnr.', required: false },
   { key: 'origin_address', label: 'Abholadresse', required: true },
@@ -20,23 +20,40 @@ const IMPORT_FIELDS = [
   { key: 'description', label: 'Beschreibung', required: false },
 ];
 
+type Template = {
+  id: number;
+  template_name: string;
+  mapping: Record<string, string[]>;
+};
+
 const fetchCustomers = async (): Promise<Customer[]> => {
   const { data, error } = await supabase.functions.invoke('get-customers');
   if (error) throw new Error(error.message);
   return data.customers;
 };
 
+const fetchTemplates = async (customerId: number): Promise<Template[]> => {
+  const { data, error } = await supabase.functions.invoke('get-import-templates', { body: { customerId } });
+  if (error) throw error;
+  return data.templates;
+};
+
 const OrderImport = () => {
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<any[][]>([]);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [mapping, setMapping] = useState<Record<string, string[]>>({});
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const queryClient = useQueryClient();
 
-  const { data: customers } = useQuery<Customer[]>({
-    queryKey: ['customers'],
-    queryFn: fetchCustomers,
+  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: fetchCustomers });
+  const { data: templates } = useQuery({
+    queryKey: ['importTemplates', selectedCustomerId],
+    queryFn: () => fetchTemplates(selectedCustomerId!),
+    enabled: !!selectedCustomerId,
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,33 +71,35 @@ const OrderImport = () => {
         if (jsonData.length > 0) {
           setHeaders(jsonData[0].map(h => String(h)));
           setRows(jsonData.slice(1));
-          setMapping({}); // Reset mapping on new file
+          setMapping({});
         }
       };
       reader.readAsArrayBuffer(selectedFile);
     }
   };
 
-  const handleMappingChange = (systemField: string, excelHeader: string) => {
-    setMapping(prev => ({ ...prev, [systemField]: excelHeader }));
+  const handleMappingChange = (systemField: string, excelHeaders: string[]) => {
+    setMapping(prev => ({ ...prev, [systemField]: excelHeaders }));
   };
 
   const previewData = useMemo(() => {
     if (rows.length === 0 || Object.keys(mapping).length === 0) return [];
-    
     const headerIndexMap: Record<string, number> = {};
     headers.forEach((h, i) => { headerIndexMap[h] = i; });
 
     return rows.map(row => {
       const rowData: Record<string, any> = {};
       IMPORT_FIELDS.forEach(field => {
-        const excelHeader = mapping[field.key];
-        if (excelHeader) {
-          const index = headerIndexMap[excelHeader];
-          let value = row[index];
-          if (value instanceof Date) {
-            value = value.toISOString().split('T')[0];
-          }
+        const excelHeaders = mapping[field.key];
+        if (excelHeaders && excelHeaders.length > 0) {
+          const value = excelHeaders.map(header => {
+            const index = headerIndexMap[header];
+            let cellValue = row[index];
+            if (cellValue instanceof Date) {
+              cellValue = cellValue.toISOString().split('T')[0];
+            }
+            return cellValue;
+          }).filter(Boolean).join(' ');
           rowData[field.key] = value;
         }
       });
@@ -90,35 +109,36 @@ const OrderImport = () => {
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedCustomerId || previewData.length === 0) {
-        throw new Error("Bitte wählen Sie einen Kunden aus und stellen Sie sicher, dass Daten zur Vorschau vorhanden sind.");
-      }
-      const { data, error } = await supabase.functions.invoke('batch-import-orders', {
-        body: {
-          customerId: selectedCustomerId,
-          orders: previewData,
-        },
-      });
+      if (!selectedCustomerId || previewData.length === 0) throw new Error("Kunde oder Daten fehlen.");
+      const { data, error } = await supabase.functions.invoke('batch-import-orders', { body: { customerId: selectedCustomerId, orders: previewData } });
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      showSuccess(`${data.successCount} von ${data.totalCount} Aufträgen erfolgreich importiert!`);
-      if (data.errorCount > 0) {
-        showError(`${data.errorCount} Aufträge konnten nicht importiert werden. Details in der Konsole.`);
-        console.error("Importfehler:", data.errors);
-      }
-      setFile(null);
-      setHeaders([]);
-      setRows([]);
-      setMapping({});
+      showSuccess(`${data.successCount} von ${data.totalCount} Aufträgen importiert!`);
+      if (data.errorCount > 0) showError(`${data.errorCount} Aufträge fehlerhaft.`);
+      setFile(null); setHeaders([]); setRows([]); setMapping({});
     },
-    onError: (err: any) => {
-      showError(err.data?.error || err.message || "Ein unerwarteter Fehler ist aufgetreten.");
-    }
+    onError: (err: any) => showError(err.data?.error || err.message),
   });
 
-  const isMappingComplete = IMPORT_FIELDS.filter(f => f.required).every(f => mapping[f.key]);
+  const saveTemplateMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCustomerId || !newTemplateName) throw new Error("Kunden-ID oder Vorlagenname fehlt.");
+      const { error } = await supabase.functions.invoke('save-import-template', { body: { customerId: selectedCustomerId, templateName: newTemplateName, mapping } });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Vorlage gespeichert!");
+      queryClient.invalidateQueries({ queryKey: ['importTemplates', selectedCustomerId] });
+      setShowSaveTemplateModal(false);
+      setNewTemplateName("");
+    },
+    onError: (err: any) => showError(err.data?.error || err.message),
+  });
+
+  const isMappingComplete = IMPORT_FIELDS.filter(f => f.required).every(f => mapping[f.key] && mapping[f.key].length > 0);
+  const headerOptions = headers.map(h => ({ value: h, label: h }));
 
   return (
     <>
@@ -128,98 +148,63 @@ const OrderImport = () => {
           <Card className="mb-4">
             <Card.Header><Card.Title as="h6">1. Datei & Kunde auswählen</Card.Title></Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>XLSX-Datei hochladen</Form.Label>
-                <Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
-              </Form.Group>
+              <Form.Group className="mb-3"><Form.Label>XLSX-Datei</Form.Label><Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} /></Form.Group>
               {file && (
-                <Form.Group>
-                  <Form.Label>Kunde für diesen Import</Form.Label>
-                  <CustomerCombobox
-                    customers={customers || []}
-                    value={selectedCustomerId}
-                    onChange={(val) => setSelectedCustomerId(val)}
-                    onAddNew={() => setIsAddCustomerDialogOpen(true)}
-                  />
-                </Form.Group>
+                <Form.Group><Form.Label>Kunde</Form.Label><CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} /></Form.Group>
               )}
             </Card.Body>
           </Card>
-          {headers.length > 0 && (
+          {headers.length > 0 && selectedCustomerId && (
             <Card>
               <Card.Header><Card.Title as="h6">2. Spalten zuordnen</Card.Title></Card.Header>
               <Card.Body>
-                <p className="small text-muted">Ordnen Sie die Spalten Ihrer Excel-Datei den Systemfeldern zu.</p>
+                <Form.Group className="mb-3"><Form.Label>Vorlage anwenden</Form.Label>
+                  <Select options={templates?.map(t => ({ value: t.id, label: t.template_name }))} isClearable placeholder="Vorlage auswählen..." onChange={(opt) => {
+                      const selectedTemplate = templates?.find(t => t.id === opt?.value);
+                      if (selectedTemplate) setMapping(selectedTemplate.mapping);
+                  }} />
+                </Form.Group>
+                <hr />
                 {IMPORT_FIELDS.map(field => (
-                  <Form.Group as={Row} className="mb-2 align-items-center" key={field.key}>
-                    <Form.Label column sm="5">
-                      {field.label} {field.required && <span className="text-danger">*</span>}
-                    </Form.Label>
-                    <Col sm="7">
-                      <Form.Select
-                        value={mapping[field.key] || ''}
-                        onChange={(e) => handleMappingChange(field.key, e.target.value)}
-                      >
-                        <option value="">Spalte auswählen...</option>
-                        {headers.map(header => <option key={header} value={header}>{header}</option>)}
-                      </Form.Select>
-                    </Col>
+                  <Form.Group className="mb-2" key={field.key}>
+                    <Form.Label>{field.label} {field.required && <span className="text-danger">*</span>}</Form.Label>
+                    <Select isMulti options={headerOptions} value={headerOptions.filter(o => mapping[field.key]?.includes(o.value))} onChange={(opts) => handleMappingChange(field.key, opts.map(o => o.value))} />
                   </Form.Group>
                 ))}
+                <Button variant="outline-secondary" size="sm" className="mt-3" onClick={() => setShowSaveTemplateModal(true)} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
               </Card.Body>
             </Card>
           )}
         </Col>
-
         <Col lg={7}>
           <Card>
             <Card.Header><Card.Title as="h6">3. Vorschau & Import</Card.Title></Card.Header>
             <Card.Body>
               {!isMappingComplete || !selectedCustomerId ? (
-                <div className="text-center text-muted py-5">
-                  <p>Bitte laden Sie eine Datei hoch, wählen Sie einen Kunden und ordnen Sie alle Pflichtfelder (*) zu, um eine Vorschau zu sehen.</p>
-                </div>
+                <div className="text-center text-muted py-5"><p>Bitte laden Sie eine Datei hoch, wählen Sie einen Kunden und ordnen Sie alle Pflichtfelder (*) zu.</p></div>
               ) : (
                 <>
-                  <Alert variant="info">
-                    Es werden <strong>{previewData.length}</strong> Aufträge für den Kunden <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.
-                  </Alert>
-                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    <Table striped bordered hover size="sm">
-                      <thead>
-                        <tr>
-                          {IMPORT_FIELDS.map(field => <th key={field.key}>{field.label}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {previewData.slice(0, 10).map((row, index) => (
-                          <tr key={index}>
-                            {IMPORT_FIELDS.map(field => <td key={field.key}>{String(row[field.key] ?? '')}</td>)}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </div>
+                  <Alert variant="info">Es werden <strong>{previewData.length}</strong> Aufträge für <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.</Alert>
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}><Table striped bordered hover size="sm"><thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead><tbody>{previewData.slice(0, 10).map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody></Table></div>
                   {previewData.length > 10 && <p className="small text-muted text-center">... und {previewData.length - 10} weitere Zeilen.</p>}
-                  <div className="d-grid mt-3">
-                    <Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>
-                      {importMutation.isPending ? <Spinner size="sm" /> : `Import starten`}
-                    </Button>
-                  </div>
+                  <div className="d-grid mt-3"><Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>{importMutation.isPending ? <Spinner size="sm" /> : `Import starten`}</Button></div>
                 </>
               )}
             </Card.Body>
           </Card>
         </Col>
       </Row>
-      <AddCustomerDialog
-        show={isAddCustomerDialogOpen}
-        onHide={() => setIsAddCustomerDialogOpen(false)}
-        onCustomerCreated={(newCustomer) => {
-          setSelectedCustomerId(newCustomer.id);
-          setIsAddCustomerDialogOpen(false);
-        }}
-      />
+      <AddCustomerDialog show={isAddCustomerDialogOpen} onHide={() => setIsAddCustomerDialogOpen(false)} onCustomerCreated={(c) => { setSelectedCustomerId(c.id); setIsAddCustomerDialogOpen(false); }} />
+      <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
+        <Modal.Header closeButton><Modal.Title>Vorlage speichern</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <Form.Group><Form.Label>Name der Vorlage</Form.Label><Form.Control value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="z.B. Monatsabrechnung" /></Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)}>Abbrechen</Button>
+          <Button onClick={() => saveTemplateMutation.mutate()} disabled={!newTemplateName || saveTemplateMutation.isPending}>{saveTemplateMutation.isPending ? <Spinner size="sm" /> : "Speichern"}</Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };
