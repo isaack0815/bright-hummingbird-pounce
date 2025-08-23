@@ -33,8 +33,8 @@ const fetchCustomers = async (): Promise<Customer[]> => {
 };
 
 const fetchTemplates = async (customerId: number): Promise<Template[]> => {
-  const { data, error } = await supabase.functions.invoke('manage-import-templates', {
-    body: { action: 'get', payload: { customerId } },
+  const { data, error } = await supabase.functions.invoke('manage-order-import', {
+    body: { action: 'get-templates', payload: { customerId } },
   });
   if (error) throw error;
   return data.templates;
@@ -113,7 +113,12 @@ const OrderImport = () => {
   const importMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomerId || previewData.length === 0) throw new Error("Kunde oder Daten fehlen.");
-      const { data, error } = await supabase.functions.invoke('batch-import-orders', { body: { customerId: selectedCustomerId, orders: previewData } });
+      const { data, error } = await supabase.functions.invoke('manage-order-import', { 
+        body: { 
+          action: 'import-orders', 
+          payload: { customerId: selectedCustomerId, orders: previewData } 
+        } 
+      });
       if (error) throw error;
       return data;
     },
@@ -128,9 +133,9 @@ const OrderImport = () => {
   const saveTemplateMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomerId || !newTemplateName) throw new Error("Kunden-ID oder Vorlagenname fehlt.");
-      const { error } = await supabase.functions.invoke('manage-import-templates', { 
+      const { error } = await supabase.functions.invoke('manage-order-import', { 
         body: { 
-          action: 'save', 
+          action: 'save-template', 
           payload: { 
             customerId: selectedCustomerId, 
             templateName: newTemplateName, 
@@ -151,8 +156,8 @@ const OrderImport = () => {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (templateId: number) => {
-      const { error } = await supabase.functions.invoke('manage-import-templates', {
-        body: { action: 'delete', payload: { templateId } },
+      const { error } = await supabase.functions.invoke('manage-order-import', {
+        body: { action: 'delete-template', payload: { templateId } },
       });
       if (error) throw error;
     },
