@@ -11,3 +11,14 @@ export type OrderFileWithDetails = {
   last_name: string | null;
   order_number: string;
 };
+
+export type FileActivityLog = {
+  id: number;
+  created_at: string;
+  action: string;
+  details: any;
+  profiles: {
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
+};

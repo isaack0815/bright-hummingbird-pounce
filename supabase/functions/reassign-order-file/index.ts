@@ -12,6 +12,14 @@ serve(async (req) => {
   }
 
   try {
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error("User not authenticated for logging.");
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -22,26 +30,30 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'File ID and new Order ID are required' }), { status: 400 })
     }
 
-    // 1. Get the old file path
-    const { data: file, error: fetchError } = await supabaseAdmin
+    const { data: oldFile, error: fetchError } = await supabaseAdmin
       .from('order_files')
-      .select('file_path')
+      .select('order_id, file_path')
       .eq('id', fileId)
       .single()
     if (fetchError) throw fetchError
 
-    // 2. Move the file in storage
-    const oldPath = file.file_path
+    const oldPath = oldFile.file_path
     const newPath = oldPath.replace(/^\d+\//, `${newOrderId}/`)
     const { error: moveError } = await supabaseAdmin.storage.from('order-files').move(oldPath, newPath)
     if (moveError) throw moveError
 
-    // 3. Update the database record
     const { error: updateError } = await supabaseAdmin
       .from('order_files')
       .update({ order_id: newOrderId, file_path: newPath })
       .eq('id', fileId)
     if (updateError) throw updateError
+
+    await supabaseAdmin.from('file_activity_logs').insert({
+        file_id: fileId,
+        user_id: user.id,
+        action: 'reassigned',
+        details: { from_order_id: oldFile.order_id, to_order_id: newOrderId }
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

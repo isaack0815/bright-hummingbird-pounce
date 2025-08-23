@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Button, Table, Form, Spinner, Row, Col, ListGroup, Badge } from 'react-bootstrap';
-import { Upload, File as FileIcon, Folder, Edit, Trash2, Download, Mail } from 'lucide-react';
+import { Upload, File as FileIcon, Folder, Edit, Trash2, Download, Mail, History } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import Select from 'react-select';
 import { ReassignFileDialog } from '@/components/file-manager/ReassignFileDialog';
 import { SendFileDialog } from '@/components/file-manager/SendFileDialog';
+import { FileHistoryModal } from '@/components/file-manager/FileHistoryModal';
 import type { OrderFileWithDetails } from '@/types/files';
 import TablePlaceholder from '@/components/TablePlaceholder';
 
@@ -31,6 +32,7 @@ const FileManager = () => {
   const [uploading, setUploading] = useState(false);
   const [fileToReassign, setFileToReassign] = useState<OrderFileWithDetails | null>(null);
   const [fileToSend, setFileToSend] = useState<OrderFileWithDetails | null>(null);
+  const [fileToShowHistory, setFileToShowHistory] = useState<OrderFileWithDetails | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [draggedOverOrderId, setDraggedOverOrderId] = useState<number | null>(null);
   const { user } = useAuth();
@@ -62,13 +64,22 @@ const FileManager = () => {
       const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      await supabase.from('order_files').insert({
+      const { data: newFile, error: dbError } = await supabase.from('order_files').insert({
         order_id: orderId,
         user_id: user.id,
         file_path: filePath,
         file_name: file.name,
         file_type: file.type,
+      }).select().single();
+      if (dbError) throw dbError;
+
+      await supabase.from('file_activity_logs').insert({
+        file_id: newFile.id,
+        user_id: user.id,
+        action: 'created',
+        details: { original_filename: file.name }
       });
+
       const orderNumber = ordersWithFiles.get(orderId)?.order_number || '';
       showSuccess(`Datei "${file.name}" erfolgreich in Auftrag ${orderNumber} hochgeladen!`);
       queryClient.invalidateQueries({ queryKey: ['allOrderFiles'] });
@@ -92,7 +103,7 @@ const FileManager = () => {
   const handleDownload = async (file: OrderFileWithDetails) => {
     try {
       const { data, error } = await supabase.functions.invoke('get-download-url', {
-        body: { filePath: file.file_path },
+        body: { fileId: file.id, filePath: file.file_path },
       });
       if (error) throw error;
       window.open(data.signedUrl, '_blank');
@@ -214,10 +225,11 @@ const FileManager = () => {
                         <td>{`${file.first_name || ''} ${file.last_name || ''}`.trim()}</td>
                         <td>{new Date(file.created_at).toLocaleString('de-DE')}</td>
                         <td className="text-end">
-                          <Button variant="ghost" size="sm" onClick={() => handleDownload(file)}><Download size={16} /></Button>
-                          <Button variant="ghost" size="sm" onClick={() => setFileToSend(file)}><Mail size={16} /></Button>
-                          <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file)}><Edit size={16} /></Button>
-                          <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file.id)}><Trash2 size={16} /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDownload(file)} title="Herunterladen"><Download size={16} /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => setFileToSend(file)} title="Senden"><Mail size={16} /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file)} title="Neu zuordnen"><Edit size={16} /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => setFileToShowHistory(file)} title="Historie"><History size={16} /></Button>
+                          <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file.id)} title="Löschen"><Trash2 size={16} /></Button>
                         </td>
                       </tr>
                     ))}
@@ -230,6 +242,7 @@ const FileManager = () => {
       </Row>
       <ReassignFileDialog show={!!fileToReassign} onHide={() => setFileToReassign(null)} file={fileToReassign} />
       <SendFileDialog show={!!fileToSend} onHide={() => setFileToSend(null)} file={fileToSend} />
+      <FileHistoryModal show={!!fileToShowHistory} onHide={() => setFileToShowHistory(null)} file={fileToShowHistory} />
     </>
   );
 };

@@ -12,7 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // Create a client with the user's auth token to check if they are authenticated.
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -21,15 +20,14 @@ serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser()
     if (!user) throw new Error("User not authenticated")
 
-    // Create an admin client to generate the signed URL.
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { filePath } = await req.json()
-    if (!filePath) {
-      return new Response(JSON.stringify({ error: 'filePath is required' }), {
+    const { fileId, filePath } = await req.json()
+    if (!filePath || !fileId) {
+      return new Response(JSON.stringify({ error: 'fileId and filePath are required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
@@ -37,9 +35,17 @@ serve(async (req) => {
 
     const { data, error } = await supabaseAdmin.storage
       .from('order-files')
-      .createSignedUrl(filePath, 60) // 60-second expiry
+      .createSignedUrl(filePath, 60)
 
     if (error) throw error
+
+    // Log the download activity
+    await supabaseAdmin.from('file_activity_logs').insert({
+      file_id: fileId,
+      user_id: user.id,
+      action: 'downloaded',
+      details: { ip: req.headers.get('x-forwarded-for') }
+    });
 
     return new Response(JSON.stringify({ signedUrl: data.signedUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

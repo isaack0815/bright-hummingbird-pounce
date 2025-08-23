@@ -50,14 +50,22 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
       const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase.from('order_files').insert({
+      const { data: newFile, error: dbError } = await supabase.from('order_files').insert({
         order_id: orderId,
         user_id: user.id,
         file_path: filePath,
         file_name: file.name,
         file_type: file.type,
-      });
+      }).select().single();
       if (dbError) throw dbError;
+
+      // Log creation activity
+      await supabase.from('file_activity_logs').insert({
+        file_id: newFile.id,
+        user_id: user.id,
+        action: 'created',
+        details: { original_filename: file.name }
+      });
 
       queryClient.invalidateQueries({ queryKey: ['orderFiles', orderId] });
       showSuccess("Datei erfolgreich hochgeladen!");
