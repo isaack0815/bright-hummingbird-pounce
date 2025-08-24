@@ -83,7 +83,7 @@ const OrderImport = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState("");
+  const [templateToSave, setTemplateToSave] = useState<{id?: number, name: string}>({name: ''});
   const queryClient = useQueryClient();
 
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: fetchCustomers });
@@ -158,16 +158,15 @@ const OrderImport = () => {
 
   const saveTemplateMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedCustomerId || !newTemplateName) throw new Error("Kunden-ID oder Vorlagenname fehlt.");
+      if (!selectedCustomerId || !templateToSave.name) throw new Error("Kunden-ID oder Vorlagenname fehlt.");
+      const payload = { 
+        customerId: selectedCustomerId, 
+        templateName: templateToSave.name, 
+        mapping,
+        templateId: templateToSave.id
+      };
       const { error } = await supabase.functions.invoke('manage-order-import', { 
-        body: { 
-          action: 'save-template', 
-          payload: { 
-            customerId: selectedCustomerId, 
-            templateName: newTemplateName, 
-            mapping 
-          } 
-        } 
+        body: { action: 'save-template', payload } 
       });
       if (error) throw error;
     },
@@ -175,9 +174,14 @@ const OrderImport = () => {
       showSuccess("Vorlage gespeichert!");
       queryClient.invalidateQueries({ queryKey: ['importTemplates', selectedCustomerId] });
       setShowSaveTemplateModal(false);
-      setNewTemplateName("");
     },
-    onError: (err: any) => showError(err.data?.error || err.message),
+    onError: (err: any) => {
+      if (err.message.includes("unique_template_name_for_customer")) {
+        showError("Eine Vorlage mit diesem Namen existiert bereits für diesen Kunden.");
+      } else {
+        showError(err.data?.error || err.message);
+      }
+    },
   });
 
   const deleteTemplateMutation = useMutation({
@@ -195,6 +199,16 @@ const OrderImport = () => {
     },
     onError: (err: any) => showError(err.data?.error || err.message),
   });
+
+  const handleOpenSaveTemplateModal = () => {
+    const selectedTemplate = templates?.find(t => t.id === selectedTemplateId);
+    if (selectedTemplate) {
+      setTemplateToSave({ id: selectedTemplate.id, name: selectedTemplate.template_name });
+    } else {
+      setTemplateToSave({ name: '' });
+    }
+    setShowSaveTemplateModal(true);
+  };
 
   const isMappingComplete = IMPORT_FIELDS.filter(f => f.required).every(f => mapping[f.key]);
 
@@ -265,7 +279,7 @@ const OrderImport = () => {
                     />
                   </Form.Group>
                 ))}
-                <Button variant="outline-secondary" size="sm" className="mt-3" onClick={() => setShowSaveTemplateModal(true)} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
+                <Button variant="outline-secondary" size="sm" className="mt-3" onClick={handleOpenSaveTemplateModal} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
               </Card.Body>
             </Card>
           )}
@@ -291,11 +305,11 @@ const OrderImport = () => {
       <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
         <Modal.Header closeButton><Modal.Title>Vorlage speichern</Modal.Title></Modal.Header>
         <Modal.Body>
-          <Form.Group><Form.Label>Name der Vorlage</Form.Label><Form.Control value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} placeholder="z.B. Monatsabrechnung" /></Form.Group>
+          <Form.Group><Form.Label>Name der Vorlage</Form.Label><Form.Control value={templateToSave.name} onChange={(e) => setTemplateToSave(prev => ({...prev, name: e.target.value}))} placeholder="z.B. Monatsabrechnung" /></Form.Group>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)}>Abbrechen</Button>
-          <Button onClick={() => saveTemplateMutation.mutate()} disabled={!newTemplateName || saveTemplateMutation.isPending}>{saveTemplateMutation.isPending ? <Spinner size="sm" /> : "Speichern"}</Button>
+          <Button onClick={() => saveTemplateMutation.mutate()} disabled={!templateToSave.name || saveTemplateMutation.isPending}>{saveTemplateMutation.isPending ? <Spinner size="sm" /> : "Speichern"}</Button>
         </Modal.Footer>
       </Modal>
     </>
