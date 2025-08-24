@@ -41,7 +41,15 @@ const fetchTemplates = async (customerId: number): Promise<Template[]> => {
     body: { action: 'get-templates', payload: { customerId } },
   });
   if (error) throw error;
-  return data;
+  // Defensive check: handle both old object wrapper and new direct array response
+  if (data && Array.isArray(data.templates)) {
+    return data.templates;
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  // If data is something else, return an empty array to prevent crashes
+  return [];
 };
 
 // Helper function to extract data from cells/ranges
