@@ -18,6 +18,8 @@ const IMPORT_FIELDS = [
   { key: 'delivery_date', label: 'Lieferdatum', required: false },
   { key: 'price', label: 'Preis', required: false },
   { key: 'description', label: 'Beschreibung', required: false },
+  { key: 'weight', label: 'Gewicht (kg)', required: false },
+  { key: 'loading_meters', label: 'Lademeter', required: false },
 ];
 
 type Template = {

@@ -33,28 +33,62 @@ serve(async (req) => {
         if (!customerId || !Array.isArray(orders) || orders.length === 0) {
           return new Response(JSON.stringify({ error: 'Customer ID and a non-empty orders array are required.' }), { status: 400, headers: corsHeaders });
         }
-        const ordersToInsert = orders.map((order: any) => ({
-          customer_id: customerId,
-          external_order_number: order.external_order_number || null,
-          status: 'Angelegt',
-          origin_address: order.origin_address || null,
-          pickup_date: order.pickup_date || null,
-          destination_address: order.destination_address || null,
-          delivery_date: order.delivery_date || null,
-          price: order.price ? Number(order.price) : null,
-          description: order.description || null,
-        }));
-        const results = await Promise.allSettled(ordersToInsert.map(order => supabaseAdmin.from('freight_orders').insert(order).select('id').single()));
-        let successCount = 0, errorCount = 0;
+        
+        let successCount = 0;
+        let errorCount = 0;
         const errors: string[] = [];
-        results.forEach((result, index) => {
-          if (result.status === 'fulfilled' && !result.value.error) successCount++;
-          else {
+
+        for (const [index, order] of orders.entries()) {
+          try {
+            // 1. Prepare freight_order data
+            const orderToInsert = {
+              customer_id: customerId,
+              external_order_number: order.external_order_number || null,
+              status: 'Angelegt',
+              origin_address: order.origin_address || null,
+              pickup_date: order.pickup_date || null,
+              destination_address: order.destination_address || null,
+              delivery_date: order.delivery_date || null,
+              price: order.price ? Number(order.price) : null,
+              description: order.description || null,
+            };
+
+            // 2. Insert freight_order
+            const { data: newOrder, error: orderError } = await supabaseAdmin
+              .from('freight_orders')
+              .insert(orderToInsert)
+              .select('id')
+              .single();
+
+            if (orderError) {
+              throw new Error(`Order insert failed: ${orderError.message}`);
+            }
+
+            // 3. Prepare and insert cargo_item if data exists
+            if (order.weight || order.loading_meters) {
+              const cargoItemToInsert = {
+                order_id: newOrder.id,
+                weight: order.weight ? Number(order.weight) : null,
+                loading_meters: order.loading_meters ? Number(order.loading_meters) : null,
+                description: order.description || 'Importierte Ladung', // Use main description as fallback
+                quantity: 1,
+              };
+              const { error: cargoError } = await supabaseAdmin
+                .from('cargo_items')
+                .insert(cargoItemToInsert);
+
+              if (cargoError) {
+                throw new Error(`Order created, but cargo item insert failed: ${cargoError.message}`);
+              }
+            }
+            
+            successCount++;
+          } catch (e) {
             errorCount++;
-            const errorMessage = result.status === 'rejected' ? result.reason.message : result.value.error.message;
-            errors.push(`Order ${index + 1}: ${errorMessage}`);
+            errors.push(`Order ${index + 1}: ${e.message}`);
           }
-        });
+        }
+
         return new Response(JSON.stringify({ successCount, errorCount, totalCount: orders.length, errors }), { status: 200, headers: corsHeaders });
       }
 
