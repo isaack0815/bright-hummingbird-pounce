@@ -97,7 +97,7 @@ serve(async (req) => {
         if (!customerId) return new Response(JSON.stringify({ error: 'Customer ID is required' }), { status: 400, headers: corsHeaders });
         const { data, error } = await supabaseAdmin.from('import_templates').select('*').eq('customer_id', customerId).order('template_name');
         if (error) throw error;
-        return new Response(JSON.stringify(data), { status: 200, headers: corsHeaders });
+        return new Response(JSON.stringify({ templates: data || [] }), { status: 200, headers: corsHeaders });
       }
 
       case 'save-template': {
