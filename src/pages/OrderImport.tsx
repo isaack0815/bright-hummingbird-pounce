@@ -41,7 +41,7 @@ const fetchTemplates = async (customerId: number): Promise<Template[]> => {
     body: { action: 'get-templates', payload: { customerId } },
   });
   if (error) throw error;
-  return data.templates;
+  return data;
 };
 
 // Helper function to extract data from cells/ranges
