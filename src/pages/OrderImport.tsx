@@ -9,7 +9,6 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Customer } from '@/pages/CustomerManagement';
 import Select from 'react-select';
-import { SampleDataPreview } from '@/components/import/SampleDataPreview';
 
 const IMPORT_FIELDS = [
   { key: 'external_order_number', label: 'Externe Auftragsnr.', required: false },
@@ -24,7 +23,7 @@ const IMPORT_FIELDS = [
 type Template = {
   id: number;
   template_name: string;
-  mapping: Record<string, string[]>;
+  mapping: Record<string, string>;
 };
 
 const fetchCustomers = async (): Promise<Customer[]> => {
@@ -43,11 +42,41 @@ const fetchTemplates = async (customerId: number): Promise<Template[]> => {
   return data.templates;
 };
 
+// Helper function to extract data from cells/ranges
+const extractCellData = (worksheet: XLSX.WorkSheet, mappingString: string): string => {
+  if (!mappingString || !worksheet) return '';
+  
+  try {
+    if (mappingString.includes(':')) {
+      // It's a range
+      const range = XLSX.utils.decode_range(mappingString);
+      const values = [];
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell_address = { c: C, r: R };
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          const cell = worksheet[cell_ref];
+          if (cell && cell.v) {
+            values.push(cell.w || cell.v);
+          }
+        }
+      }
+      return values.join(' ');
+    } else {
+      // It's a single cell
+      const cell = worksheet[mappingString];
+      return cell ? String(cell.w || cell.v) : '';
+    }
+  } catch (e) {
+    console.error(`Error parsing mapping string "${mappingString}":`, e);
+    return `[Fehlerhafte Eingabe: ${mappingString}]`;
+  }
+};
+
 const OrderImport = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<any[][]>([]);
-  const [mapping, setMapping] = useState<Record<string, string[]>>({});
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
@@ -69,49 +98,41 @@ const OrderImport = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        
-        if (jsonData.length > 0) {
-          setHeaders(jsonData[0].map(h => String(h)));
-          setRows(jsonData.slice(1));
-          setMapping({});
-        }
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+        setWorkbook(wb);
+        setMapping({});
       };
       reader.readAsArrayBuffer(selectedFile);
     }
   };
 
-  const handleMappingChange = (systemField: string, excelHeaders: string[]) => {
-    setMapping(prev => ({ ...prev, [systemField]: excelHeaders }));
+  const handleMappingChange = (systemField: string, cellRef: string) => {
+    setMapping(prev => ({ ...prev, [systemField]: cellRef }));
   };
 
   const previewData = useMemo(() => {
-    if (rows.length === 0 || Object.keys(mapping).length === 0) return [];
-    const headerIndexMap: Record<string, number> = {};
-    headers.forEach((h, i) => { headerIndexMap[h] = i; });
-
-    return rows.map(row => {
+    if (!workbook || Object.keys(mapping).length === 0) return [];
+    
+    return workbook.SheetNames.map(sheetName => {
+      const worksheet = workbook.Sheets[sheetName];
       const rowData: Record<string, any> = {};
       IMPORT_FIELDS.forEach(field => {
-        const excelHeaders = mapping[field.key];
-        if (excelHeaders && excelHeaders.length > 0) {
-          const value = excelHeaders.map(header => {
-            const index = headerIndexMap[header];
-            let cellValue = row[index];
-            if (cellValue instanceof Date) {
-              cellValue = cellValue.toISOString().split('T')[0];
+        const mappingString = mapping[field.key];
+        if (mappingString) {
+          let value = extractCellData(worksheet, mappingString);
+          if ((field.key.includes('date')) && value) {
+            // Attempt to parse common date formats
+            const dateMatch = value.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+            if (dateMatch) {
+              value = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
             }
-            return cellValue;
-          }).filter(Boolean).join(' ');
+          }
           rowData[field.key] = value;
         }
       });
       return rowData;
-    }).filter(row => Object.values(row).some(val => val !== undefined && val !== null && val !== ''));
-  }, [rows, headers, mapping]);
+    }).filter(row => Object.values(row).some(val => val));
+  }, [workbook, mapping]);
 
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -128,7 +149,7 @@ const OrderImport = () => {
     onSuccess: (data) => {
       showSuccess(`${data.successCount} von ${data.totalCount} Aufträgen importiert!`);
       if (data.errorCount > 0) showError(`${data.errorCount} Aufträge fehlerhaft.`);
-      setFile(null); setHeaders([]); setRows([]); setMapping({});
+      setFile(null); setWorkbook(null); setMapping({});
     },
     onError: (err: any) => showError(err.data?.error || err.message),
   });
@@ -173,8 +194,7 @@ const OrderImport = () => {
     onError: (err: any) => showError(err.data?.error || err.message),
   });
 
-  const isMappingComplete = IMPORT_FIELDS.filter(f => f.required).every(f => mapping[f.key] && mapping[f.key].length > 0);
-  const headerOptions = headers.map(h => ({ value: h, label: h }));
+  const isMappingComplete = IMPORT_FIELDS.filter(f => f.required).every(f => mapping[f.key]);
 
   return (
     <>
@@ -188,7 +208,15 @@ const OrderImport = () => {
                 <Form.Label>XLSX-Datei</Form.Label>
                 <Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
               </Form.Group>
-              {!file && <SampleDataPreview />}
+              {!file && (
+                <Alert variant="info">
+                  <Alert.Heading as="h6">Wie funktioniert der Import?</Alert.Heading>
+                  <p className="small">
+                    Laden Sie eine Excel-Datei hoch. Das System geht davon aus, dass jedes Tabellenblatt (Sheet) in der Datei einen einzelnen Auftrag darstellt.
+                    Im nächsten Schritt können Sie dann die Systemfelder (z.B. "Abholadresse") mit den entsprechenden Zellen (z.B. `B5`) oder Zellbereichen (z.B. `B12:B15`) aus Ihrer Datei verknüpfen.
+                  </p>
+                </Alert>
+              )}
               {file && (
                 <Form.Group>
                   <Form.Label>Kunde</Form.Label>
@@ -197,9 +225,9 @@ const OrderImport = () => {
               )}
             </Card.Body>
           </Card>
-          {headers.length > 0 && selectedCustomerId && (
+          {workbook && selectedCustomerId && (
             <Card>
-              <Card.Header><Card.Title as="h6">2. Spalten zuordnen</Card.Title></Card.Header>
+              <Card.Header><Card.Title as="h6">2. Zellen zuordnen</Card.Title></Card.Header>
               <Card.Body>
                 <Form.Group className="mb-3">
                   <Form.Label>Vorlage anwenden</Form.Label>
@@ -228,7 +256,11 @@ const OrderImport = () => {
                 {IMPORT_FIELDS.map(field => (
                   <Form.Group className="mb-2" key={field.key}>
                     <Form.Label>{field.label} {field.required && <span className="text-danger">*</span>}</Form.Label>
-                    <Select isMulti options={headerOptions} value={headerOptions.filter(o => mapping[field.key]?.includes(o.value))} onChange={(opts) => handleMappingChange(field.key, opts.map(o => o.value))} />
+                    <Form.Control 
+                      placeholder="z.B. B5 oder A10:C12" 
+                      value={mapping[field.key] || ''}
+                      onChange={(e) => handleMappingChange(field.key, e.target.value)}
+                    />
                   </Form.Group>
                 ))}
                 <Button variant="outline-secondary" size="sm" className="mt-3" onClick={() => setShowSaveTemplateModal(true)} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
@@ -245,8 +277,7 @@ const OrderImport = () => {
               ) : (
                 <>
                   <Alert variant="info">Es werden <strong>{previewData.length}</strong> Aufträge für <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.</Alert>
-                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}><Table striped bordered hover size="sm"><thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead><tbody>{previewData.slice(0, 10).map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody></Table></div>
-                  {previewData.length > 10 && <p className="small text-muted text-center">... und {previewData.length - 10} weitere Zeilen.</p>}
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}><Table striped bordered hover size="sm"><thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead><tbody>{previewData.map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody></Table></div>
                   <div className="d-grid mt-3"><Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>{importMutation.isPending ? <Spinner size="sm" /> : `Import starten`}</Button></div>
                 </>
               )}
