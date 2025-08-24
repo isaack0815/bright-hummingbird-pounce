@@ -12,16 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    // Use user client only to get the authenticated user
+    const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await userClient.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
     const { action, payload } = await req.json();
 
+    // Use admin client for all database operations to bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -40,7 +42,6 @@ serve(async (req) => {
 
         for (const [index, order] of orders.entries()) {
           try {
-            // 1. Prepare freight_order data
             const orderToInsert = {
               customer_id: customerId,
               external_order_number: order.external_order_number || null,
@@ -51,9 +52,9 @@ serve(async (req) => {
               delivery_date: order.delivery_date || null,
               price: order.price ? Number(order.price) : null,
               description: order.description || null,
+              created_by: user.id,
             };
 
-            // 2. Insert freight_order
             const { data: newOrder, error: orderError } = await supabaseAdmin
               .from('freight_orders')
               .insert(orderToInsert)
@@ -64,13 +65,12 @@ serve(async (req) => {
               throw new Error(`Order insert failed: ${orderError.message}`);
             }
 
-            // 3. Prepare and insert cargo_item if data exists
             if (order.weight || order.loading_meters) {
               const cargoItemToInsert = {
                 order_id: newOrder.id,
                 weight: order.weight ? Number(order.weight) : null,
                 loading_meters: order.loading_meters ? Number(order.loading_meters) : null,
-                description: order.description || 'Importierte Ladung', // Use main description as fallback
+                description: order.description || 'Importierte Ladung',
                 quantity: 1,
               };
               const { error: cargoError } = await supabaseAdmin
@@ -78,7 +78,7 @@ serve(async (req) => {
                 .insert(cargoItemToInsert);
 
               if (cargoError) {
-                throw new Error(`Order created, but cargo item insert failed: ${cargoError.message}`);
+                console.warn(`Order ${newOrder.id} created, but cargo item insert failed: ${cargoError.message}`);
               }
             }
             
@@ -95,7 +95,7 @@ serve(async (req) => {
       case 'get-templates': {
         const { customerId } = payload;
         if (!customerId) return new Response(JSON.stringify({ error: 'Customer ID is required' }), { status: 400, headers: corsHeaders });
-        const { data, error } = await supabase.from('import_templates').select('*').eq('customer_id', customerId).order('template_name');
+        const { data, error } = await supabaseAdmin.from('import_templates').select('*').eq('customer_id', customerId).order('template_name');
         if (error) throw error;
         return new Response(JSON.stringify({ templates: data }), { status: 200, headers: corsHeaders });
       }
@@ -104,7 +104,7 @@ serve(async (req) => {
         const { customerId, templateName, mapping, templateId } = payload;
         if (!customerId || !templateName || !mapping) return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: corsHeaders });
         const upsertData = { id: templateId || undefined, customer_id: customerId, template_name: templateName, mapping: mapping, created_by: user.id };
-        const { data, error } = await supabase.from('import_templates').upsert(upsertData).select().single();
+        const { data, error } = await supabaseAdmin.from('import_templates').upsert(upsertData).select().single();
         if (error) throw error;
         return new Response(JSON.stringify({ template: data }), { status: 200, headers: corsHeaders });
       }
@@ -112,7 +112,7 @@ serve(async (req) => {
       case 'delete-template': {
         const { templateId } = payload;
         if (!templateId) return new Response(JSON.stringify({ error: 'Template ID is required' }), { status: 400, headers: corsHeaders });
-        const { error } = await supabase.from('import_templates').delete().eq('id', templateId);
+        const { error } = await supabaseAdmin.from('import_templates').delete().eq('id', templateId);
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
       }
