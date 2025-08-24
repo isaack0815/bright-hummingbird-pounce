@@ -7,6 +7,7 @@ import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
 }
 
 const BATCH_SIZE = 5;
