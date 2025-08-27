@@ -10,17 +10,21 @@ import { showError, showSuccess } from '@/utils/toast';
 import type { Customer } from '@/pages/CustomerManagement';
 import Select from 'react-select';
 
-const IMPORT_FIELDS = [
+const baseImportFields = [
   { key: 'external_order_number', label: 'Externe Auftragsnr.', required: false },
-  { key: 'origin_address', label: 'Abholadresse', required: true },
-  { key: 'pickup_date', label: 'Abholdatum', required: false },
-  { key: 'destination_address', label: 'Lieferadresse', required: true },
-  { key: 'delivery_date', label: 'Lieferdatum', required: false },
   { key: 'price', label: 'Preis', required: false },
   { key: 'description', label: 'Beschreibung', required: false },
   { key: 'weight', label: 'Gewicht (kg)', required: false },
   { key: 'loading_meters', label: 'Lademeter', required: false },
 ];
+
+const stopFields = Array.from({ length: 5 }, (_, i) => ([
+  { key: `stop_${i + 1}_address`, label: `Stopp ${i + 1} Adresse`, required: i === 0 },
+  { key: `stop_${i + 1}_type`, label: `Stopp ${i + 1} Typ`, required: false },
+  { key: `stop_${i + 1}_date`, label: `Stopp ${i + 1} Datum`, required: false },
+]));
+
+const IMPORT_FIELDS = [...baseImportFields, ...stopFields.flat()];
 
 type Template = {
   id: number;
@@ -139,10 +143,35 @@ const OrderImport = () => {
   const importMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomerId || previewData.length === 0) throw new Error("Kunde oder Daten fehlen.");
+      
+      const ordersToImport = previewData.map(order => {
+        const stops = [];
+        for (let i = 1; i <= 5; i++) {
+          if (order[`stop_${i}_address`]) {
+            stops.push({
+              address: order[`stop_${i}_address`],
+              stop_type: order[`stop_${i}_type`] || (i === 1 ? 'Abholung' : 'Lieferung'),
+              stop_date: order[`stop_${i}_date`] || null,
+              position: i - 1,
+            });
+          }
+        }
+        
+        const { ...rest } = order;
+        // Remove stop fields from the main object
+        for (let i = 1; i <= 5; i++) {
+          delete rest[`stop_${i}_address`];
+          delete rest[`stop_${i}_type`];
+          delete rest[`stop_${i}_date`];
+        }
+
+        return { ...rest, stops };
+      });
+
       const { data, error } = await supabase.functions.invoke('manage-order-import', { 
         body: { 
           action: 'import-orders', 
-          payload: { customerId: selectedCustomerId, orders: previewData } 
+          payload: { customerId: selectedCustomerId, orders: ordersToImport } 
         } 
       });
       if (error) throw error;
@@ -244,7 +273,7 @@ const OrderImport = () => {
           {workbook && selectedCustomerId && (
             <Card>
               <Card.Header><Card.Title as="h6">2. Zellen zuordnen</Card.Title></Card.Header>
-              <Card.Body>
+              <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                 <Form.Group className="mb-3">
                   <Form.Label>Vorlage anwenden</Form.Label>
                   <InputGroup>

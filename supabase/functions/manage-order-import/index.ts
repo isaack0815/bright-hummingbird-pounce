@@ -43,16 +43,20 @@ serve(async (req) => {
 
         for (const [index, order] of orders.entries()) {
           try {
+            const { stops, ...orderData } = order;
+            const firstStop = stops && stops.length > 0 ? stops[0] : null;
+            const lastStop = stops && stops.length > 0 ? stops[stops.length - 1] : null;
+
             const orderToInsert = {
               customer_id: customerId,
-              external_order_number: order.external_order_number || null,
+              external_order_number: orderData.external_order_number || null,
               status: 'Angelegt',
-              origin_address: order.origin_address || null,
-              pickup_date: order.pickup_date || null,
-              destination_address: order.destination_address || null,
-              delivery_date: order.delivery_date || null,
-              price: order.price ? Number(order.price) : null,
-              description: order.description || null,
+              origin_address: firstStop?.address || null,
+              pickup_date: firstStop?.stop_date || null,
+              destination_address: lastStop?.address || null,
+              delivery_date: lastStop?.stop_date || null,
+              price: orderData.price ? Number(orderData.price) : null,
+              description: orderData.description || null,
               created_by: user.id,
             };
 
@@ -66,12 +70,21 @@ serve(async (req) => {
               throw new Error(`Order insert failed: ${orderError.message}`);
             }
 
-            if (order.weight || order.loading_meters) {
+            if (stops && stops.length > 0) {
+              const stopsToInsert = stops.map((stop: any) => ({
+                ...stop,
+                order_id: newOrder.id,
+              }));
+              const { error: stopsError } = await supabaseAdmin.from('freight_order_stops').insert(stopsToInsert);
+              if (stopsError) throw new Error(`Stops insert failed: ${stopsError.message}`);
+            }
+
+            if (orderData.weight || orderData.loading_meters) {
               const cargoItemToInsert = {
                 order_id: newOrder.id,
-                weight: order.weight ? Number(order.weight) : null,
-                loading_meters: order.loading_meters ? Number(order.loading_meters) : null,
-                description: order.description || 'Importierte Ladung',
+                weight: orderData.weight ? Number(orderData.weight) : null,
+                loading_meters: orderData.loading_meters ? Number(orderData.loading_meters) : null,
+                description: orderData.description || 'Importierte Ladung',
                 quantity: 1,
               };
               const { error: cargoError } = await supabaseAdmin
