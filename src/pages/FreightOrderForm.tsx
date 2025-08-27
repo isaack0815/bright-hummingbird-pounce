@@ -50,7 +50,9 @@ const formSchema = z.object({
 type FormSchemaType = z.infer<typeof formSchema>;
 
 const fetchCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase.functions.invoke('get-customers');
+  const { data, error } = await supabase.functions.invoke('manage-customers', {
+    body: { action: 'get' }
+  });
   if (error) throw new Error(error.message);
   return data.customers;
 };
