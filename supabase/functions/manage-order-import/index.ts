@@ -13,7 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    // Use user client only to get the authenticated user
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -24,7 +23,6 @@ serve(async (req) => {
 
     const { action, payload } = await req.json();
 
-    // Use admin client for all database operations to bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -66,14 +64,15 @@ serve(async (req) => {
               .select('id')
               .single();
 
-            if (orderError) {
-              throw new Error(`Order insert failed: ${orderError.message}`);
-            }
+            if (orderError) throw new Error(`Order insert failed: ${orderError.message}`);
 
             if (stops && stops.length > 0) {
               const stopsToInsert = stops.map((stop: any) => ({
-                ...stop,
                 order_id: newOrder.id,
+                address: stop.address,
+                stop_type: stop.stop_type,
+                stop_date: stop.stop_date,
+                position: stop.position,
               }));
               const { error: stopsError } = await supabaseAdmin.from('freight_order_stops').insert(stopsToInsert);
               if (stopsError) throw new Error(`Stops insert failed: ${stopsError.message}`);
@@ -87,13 +86,8 @@ serve(async (req) => {
                 description: orderData.description || 'Importierte Ladung',
                 quantity: 1,
               };
-              const { error: cargoError } = await supabaseAdmin
-                .from('cargo_items')
-                .insert(cargoItemToInsert);
-
-              if (cargoError) {
-                console.warn(`Order ${newOrder.id} created, but cargo item insert failed: ${cargoError.message}`);
-              }
+              const { error: cargoError } = await supabaseAdmin.from('cargo_items').insert(cargoItemToInsert);
+              if (cargoError) console.warn(`Order ${newOrder.id} created, but cargo item insert failed: ${cargoError.message}`);
             }
             
             successCount++;
