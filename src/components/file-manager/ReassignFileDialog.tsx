@@ -71,7 +71,7 @@ export const ReassignFileDialog = ({ file, show, onHide }: ReassignFileDialogPro
           <Select
             options={orderOptions}
             isLoading={isLoading}
-            onChange={(option) => setSelectedOrderId(option?.value || null)}
+            onChange={(option: any) => setSelectedOrderId(option?.value || null)}
             placeholder="Auftrag auswählen..."
             isClearable
           />

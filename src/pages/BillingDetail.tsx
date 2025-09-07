@@ -234,7 +234,6 @@ const BillingDetail = () => {
     try {
         const { data, error } = await supabase.functions.invoke('get-lexoffice-invoice-pdf', {
             body: { invoiceId: order.lex_invoice_id },
-            responseType: 'blob'
         });
         if (error) throw error;
 

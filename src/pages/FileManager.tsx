@@ -162,7 +162,7 @@ const FileManager = () => {
         <Card.Body>
           <div className="row g-3 align-items-end">
             <div className="col-md-5"><Form.Group><Form.Label>Datei auswählen</Form.Label><Form.Control type="file" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSelectedFile(e.target.files?.[0] || null)} /></Form.Group></div>
-            <div className="col-md-5"><Form.Group><Form.Label>Auftrag zuordnen</Form.Label><Select options={orderOptions} isLoading={isLoadingOrders} onChange={(opt) => setSelectedOrderIdForUpload(opt?.value || null)} placeholder="Auftrag auswählen..." isClearable /></Form.Group></div>
+            <div className="col-md-5"><Form.Group><Form.Label>Auftrag zuordnen</Form.Label><Select options={orderOptions} isLoading={isLoadingOrders} onChange={(opt: any) => setSelectedOrderIdForUpload(opt?.value || null)} placeholder="Auftrag auswählen..." isClearable /></Form.Group></div>
             <div className="col-md-2"><Button onClick={handleManualUpload} disabled={uploading || !selectedFile || !selectedOrderIdForUpload} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></div>
           </div>
         </Card.Body>

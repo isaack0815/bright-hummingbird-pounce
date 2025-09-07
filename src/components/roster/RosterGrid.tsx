@@ -165,7 +165,7 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
                     <td>{format(date, 'd')}</td>
                     {tours.map(tour => {
                       const assignedUserIds = assignments[dateStr]?.[tour.id] || [];
-                      const assignedUsers = assignedUserIds.map(id => membersMap.get(id)).filter(Boolean);
+                      const assignedUsers = assignedUserIds.map(id => membersMap.get(id)).filter(Boolean) as Member[];
                       return (
                         <td key={tour.id}>
                           <Button
@@ -178,7 +178,7 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
                           </Button>
                           <div className="small text-muted mt-1">
                             {assignedUsers.map(user => (
-                              <div key={user!.id}>{user!.first_name} {user!.last_name}</div>
+                              <div key={user.id}>{user.first_name} {user.last_name}</div>
                             ))}
                           </div>
                         </td>
