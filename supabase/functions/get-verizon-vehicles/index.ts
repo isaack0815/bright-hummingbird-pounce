@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const VERIZON_SERVICE_NAME = 'verizon_connect_fleetmatics';
 const VERIZON_TOKEN_URL = 'https://fim.api.eu.fleetmatics.com:443/token/';
-const VEHICLES_LOCATION_API_URL = 'https://fim.api.eu.fleetmatics.com:443/rad/v1/vehicles/locations';
+const VEHICLES_API_URL = 'https://fim.api.eu.fleetmatics.com:443/rad/v1/vehicles';
 const ATMOSPHERE_APP_ID = 'fleetmatics-p-eu-BcgrmZVK3NtIxyuoqVZMUQ8O0zp8kB20En9goyaK';
 
 async function getAccessToken(supabaseAdmin: any): Promise<string> {
@@ -68,7 +68,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Get our local vehicles that have a Verizon ID
+    const accessToken = await getAccessToken(supabaseAdmin);
+
     const { data: localVehicles, error: localVehiclesError } = await supabaseAdmin
       .from('vehicles')
       .select('id, license_plate, verizon_vehicle_id')
@@ -83,46 +84,32 @@ serve(async (req) => {
       });
     }
 
-    const vehicleNumbers = localVehicles.map(v => v.verizon_vehicle_id);
+    const vehicleDataPromises = localVehicles.map(async (localVehicle) => {
+      if (!localVehicle.verizon_vehicle_id) return null;
 
-    // 2. Get the access token
-    const accessToken = await getAccessToken(supabaseAdmin);
+      const url = `${VEHICLES_API_URL}/${localVehicle.verizon_vehicle_id}/location`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Atmosphere atmosphere_app_id=${ATMOSPHERE_APP_ID}, Bearer ${accessToken}`,
+          'Accept': 'application/json',
+        },
+      });
 
-    // 3. Fetch locations from Verizon API
-    const response = await fetch(VEHICLES_LOCATION_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Atmosphere atmosphere_app_id=${ATMOSPHERE_APP_ID}, Bearer ${accessToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ VehicleNumbers: vehicleNumbers }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Fehler von der Verizon API: ${response.status} - ${errorBody}`);
-    }
-
-    const rawData = await response.json();
-    const verizonDataMap = new Map(rawData.map((item: any) => [item.VehicleNumber, item]));
-
-    // 4. Combine local data with Verizon data
-    const combinedVehicles = localVehicles.map(localVehicle => {
-      const verizonData = verizonDataMap.get(localVehicle.verizon_vehicle_id);
-      const value = verizonData?.ContentResource?.Value;
-
-      if (!value) {
+      if (!response.ok) {
+        console.error(`Failed to fetch Verizon data for ${localVehicle.verizon_vehicle_id}: ${response.status}`);
         return {
           id: localVehicle.id,
           vehicleName: localVehicle.verizon_vehicle_id,
           licensePlate: localVehicle.license_plate,
           driverName: 'N/A',
           speed: { value: 0, unit: 'km/h' },
-          location: { latitude: 0, longitude: 0, address: 'Keine Daten von Verizon empfangen' },
+          location: { latitude: 0, longitude: 0, address: `Fehler beim Abruf: ${response.status}` },
           lastContactTime: null,
         };
       }
+
+      const value = await response.json();
 
       const addressParts = [
         value.Address?.AddressLine1,
@@ -133,7 +120,7 @@ serve(async (req) => {
 
       return {
         id: localVehicle.id,
-        vehicleName: verizonData.VehicleNumber,
+        vehicleName: localVehicle.verizon_vehicle_id,
         licensePlate: localVehicle.license_plate,
         driverName: value.DriverNumber || null,
         speed: {
@@ -148,6 +135,8 @@ serve(async (req) => {
         lastContactTime: value.UpdateUTC,
       };
     });
+
+    const combinedVehicles = (await Promise.all(vehicleDataPromises)).filter(Boolean);
 
     return new Response(JSON.stringify({ vehicles: combinedVehicles }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
