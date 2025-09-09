@@ -13,13 +13,11 @@ const createVehicleIcon = (vehicleType: string | null): DivIcon => {
   switch (vehicleType) {
     case 'Sattelzugmaschine':
     case 'LKW':
+    case 'Transporter':
       iconComponent = <Truck color="white" size={20} />;
       break;
     case 'Anhänger':
       iconComponent = <Caravan color="white" size={20} />;
-      break;
-    case 'Transporter':
-      iconComponent = <Package color="white" size={20} />;
       break;
     case 'PKW':
       iconComponent = <Car color="white" size={20} />;
