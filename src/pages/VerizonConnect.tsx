@@ -109,7 +109,7 @@ const VerizonConnect = () => {
 
   return (
     <div>
-      <h1 className="h2 mb-4">Verizon Connect - Live-Karte</h1>
+      <h1 className="h2 mb-4">Tourenplanung Fracht</h1>
       
       {error && (
         <Alert variant="danger">

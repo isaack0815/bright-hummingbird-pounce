@@ -115,7 +115,7 @@ serve(async (req) => {
 
         const { data: order, error: orderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('*, freight_order_stops(*, order!inner(id))')
+          .select('*, freight_order_stops(*)')
           .eq('vehicle_id', vehicleId)
           .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
           .order('created_at', { ascending: false })
@@ -144,7 +144,7 @@ serve(async (req) => {
 
         const { data: currentOrder, error: currentOrderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('*, freight_order_stops(*, order!inner(id))')
+          .select('*, freight_order_stops(*)')
           .eq('id', currentOrderId)
           .single();
         if (currentOrderError) throw currentOrderError;
@@ -158,7 +158,7 @@ serve(async (req) => {
 
         const { data: potentialOrders, error: potentialOrdersError } = await supabaseAdmin
           .from('freight_orders')
-          .select('*, freight_order_stops(*, order!inner(id))')
+          .select('*, freight_order_stops(*)')
           .eq('status', 'Angelegt')
           .is('vehicle_id', null)
           .neq('id', currentOrderId);
