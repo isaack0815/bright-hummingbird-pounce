@@ -67,6 +67,7 @@ const VerizonConnect = () => {
   const [tourChain, setTourChain] = useState<any[]>([]);
   const [potentialFollowUps, setPotentialFollowUps] = useState<any[] | null>(null);
   const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
+  const [previewOrder, setPreviewOrder] = useState<any | null>(null);
   const queryClient = useQueryClient();
 
   const { data: vehicles, isLoading, error } = useQuery<VerizonVehicle[]>({
@@ -194,7 +195,7 @@ const VerizonConnect = () => {
       {!isLoading && !error && vehicles && (
         <Row className="g-4">
           <Col lg={8}>
-            <VerizonMap vehicles={vehicles} tourChain={tourChain} />
+            <VerizonMap vehicles={vehicles} tourChain={tourChain} previewOrder={previewOrder} />
           </Col>
           <Col lg={4}>
             <div className="d-flex flex-column gap-4">
@@ -254,7 +255,14 @@ const VerizonConnect = () => {
                     {potentialFollowUps.length > 0 ? (
                       <ListGroup variant="flush">
                         {potentialFollowUps.map(order => (
-                          <ListGroup.Item key={order.id} action onClick={() => handleSelectFollowUp(order)} disabled={order.is_overweight}>
+                          <ListGroup.Item 
+                            key={order.id} 
+                            action 
+                            onClick={() => handleSelectFollowUp(order)} 
+                            disabled={order.is_overweight}
+                            onMouseEnter={() => setPreviewOrder(order)}
+                            onMouseLeave={() => setPreviewOrder(null)}
+                          >
                             <div className="d-flex justify-content-between align-items-center">
                               <span className="fw-bold">{order.order_number}</span>
                               <div>

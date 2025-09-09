@@ -89,13 +89,15 @@ const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }
     if (positions && Array.isArray(positions) && positions.length > 0) {
       map.fitBounds(positions, { padding: [50, 50] });
     }
-  }, [JSON.stringify(positions)]); // Depend on the stringified value to prevent re-renders
+  }, [JSON.stringify(positions)]);
   return null;
 };
 
-export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[], tourChain: any[] }) => {
+export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: VerizonVehicle[], tourChain: any[], previewOrder: any | null }) => {
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
   const [stopMarkers, setStopMarkers] = useState<StopMarker[]>([]);
+  const [previewRouteSegments, setPreviewRouteSegments] = useState<RouteSegment[]>([]);
+  const [previewStopMarkers, setPreviewStopMarkers] = useState<StopMarker[]>([]);
 
   useEffect(() => {
     const fetchAndSetRoutes = async () => {
@@ -104,31 +106,22 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
         setStopMarkers([]);
         return;
       }
-
       const newSegments: RouteSegment[] = [];
       const newMarkers: StopMarker[] = [];
       const allStopCoords: { stop: any, coords: LatLngTuple | null }[] = [];
-
       for (const order of tourChain) {
         for (const stop of order.freight_order_stops) {
           const coords = await geocodeAddress(stop.address);
           allStopCoords.push({ stop, coords });
         }
       }
-
       allStopCoords.forEach(({ stop, coords }, index) => {
         if (coords) {
           const isFirst = index === 0;
           const isLast = index === allStopCoords.length - 1;
-          newMarkers.push({
-            pos: coords,
-            type: isFirst ? 'start' : isLast ? 'end' : 'waypoint',
-            label: `${stop.address}`,
-            timeInfo: formatStopTime(stop)
-          });
+          newMarkers.push({ pos: coords, type: isFirst ? 'start' : isLast ? 'end' : 'waypoint', label: `${stop.address}`, timeInfo: formatStopTime(stop) });
         }
       });
-
       for (let i = 0; i < allStopCoords.length - 1; i++) {
         const start = allStopCoords[i];
         const end = allStopCoords[i + 1];
@@ -136,20 +129,59 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
           const routeData = await fetchRoute([start.coords, end.coords]);
           if (routeData) {
             const midpointIndex = Math.floor(routeData.route.length / 2);
-            newSegments.push({
-              path: routeData.route,
-              midpoint: routeData.route[midpointIndex],
-              durationText: formatDuration(routeData.duration),
-            });
+            newSegments.push({ path: routeData.route, midpoint: routeData.route[midpointIndex], durationText: formatDuration(routeData.duration) });
           }
         }
       }
-      
       setStopMarkers(newMarkers);
       setRouteSegments(newSegments);
     };
     fetchAndSetRoutes();
   }, [tourChain]);
+
+  useEffect(() => {
+    const fetchPreviewRoute = async () => {
+      if (!previewOrder || tourChain.length === 0) {
+        setPreviewRouteSegments([]);
+        setPreviewStopMarkers([]);
+        return;
+      }
+      const lastConfirmedStop = tourChain[tourChain.length - 1].freight_order_stops.slice(-1)[0];
+      const lastConfirmedCoords = await geocodeAddress(lastConfirmedStop.address);
+      if (!lastConfirmedCoords) return;
+
+      const previewStops = previewOrder.freight_order_stops;
+      const allPreviewStopCoords: { stop: any, coords: LatLngTuple | null }[] = [];
+      for (const stop of previewStops) {
+        const coords = await geocodeAddress(stop.address);
+        allPreviewStopCoords.push({ stop, coords });
+      }
+
+      const newPreviewMarkers: StopMarker[] = [];
+      allPreviewStopCoords.forEach(({ stop, coords }) => {
+        if (coords) {
+          newPreviewMarkers.push({ pos: coords, type: 'waypoint', label: stop.address, timeInfo: formatStopTime(stop) });
+        }
+      });
+      setPreviewStopMarkers(newPreviewMarkers);
+
+      const newPreviewSegments: RouteSegment[] = [];
+      const allPoints = [{ coords: lastConfirmedCoords }, ...allPreviewStopCoords];
+      for (let i = 0; i < allPoints.length - 1; i++) {
+        const start = allPoints[i];
+        const end = allPoints[i + 1];
+        if (start.coords && end.coords) {
+          const routeData = await fetchRoute([start.coords, end.coords]);
+          if (routeData) {
+            const midpointIndex = Math.floor(routeData.route.length / 2);
+            newPreviewSegments.push({ path: routeData.route, midpoint: routeData.route[midpointIndex], durationText: formatDuration(routeData.duration) });
+          }
+        }
+      }
+      setPreviewRouteSegments(newPreviewSegments);
+    };
+    fetchPreviewRoute();
+  }, [previewOrder, tourChain]);
 
   const vehiclePositions = vehicles.filter(v => v.location?.latitude && v.location?.longitude).map(v => [v.location.latitude, v.location.longitude] as [number, number]);
   const bounds = [...vehiclePositions, ...stopMarkers.map(p => p.pos)];
@@ -157,7 +189,6 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
   return (
     <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem' }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
-      
       {vehicles.map(vehicle => {
         if (!vehicle.location?.latitude || !vehicle.location?.longitude) return null;
         return (
@@ -166,24 +197,28 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
           </Marker>
         );
       })}
-      
       {routeSegments.map((segment, index) => (
         <Polyline key={index} positions={segment.path} color="#0d6efd" weight={5} opacity={0.7}>
-          <Tooltip direction="center" permanent className="map-label-tooltip">
-            {segment.durationText}
-          </Tooltip>
+          <Tooltip direction="center" permanent className="map-label-tooltip">{segment.durationText}</Tooltip>
         </Polyline>
       ))}
-      
       {stopMarkers.map((marker, index) => (
           <Marker key={index} position={marker.pos} icon={createRouteMarkerIcon(marker.type)}>
               <Popup>{marker.label}</Popup>
-              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">
-                {marker.timeInfo}
-              </Tooltip>
+              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">{marker.timeInfo}</Tooltip>
           </Marker>
       ))}
-
+      {previewRouteSegments.map((segment, index) => (
+        <Polyline key={`preview-${index}`} positions={segment.path} color="#6c757d" weight={5} opacity={0.7} dashArray="5, 10">
+          <Tooltip direction="center" permanent className="map-label-tooltip">{segment.durationText}</Tooltip>
+        </Polyline>
+      ))}
+      {previewStopMarkers.map((marker, index) => (
+          <Marker key={`preview-marker-${index}`} position={marker.pos} icon={createRouteMarkerIcon(marker.type)} opacity={0.7}>
+              <Popup>{marker.label}</Popup>
+              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">{marker.timeInfo}</Tooltip>
+          </Marker>
+      ))}
       <FitBoundsToMarkers positions={bounds} />
     </MapContainer>
   );
