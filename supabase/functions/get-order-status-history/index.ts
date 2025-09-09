@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const { data, error } = await supabase
       .from('order_status_history')
-      .select('*, profiles(first_name, last_name)')
+      .select('*, profiles!changed_by(first_name, last_name)')
       .eq('order_id', orderId)
       .order('changed_at', { ascending: false });
 
