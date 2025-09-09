@@ -17,6 +17,7 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
+import StatusHistoryTab from '@/components/freight/StatusHistoryTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
 
@@ -190,6 +191,7 @@ const FreightOrderForm = () => {
         queryClient.invalidateQueries({ queryKey: ['orderNotes', Number(id)] });
         queryClient.invalidateQueries({ queryKey: ['orderFiles', Number(id)] });
         queryClient.invalidateQueries({ queryKey: ['orderTeam', Number(id)] });
+        queryClient.invalidateQueries({ queryKey: ['orderStatusHistory', Number(id)] });
       }
     },
     onError: (err: any) => {
@@ -338,6 +340,7 @@ const FreightOrderForm = () => {
         <Tab eventKey="notes" title="Notizen"><NotesTab orderId={id ? Number(id) : null} /></Tab>
         <Tab eventKey="files" title="Dateien"><FilesTab orderId={id ? Number(id) : null} /></Tab>
         <Tab eventKey="team" title="Team"><TeamTab orderId={id ? Number(id) : null} /></Tab>
+        <Tab eventKey="history" title="Verlauf" disabled={!isEditMode}><StatusHistoryTab orderId={id ? Number(id) : null} /></Tab>
       </Tabs>
     </Form>
     <AddCustomerDialog
