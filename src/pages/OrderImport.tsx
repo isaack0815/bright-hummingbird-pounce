@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import { Container, Card, Button, Form, Row, Col, Table, Spinner, Alert, InputGroup, Modal } from 'react-bootstrap';
-import { Save, Trash2, PlusCircle } from 'lucide-react';
+import { Container, Card, Button, Form, Row, Col, Table, Spinner, Alert, InputGroup, Modal, Accordion } from 'react-bootstrap';
+import { Save, Trash2, PlusCircle, Upload, Users, GitBranch, Eye } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { showError, showSuccess } from '@/utils/toast';
@@ -210,33 +210,68 @@ const OrderImport = () => {
 
   return (
     <>
-      <h1 className="h2 mb-4">Auftragsimport via XLSX</h1>
+      <div className="mb-4">
+        <h1 className="h2">Auftragsimport via XLSX</h1>
+        <p className="text-muted">Importieren Sie Kundenaufträge schnell und einfach aus einer Excel-Datei.</p>
+      </div>
       <Row className="g-4">
-        <Col lg={5}>
-          <Card className="mb-4">
-            <Card.Header><Card.Title as="h6">1. Datei & Kunde auswählen</Card.Title></Card.Header>
+        <Col lg={5} className="d-flex flex-column gap-4">
+          <Card className="shadow-sm">
+            <Card.Header className="d-flex align-items-center gap-2">
+              <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>1</div>
+              <Card.Title as="h6" className="mb-0">Einrichtung</Card.Title>
+            </Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3"><Form.Label>XLSX-Datei</Form.Label><Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} /></Form.Group>
-              {file && <Form.Group><Form.Label>Kunde</Form.Label><CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} /></Form.Group>}
+              <Form.Group className="mb-3">
+                <Form.Label className="d-flex align-items-center"><Upload size={16} className="me-2" />XLSX-Datei</Form.Label>
+                <Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
+              </Form.Group>
+              {file && (
+                <Form.Group>
+                  <Form.Label className="d-flex align-items-center"><Users size={16} className="me-2" />Kunde</Form.Label>
+                  <CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} />
+                </Form.Group>
+              )}
             </Card.Body>
           </Card>
+
           {workbook && selectedCustomerId && (
-            <Card>
-              <Card.Header><Card.Title as="h6">2. Zellen zuordnen</Card.Title></Card.Header>
+            <Card className="shadow-sm">
+              <Card.Header className="d-flex align-items-center gap-2">
+                <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>2</div>
+                <Card.Title as="h6" className="mb-0">Zuordnung</Card.Title>
+              </Card.Header>
               <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                <Form.Group className="mb-3"><Form.Label>Vorlage anwenden</Form.Label><InputGroup><Select className="flex-grow-1" options={templates?.map(t => ({ value: t.id, label: t.template_name }))} isClearable placeholder="Vorlage auswählen..." value={templates?.map(t => ({ value: t.id, label: t.template_name })).find(o => o.value === selectedTemplateId) || null} onChange={(opt) => { const t = templates?.find(t => t.id === opt?.value); setSelectedTemplateId(opt?.value || null); setMapping(t ? t.mapping : {}); }} /><Button variant="outline-danger" onClick={() => selectedTemplateId && deleteTemplateMutation.mutate(selectedTemplateId)} disabled={!selectedTemplateId || deleteTemplateMutation.isPending}><Trash2 size={16} /></Button></InputGroup></Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Vorlage anwenden</Form.Label>
+                  <InputGroup>
+                    <Select className="flex-grow-1" options={templates?.map(t => ({ value: t.id, label: t.template_name }))} isClearable placeholder="Vorlage auswählen..." value={templates?.map(t => ({ value: t.id, label: t.template_name })).find(o => o.value === selectedTemplateId) || null} onChange={(opt) => { const t = templates?.find(t => t.id === opt?.value); setSelectedTemplateId(opt?.value || null); setMapping(t ? t.mapping : {}); }} />
+                    <Button variant="outline-danger" onClick={() => selectedTemplateId && deleteTemplateMutation.mutate(selectedTemplateId)} disabled={!selectedTemplateId || deleteTemplateMutation.isPending}><Trash2 size={16} /></Button>
+                  </InputGroup>
+                </Form.Group>
                 <hr />
-                {baseImportFields.map(field => (<Form.Group className="mb-2" key={field.key}><Form.Label>{field.label}</Form.Label><Form.Control placeholder="z.B. B5" value={mapping[field.key] || ''} onChange={(e) => handleMappingChange(field.key, e.target.value)} /></Form.Group>))}
-                <hr />
-                {Array.from({ length: stopCount }).map((_, index) => (
-                  <div key={`stop-group-${index}`} className="mb-3 p-2 border rounded">
-                    <h6 className="small fw-bold">Stopp {index + 1}</h6>
-                    <Form.Group className="mb-2"><Form.Label>Adresse {index < 2 && <span className="text-danger">*</span>}</Form.Label><Form.Control placeholder="z.B. B12:B15" value={mapping[`stop_${index + 1}_address`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_address`, e.target.value)} /></Form.Group>
-                    <Form.Group className="mb-2"><Form.Label>Typ</Form.Label><Form.Control placeholder="z.B. Abholung" value={mapping[`stop_${index + 1}_type`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_type`, e.target.value)} /></Form.Group>
-                    <Form.Group><Form.Label>Datum</Form.Label><Form.Control placeholder="z.B. C8" value={mapping[`stop_${index + 1}_date`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_date`, e.target.value)} /></Form.Group>
-                  </div>
-                ))}
-                <Button variant="link" size="sm" onClick={() => setStopCount(c => c + 1)}><PlusCircle size={14} className="me-1" /> Weiteren Stopp hinzufügen</Button>
+                <Accordion defaultActiveKey="0">
+                  <Accordion.Item eventKey="0">
+                    <Accordion.Header>Allgemeine Auftragsdaten</Accordion.Header>
+                    <Accordion.Body>
+                      {baseImportFields.map(field => (<Form.Group className="mb-2" key={field.key}><Form.Label>{field.label}</Form.Label><Form.Control placeholder="z.B. B5" value={mapping[field.key] || ''} onChange={(e) => handleMappingChange(field.key, e.target.value)} /></Form.Group>))}
+                    </Accordion.Body>
+                  </Accordion.Item>
+                  <Accordion.Item eventKey="1">
+                    <Accordion.Header>Routen-Stopps</Accordion.Header>
+                    <Accordion.Body>
+                      {Array.from({ length: stopCount }).map((_, index) => (
+                        <div key={`stop-group-${index}`} className="mb-3 p-2 border rounded">
+                          <h6 className="small fw-bold">Stopp {index + 1}</h6>
+                          <Form.Group className="mb-2"><Form.Label>Adresse {index < 2 && <span className="text-danger">*</span>}</Form.Label><Form.Control placeholder="z.B. B12:B15" value={mapping[`stop_${index + 1}_address`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_address`, e.target.value)} /></Form.Group>
+                          <Form.Group className="mb-2"><Form.Label>Typ</Form.Label><Form.Control placeholder="z.B. Abholung" value={mapping[`stop_${index + 1}_type`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_type`, e.target.value)} /></Form.Group>
+                          <Form.Group><Form.Label>Datum</Form.Label><Form.Control placeholder="z.B. C8" value={mapping[`stop_${index + 1}_date`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_date`, e.target.value)} /></Form.Group>
+                        </div>
+                      ))}
+                      <Button variant="link" size="sm" onClick={() => setStopCount(c => c + 1)}><PlusCircle size={14} className="me-1" /> Weiteren Stopp hinzufügen</Button>
+                    </Accordion.Body>
+                  </Accordion.Item>
+                </Accordion>
                 <hr />
                 <Button variant="outline-secondary" size="sm" onClick={handleOpenSaveTemplateModal} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
               </Card.Body>
@@ -244,18 +279,54 @@ const OrderImport = () => {
           )}
         </Col>
         <Col lg={7}>
-          <Card>
-            <Card.Header><Card.Title as="h6">3. Vorschau & Import</Card.Title></Card.Header>
+          <Card className="shadow-sm">
+            <Card.Header className="d-flex align-items-center gap-2">
+              <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>3</div>
+              <Card.Title as="h6" className="mb-0">Vorschau & Import</Card.Title>
+            </Card.Header>
             <Card.Body>
-              {!isMappingComplete || !selectedCustomerId ? (<div className="text-center text-muted py-5"><p>Bitte laden Sie eine Datei hoch, wählen Sie einen Kunden und ordnen Sie alle Pflichtfelder (*) zu.</p></div>) : (
-                <><Alert variant="info">Es werden <strong>{previewData.length}</strong> Aufträge für <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.</Alert><div style={{ maxHeight: '400px', overflowY: 'auto' }}><Table striped bordered hover size="sm"><thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead><tbody>{previewData.map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody></Table></div><div className="d-grid mt-3"><Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>{importMutation.isPending ? <Spinner size="sm" /> : `Import starten`}</Button></div></>
+              {!isMappingComplete || !selectedCustomerId ? (
+                <div className="text-center text-muted d-flex align-items-center justify-content-center" style={{ minHeight: '300px' }}>
+                  <p>Bitte laden Sie eine Datei hoch, wählen Sie einen Kunden und ordnen Sie alle Pflichtfelder (*) zu.</p>
+                </div>
+              ) : (
+                <>
+                  <Alert variant="info">Es werden <strong>{previewData.length}</strong> Aufträge für <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.</Alert>
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <Table striped bordered hover size="sm">
+                      <thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead>
+                      <tbody>{previewData.map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody>
+                    </Table>
+                  </div>
+                </>
               )}
             </Card.Body>
+            {isMappingComplete && selectedCustomerId && (
+              <Card.Footer className="text-end">
+                <Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>
+                  {importMutation.isPending ? <><Spinner size="sm" className="me-2" />Wird importiert...</> : `Import starten`}
+                </Button>
+              </Card.Footer>
+            )}
           </Card>
         </Col>
       </Row>
       <AddCustomerDialog show={isAddCustomerDialogOpen} onHide={() => setIsAddCustomerDialogOpen(false)} onCustomerCreated={(c) => { setSelectedCustomerId(c.id); setIsAddCustomerDialogOpen(false); }} />
-      <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}><Modal.Header closeButton><Modal.Title>Vorlage speichern</Modal.Title></Modal.Header><Modal.Body><Form.Group><Form.Label>Name der Vorlage</Form.Label><Form.Control value={templateToSave.name} onChange={(e) => setTemplateToSave(prev => ({...prev, name: e.target.value}))} placeholder="z.B. Monatsabrechnung" /></Form.Group></Modal.Body><Modal.Footer><Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)}>Abbrechen</Button><Button onClick={() => saveTemplateMutation.mutate()} disabled={!templateToSave.name || saveTemplateMutation.isPending}>{saveTemplateMutation.isPending ? <Spinner size="sm" /> : "Speichern"}</Button></Modal.Footer></Modal>
+      <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
+        <Modal.Header closeButton><Modal.Title>Vorlage speichern</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label>Name der Vorlage</Form.Label>
+            <Form.Control value={templateToSave.name} onChange={(e) => setTemplateToSave(prev => ({...prev, name: e.target.value}))} placeholder="z.B. Monatsabrechnung" />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowSaveTemplateModal(false)}>Abbrechen</Button>
+          <Button onClick={() => saveTemplateMutation.mutate()} disabled={!templateToSave.name || saveTemplateMutation.isPending}>
+            {saveTemplateMutation.isPending ? <Spinner size="sm" /> : "Speichern"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };
