@@ -98,9 +98,8 @@ const VerizonConnect = () => {
                 )}
               </Card.Body>
             </Card>
-          </Card>
-        </Col>
-      </Row>
+          </Col>
+        </Row>
       )}
     </div>
   );

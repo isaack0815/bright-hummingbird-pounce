@@ -3,7 +3,7 @@ import L, { DivIcon, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import type { VerizonVehicle } from '@/types/verizon';
 import { useEffect, useState } from 'react';
 import { ListGroup } from 'react-bootstrap';
-import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Package, Flag, FlagCheckered } from 'lucide-react';
+import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Package, Flag, Goal } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import ReactDOMServer from 'react-dom/server';
@@ -21,7 +21,7 @@ const createVehicleIcon = (vehicleType: string | null): DivIcon => {
 };
 
 const createRouteMarkerIcon = (type: 'start' | 'end'): DivIcon => {
-    const icon = type === 'start' ? <Flag color="white" size={16} /> : <FlagCheckered color="white" size={16} />;
+    const icon = type === 'start' ? <Flag color="white" size={16} /> : <Goal color="white" size={16} />;
     const bgColor = type === 'start' ? '#198754' : '#dc3545';
     const iconHtml = ReactDOMServer.renderToString(<div style={{ backgroundColor: bgColor, borderRadius: '50%', padding: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center', border: '2px solid white', boxShadow: '0 2px 5px rgba(0,0,0,0.5)' }}>{icon}</div>);
     return L.divIcon({ html: iconHtml, className: 'custom-route-marker-icon', iconSize: [30, 30], iconAnchor: [15, 30] });
