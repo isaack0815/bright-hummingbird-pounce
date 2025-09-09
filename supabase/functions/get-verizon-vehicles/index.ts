@@ -72,7 +72,7 @@ serve(async (req) => {
 
     const { data: localVehicles, error: localVehiclesError } = await supabaseAdmin
       .from('vehicles')
-      .select('id, license_plate, verizon_vehicle_id')
+      .select('id, license_plate, verizon_vehicle_id, type')
       .not('verizon_vehicle_id', 'is', null);
 
     if (localVehiclesError) throw localVehiclesError;
@@ -101,6 +101,7 @@ serve(async (req) => {
         return {
           id: localVehicle.id,
           vehicleName: localVehicle.verizon_vehicle_id,
+          vehicleType: localVehicle.type,
           licensePlate: localVehicle.license_plate,
           driverName: 'N/A',
           speed: { value: 0, unit: 'km/h' },
@@ -121,6 +122,7 @@ serve(async (req) => {
       return {
         id: localVehicle.id,
         vehicleName: localVehicle.verizon_vehicle_id,
+        vehicleType: localVehicle.type,
         licensePlate: localVehicle.license_plate,
         driverName: value.DriverNumber || null,
         speed: {

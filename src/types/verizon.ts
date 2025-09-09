@@ -1,6 +1,7 @@
 export type VerizonVehicle = {
   id: string;
   vehicleName: string;
+  vehicleType: string | null;
   vehicleMake?: string | null;
   vehicleModel?: string | null;
   licensePlate?: string | null;

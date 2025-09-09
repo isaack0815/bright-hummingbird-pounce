@@ -1,30 +1,60 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L, { LatLngBoundsExpression } from 'leaflet';
+import L, { DivIcon, LatLngBoundsExpression } from 'leaflet';
 import type { VerizonVehicle } from '@/types/verizon';
 import { useEffect } from 'react';
 import { ListGroup } from 'react-bootstrap';
-import { User, Gauge, Clock, MapPin } from 'lucide-react';
+import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Package } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
+import ReactDOMServer from 'react-dom/server';
 
-// Fix für das Standard-Icon-Problem mit Vite/Webpack
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+const createVehicleIcon = (vehicleType: string | null): DivIcon => {
+  let iconComponent;
+  switch (vehicleType) {
+    case 'Sattelzugmaschine':
+    case 'LKW':
+      iconComponent = <Truck color="white" size={20} />;
+      break;
+    case 'Anhänger':
+      iconComponent = <Caravan color="white" size={20} />;
+      break;
+    case 'Transporter':
+      iconComponent = <Package color="white" size={20} />;
+      break;
+    case 'PKW':
+      iconComponent = <Car color="white" size={20} />;
+      break;
+    default:
+      iconComponent = <Truck color="white" size={20} />;
+  }
 
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
+  const iconHtml = ReactDOMServer.renderToString(
+    <div style={{
+      backgroundColor: '#0d6efd',
+      borderRadius: '50%',
+      padding: '5px',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      border: '2px solid white',
+      boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
+    }}>
+      {iconComponent}
+    </div>
+  );
 
-L.Marker.prototype.options.icon = DefaultIcon;
+  return L.divIcon({
+    html: iconHtml,
+    className: 'custom-vehicle-icon',
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  });
+};
 
 type VerizonMapProps = {
   vehicles: VerizonVehicle[];
 };
 
-// Hilfskomponente, um die Kartengrenzen an die Marker anzupassen
 const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }) => {
   const map = useMap();
   useEffect(() => {
@@ -50,7 +80,11 @@ export const VerizonMap = ({ vehicles }: VerizonMapProps) => {
         if (!vehicle.location?.latitude || !vehicle.location?.longitude) return null;
         
         return (
-          <Marker key={vehicle.id} position={[vehicle.location.latitude, vehicle.location.longitude]}>
+          <Marker 
+            key={vehicle.id} 
+            position={[vehicle.location.latitude, vehicle.location.longitude]}
+            icon={createVehicleIcon(vehicle.vehicleType)}
+          >
             <Popup>
               <div style={{minWidth: '250px'}}>
                 <h6 className="mb-2">{vehicle.licensePlate || vehicle.vehicleName}</h6>

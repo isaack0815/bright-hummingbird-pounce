@@ -202,7 +202,7 @@ const VehicleForm = () => {
                   </Col>
                   <Col md={6}><Form.Group><Form.Label>Marke</Form.Label><Form.Control {...form.register("brand")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Modell</Form.Label><Form.Control {...form.register("model")} /></Form.Group></Col>
-                  <Col md={6}><Form.Group><Form.Label>Fahrzeugtyp</Form.Label><Form.Select {...form.register("type")}><option value="Sattelzugmaschine">Sattelzugmaschine</option><option value="Anhänger">Anhänger</option><option value="Transporter">Transporter</option><option value="LKW">LKW</option></Form.Select></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Fahrzeugtyp</Form.Label><Form.Select {...form.register("type")}><option value="Sattelzugmaschine">Sattelzugmaschine</option><option value="Anhänger">Anhänger</option><option value="Transporter">Transporter</option><option value="LKW">LKW</option><option value="PKW">PKW</option></Form.Select></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Fahrgestellnummer (VIN)</Form.Label><Form.Control {...form.register("vin")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Baujahr</Form.Label><Form.Control type="number" {...form.register("year_of_manufacture")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Ladefläche (m²)</Form.Label><Form.Control type="number" step="0.01" {...form.register("loading_area")} /></Form.Group></Col>
