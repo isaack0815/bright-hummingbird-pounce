@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Table, Alert, Spinner, Badge } from 'react-bootstrap';
+import { Card, Table, Alert, Spinner } from 'react-bootstrap';
 import TablePlaceholder from '@/components/TablePlaceholder';
 import type { VerizonVehicle } from '@/types/verizon';
 import { format, parseISO } from 'date-fns';
@@ -9,7 +9,6 @@ import { de } from 'date-fns/locale';
 const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
   const { data, error } = await supabase.functions.invoke('get-verizon-vehicles');
   if (error) {
-    // The edge function returns a structured error, so we parse it.
     if (data && data.error) {
       throw new Error(data.error);
     }
@@ -22,7 +21,7 @@ const VerizonConnect = () => {
   const { data: vehicles, isLoading, error } = useQuery<VerizonVehicle[]>({
     queryKey: ['verizonVehicles'],
     queryFn: fetchVerizonVehicles,
-    retry: false, // Do not retry on error, as it's likely a config issue
+    retry: false,
   });
 
   return (
@@ -47,14 +46,13 @@ const VerizonConnect = () => {
             </Alert>
           )}
           {isLoading ? (
-            <TablePlaceholder cols={6} />
+            <TablePlaceholder cols={5} />
           ) : vehicles && vehicles.length > 0 ? (
             <Table responsive hover>
               <thead>
                 <tr>
-                  <th>Fahrzeug</th>
-                  <th>Fahrer</th>
-                  <th>Kennzeichen</th>
+                  <th>Fahrzeug-Nr.</th>
+                  <th>Fahrer-Nr.</th>
                   <th>Geschwindigkeit</th>
                   <th>Letzter Kontakt</th>
                   <th>Standort</th>
@@ -65,7 +63,6 @@ const VerizonConnect = () => {
                   <tr key={vehicle.id}>
                     <td className="fw-medium">{vehicle.vehicleName}</td>
                     <td>{vehicle.driverName || '-'}</td>
-                    <td><Badge bg="light" text="dark" className="border">{vehicle.licensePlate}</Badge></td>
                     <td>{vehicle.speed ? `${vehicle.speed.value} ${vehicle.speed.unit}` : '-'}</td>
                     <td>{vehicle.lastContactTime ? format(parseISO(vehicle.lastContactTime), 'dd.MM.yyyy HH:mm', { locale: de }) : '-'}</td>
                     <td>{vehicle.location?.address || `${vehicle.location?.latitude}, ${vehicle.location?.longitude}`}</td>

@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const VERIZON_SERVICE_NAME = 'verizon_connect_fleetmatics';
 const VERIZON_TOKEN_URL = 'https://fim.api.eu.fleetmatics.com:443/token/';
-const VEHICLES_API_URL = 'https://fim.api.eu.fleetmatics.com:443/rad/v1/vehicles';
+const VEHICLES_LOCATION_API_URL = 'https://fim.api.eu.fleetmatics.com:443/rad/v1/vehicles/locations';
 const ATMOSPHERE_APP_ID = 'fleetmatics-p-eu-BcgrmZVK3NtIxyuoqVZMUQ8O0zp8kB20En9goyaK';
 
 async function getAccessToken(supabaseAdmin: any): Promise<string> {
@@ -44,7 +44,6 @@ async function getAccessToken(supabaseAdmin: any): Promise<string> {
 
   const accessToken = await tokenResponse.text();
   
-  // Verizon token does not have an expiry, so we set it for 24 hours for safety
   const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   
   await supabaseAdmin
@@ -71,10 +70,12 @@ serve(async (req) => {
 
     const accessToken = await getAccessToken(supabaseAdmin);
 
-    const response = await fetch(VEHICLES_API_URL, {
+    const response = await fetch(VEHICLES_LOCATION_API_URL, {
+      method: 'POST',
       headers: {
         'Authorization': `Atmosphere atmosphere_app_id=${ATMOSPHERE_APP_ID}, Bearer ${accessToken}`,
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
     });
 
@@ -83,9 +84,37 @@ serve(async (req) => {
       throw new Error(`Fehler von der Verizon API: ${response.status} - ${errorBody}`);
     }
 
-    const data = await response.json();
+    const rawData = await response.json();
 
-    return new Response(JSON.stringify({ vehicles: data }), {
+    const transformedVehicles = rawData.map((item: any) => {
+      const value = item.ContentResource?.Value;
+      if (!value) return null;
+
+      const addressParts = [
+        value.Address?.AddressLine1,
+        value.Address?.AddressLine2,
+        `${value.Address?.PostalCode || ''} ${value.Address?.Locality || ''}`.trim(),
+        value.Address?.Country
+      ].filter(Boolean);
+
+      return {
+        id: item.VehicleNumber,
+        vehicleName: item.VehicleNumber,
+        driverName: value.DriverNumber || null,
+        speed: {
+          value: value.Speed,
+          unit: 'km/h'
+        },
+        location: {
+          latitude: value.Latitude,
+          longitude: value.Longitude,
+          address: addressParts.join(', ')
+        },
+        lastContactTime: value.UpdateUTC,
+      };
+    }).filter(Boolean);
+
+    return new Response(JSON.stringify({ vehicles: transformedVehicles }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
