@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Table, Alert, Spinner, Badge, Row, Col, Button, ListGroup } from 'react-bootstrap';
 import type { VerizonVehicle } from '@/types/verizon';
 import { VerizonMap } from '@/components/verizon/VerizonMap';
-import { showError } from '@/utils/toast';
-import { ArrowRight, Clock, RefreshCw, Trash2 } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
+import { ArrowRight, Clock, RefreshCw, Trash2, Save } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
@@ -44,6 +44,7 @@ const VerizonConnect = () => {
   const [tourChain, setTourChain] = useState<any[]>([]);
   const [potentialFollowUps, setPotentialFollowUps] = useState<any[] | null>(null);
   const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: vehicles, isLoading, error } = useQuery<VerizonVehicle[]>({
     queryKey: ['verizonVehicles'],
@@ -55,6 +56,34 @@ const VerizonConnect = () => {
       queryKey: ['activeOrderForVehicle', selectedVehicleId],
       queryFn: () => fetchActiveOrder(selectedVehicleId!),
       enabled: false, // Manually trigger
+  });
+
+  const saveTourMutation = useMutation({
+    mutationFn: async () => {
+        if (!selectedVehicleId || tourChain.length <= 1) {
+            throw new Error("Kein Fahrzeug ausgewählt oder keine Folgeaufträge geplant.");
+        }
+        const orderIdsToUpdate = tourChain.slice(1).map(order => order.id);
+        const { error } = await supabase.functions.invoke('assign-vehicle-to-orders', {
+            body: {
+                vehicleId: selectedVehicleId,
+                orderIds: orderIdsToUpdate,
+            }
+        });
+        if (error) throw error;
+    },
+    onSuccess: () => {
+        showSuccess("Tour erfolgreich gespeichert und Aufträge zugewiesen!");
+        queryClient.invalidateQueries({ queryKey: ['verizonVehicles'] });
+        queryClient.invalidateQueries({ queryKey: ['activeOrderForVehicle', selectedVehicleId] });
+        // Reset the view after saving
+        setTourChain([]);
+        setPotentialFollowUps(null);
+        setSelectedVehicleId(null);
+    },
+    onError: (err: any) => {
+        showError(err.data?.error || err.message || "Fehler beim Speichern der Tour.");
+    }
   });
 
   useEffect(() => {
@@ -117,7 +146,16 @@ const VerizonConnect = () => {
 
   return (
     <div>
-      <h1 className="h2 mb-4">Tourenplanung Fracht</h1>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="h2">Tourenplanung Fracht</h1>
+        <Button 
+            onClick={() => saveTourMutation.mutate()} 
+            disabled={tourChain.length <= 1 || saveTourMutation.isPending}
+        >
+            {saveTourMutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
+            Tour speichern
+        </Button>
+      </div>
       
       {error && (
         <Alert variant="danger">
