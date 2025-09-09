@@ -22,23 +22,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
     }
 
-    // 1. Get the driver ID from the vehicle
-    const { data: vehicle, error: vehicleError } = await supabaseAdmin
-      .from('vehicles')
-      .select('driver_id')
-      .eq('id', vehicleId)
-      .single();
-
-    if (vehicleError || !vehicle || !vehicle.driver_id) {
-      // No driver assigned, so no active order can be found this way.
-      return new Response(JSON.stringify({ order: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-    }
-
-    // 2. Find the most recent active order for that driver
+    // Find the most recent active order assigned directly to this vehicle
     const { data: order, error: orderError } = await supabaseAdmin
       .from('freight_orders')
       .select('origin_address, destination_address')
-      .eq('created_by', vehicle.driver_id) // Assuming the driver is the creator for now
+      .eq('vehicle_id', vehicleId)
       .in('status', ['Geplant', 'Unterwegs'])
       .order('created_at', { ascending: false })
       .limit(1)
