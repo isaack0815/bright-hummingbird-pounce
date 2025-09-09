@@ -68,8 +68,27 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // 1. Get our local vehicles that have a Verizon ID
+    const { data: localVehicles, error: localVehiclesError } = await supabaseAdmin
+      .from('vehicles')
+      .select('id, license_plate, verizon_vehicle_id')
+      .not('verizon_vehicle_id', 'is', null);
+
+    if (localVehiclesError) throw localVehiclesError;
+
+    if (!localVehicles || localVehicles.length === 0) {
+      return new Response(JSON.stringify({ vehicles: [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    const vehicleNumbers = localVehicles.map(v => v.verizon_vehicle_id);
+
+    // 2. Get the access token
     const accessToken = await getAccessToken(supabaseAdmin);
 
+    // 3. Fetch locations from Verizon API
     const response = await fetch(VEHICLES_LOCATION_API_URL, {
       method: 'POST',
       headers: {
@@ -77,6 +96,7 @@ serve(async (req) => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ VehicleNumbers: vehicleNumbers }),
     });
 
     if (!response.ok) {
@@ -85,10 +105,24 @@ serve(async (req) => {
     }
 
     const rawData = await response.json();
+    const verizonDataMap = new Map(rawData.map((item: any) => [item.VehicleNumber, item]));
 
-    const transformedVehicles = rawData.map((item: any) => {
-      const value = item.ContentResource?.Value;
-      if (!value) return null;
+    // 4. Combine local data with Verizon data
+    const combinedVehicles = localVehicles.map(localVehicle => {
+      const verizonData = verizonDataMap.get(localVehicle.verizon_vehicle_id);
+      const value = verizonData?.ContentResource?.Value;
+
+      if (!value) {
+        return {
+          id: localVehicle.id,
+          vehicleName: localVehicle.verizon_vehicle_id,
+          licensePlate: localVehicle.license_plate,
+          driverName: 'N/A',
+          speed: { value: 0, unit: 'km/h' },
+          location: { latitude: 0, longitude: 0, address: 'Keine Daten von Verizon empfangen' },
+          lastContactTime: null,
+        };
+      }
 
       const addressParts = [
         value.Address?.AddressLine1,
@@ -98,8 +132,9 @@ serve(async (req) => {
       ].filter(Boolean);
 
       return {
-        id: item.VehicleNumber,
-        vehicleName: item.VehicleNumber,
+        id: localVehicle.id,
+        vehicleName: verizonData.VehicleNumber,
+        licensePlate: localVehicle.license_plate,
         driverName: value.DriverNumber || null,
         speed: {
           value: value.Speed,
@@ -108,13 +143,13 @@ serve(async (req) => {
         location: {
           latitude: value.Latitude,
           longitude: value.Longitude,
-          address: addressParts.join(', ')
+          address: addressParts.join(', ') || 'Adresse nicht verfügbar'
         },
         lastContactTime: value.UpdateUTC,
       };
-    }).filter(Boolean);
+    });
 
-    return new Response(JSON.stringify({ vehicles: transformedVehicles }), {
+    return new Response(JSON.stringify({ vehicles: combinedVehicles }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

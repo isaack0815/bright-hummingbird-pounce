@@ -28,6 +28,7 @@ const formSchema = z.object({
   gas_inspection_due_date: z.string().optional(),
   driver_id: z.string().uuid().nullable().optional(),
   group_id: z.coerce.number().nullable().optional(),
+  verizon_vehicle_id: z.string().optional(),
 });
 
 const fetchUsers = async (): Promise<ChatUser[]> => {
@@ -86,6 +87,7 @@ const VehicleForm = () => {
       notes: "",
       driver_id: null,
       group_id: null,
+      verizon_vehicle_id: "",
     },
   });
 
@@ -106,6 +108,7 @@ const VehicleForm = () => {
         gas_inspection_due_date: existingVehicle.gas_inspection_due_date || "",
         driver_id: existingVehicle.driver_id || null,
         group_id: existingVehicle.group_id || null,
+        verizon_vehicle_id: (existingVehicle as any).verizon_vehicle_id || "",
       });
     }
   }, [existingVehicle, isEditMode, form]);
@@ -170,6 +173,7 @@ const VehicleForm = () => {
             <Card.Body>
               <Row className="g-3">
                   <Col md={6}><Form.Group><Form.Label>Kennzeichen</Form.Label><Form.Control {...form.register("license_plate")} isInvalid={!!form.formState.errors.license_plate} /><Form.Control.Feedback type="invalid">{form.formState.errors.license_plate?.message}</Form.Control.Feedback></Form.Group></Col>
+                  <Col md={6}><Form.Group><Form.Label>Verizon Vehicle ID</Form.Label><Form.Control {...form.register("verizon_vehicle_id")} placeholder="z.B. TFG-123" /></Form.Group></Col>
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label>Fahrer</Form.Label>

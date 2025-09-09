@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Table, Alert, Spinner } from 'react-bootstrap';
+import { Card, Table, Alert, Spinner, Badge } from 'react-bootstrap';
 import TablePlaceholder from '@/components/TablePlaceholder';
 import type { VerizonVehicle } from '@/types/verizon';
 import { format, parseISO } from 'date-fns';
@@ -51,7 +51,8 @@ const VerizonConnect = () => {
             <Table responsive hover>
               <thead>
                 <tr>
-                  <th>Fahrzeug-Nr.</th>
+                  <th>Kennzeichen</th>
+                  <th>Verizon ID</th>
                   <th>Fahrer-Nr.</th>
                   <th>Geschwindigkeit</th>
                   <th>Letzter Kontakt</th>
@@ -61,7 +62,8 @@ const VerizonConnect = () => {
               <tbody>
                 {vehicles.map((vehicle) => (
                   <tr key={vehicle.id}>
-                    <td className="fw-medium">{vehicle.vehicleName}</td>
+                    <td className="fw-medium"><Badge bg="light" text="dark" className="border">{vehicle.licensePlate}</Badge></td>
+                    <td>{vehicle.vehicleName}</td>
                     <td>{vehicle.driverName || '-'}</td>
                     <td>{vehicle.speed ? `${vehicle.speed.value} ${vehicle.speed.unit}` : '-'}</td>
                     <td>{vehicle.lastContactTime ? format(parseISO(vehicle.lastContactTime), 'dd.MM.yyyy HH:mm', { locale: de }) : '-'}</td>
@@ -71,7 +73,7 @@ const VerizonConnect = () => {
               </tbody>
             </Table>
           ) : (
-            !error && <p className="text-muted text-center py-4">Keine Fahrzeuge gefunden.</p>
+            !error && <p className="text-muted text-center py-4">Keine Fahrzeuge mit Verizon ID gefunden. Bitte pflegen Sie die IDs in der Fahrzeugverwaltung.</p>
           )}
         </Card.Body>
       </Card>
