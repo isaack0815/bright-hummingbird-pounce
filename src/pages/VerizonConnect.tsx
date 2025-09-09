@@ -17,15 +17,15 @@ const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
   return data.vehicles;
 };
 
-const fetchActiveOrder = async (vehicleId: string) => {
+const fetchPlannedTour = async (vehicleId: string) => {
     const { data, error } = await supabase.functions.invoke('action', {
         body: { 
-            action: 'get-active-order-for-vehicle',
+            action: 'get-planned-tour-for-vehicle',
             payload: { vehicleId: parseInt(vehicleId, 10) }
         }
     });
     if (error) throw error;
-    return data.order;
+    return data.tour;
 }
 
 const fetchFollowUpOrders = async (currentOrderId: number) => {
@@ -52,18 +52,18 @@ const VerizonConnect = () => {
     retry: false,
   });
 
-  const { data: activeOrder, isLoading: isLoadingOrder, refetch: refetchActiveOrder } = useQuery({
-      queryKey: ['activeOrderForVehicle', selectedVehicleId],
-      queryFn: () => fetchActiveOrder(selectedVehicleId!),
-      enabled: false, // Manually trigger
+  const { data: plannedTour, isLoading: isLoadingTour, refetch: refetchPlannedTour } = useQuery({
+      queryKey: ['plannedTourForVehicle', selectedVehicleId],
+      queryFn: () => fetchPlannedTour(selectedVehicleId!),
+      enabled: !!selectedVehicleId,
   });
 
   const saveTourMutation = useMutation({
     mutationFn: async () => {
-        if (!selectedVehicleId || tourChain.length <= 1) {
-            throw new Error("Kein Fahrzeug ausgewählt oder keine Folgeaufträge geplant.");
+        if (!selectedVehicleId || tourChain.length === 0) {
+            throw new Error("Kein Fahrzeug ausgewählt oder keine Aufträge geplant.");
         }
-        const orderIdsToUpdate = tourChain.slice(1).map(order => order.id);
+        const orderIdsToUpdate = tourChain.map(order => order.id);
         const { error } = await supabase.functions.invoke('assign-vehicle-to-orders', {
             body: {
                 vehicleId: selectedVehicleId,
@@ -75,8 +75,7 @@ const VerizonConnect = () => {
     onSuccess: () => {
         showSuccess("Tour erfolgreich gespeichert und Aufträge zugewiesen!");
         queryClient.invalidateQueries({ queryKey: ['verizonVehicles'] });
-        queryClient.invalidateQueries({ queryKey: ['activeOrderForVehicle', selectedVehicleId] });
-        // Reset the view after saving
+        queryClient.invalidateQueries({ queryKey: ['plannedTourForVehicle', selectedVehicleId] });
         setTourChain([]);
         setPotentialFollowUps(null);
         setSelectedVehicleId(null);
@@ -87,23 +86,18 @@ const VerizonConnect = () => {
   });
 
   useEffect(() => {
-    if (selectedVehicleId) {
-      refetchActiveOrder();
-    } else {
-      setTourChain([]);
-      setPotentialFollowUps(null);
-    }
-  }, [selectedVehicleId, refetchActiveOrder]);
-
-  useEffect(() => {
-    if (activeOrder) {
-      setTourChain([activeOrder]);
-      handleFindFollowUpTrips(activeOrder.id);
+    if (plannedTour) {
+      setTourChain(plannedTour);
+      if (plannedTour.length > 0) {
+        handleFindFollowUpTrips(plannedTour[plannedTour.length - 1].id);
+      } else {
+        setPotentialFollowUps(null);
+      }
     } else if (selectedVehicleId) {
       setTourChain([]);
       setPotentialFollowUps(null);
     }
-  }, [activeOrder, selectedVehicleId]);
+  }, [plannedTour, selectedVehicleId]);
 
   const handleVehicleSelect = (vehicleId: string) => {
     const newVehicleId = selectedVehicleId === vehicleId ? null : vehicleId;
@@ -130,18 +124,19 @@ const VerizonConnect = () => {
   };
 
   const handleRemoveLastStop = () => {
-    if (tourChain.length <= 1) return;
+    if (tourChain.length === 0) return;
     const newTourChain = tourChain.slice(0, -1);
     setTourChain(newTourChain);
-    const lastOrder = newTourChain[newTourChain.length - 1];
-    handleFindFollowUpTrips(lastOrder.id);
+    if (newTourChain.length > 0) {
+      const lastOrder = newTourChain[newTourChain.length - 1];
+      handleFindFollowUpTrips(lastOrder.id);
+    } else {
+      setPotentialFollowUps(null);
+    }
   };
 
   const handleResetTour = () => {
-    if (activeOrder) {
-      setTourChain([activeOrder]);
-      handleFindFollowUpTrips(activeOrder.id);
-    }
+    refetchPlannedTour();
   };
 
   return (
@@ -150,7 +145,7 @@ const VerizonConnect = () => {
         <h1 className="h2">Tourenplanung Fracht</h1>
         <Button 
             onClick={() => saveTourMutation.mutate()} 
-            disabled={tourChain.length <= 1 || saveTourMutation.isPending}
+            disabled={tourChain.length === 0 || saveTourMutation.isPending}
         >
             {saveTourMutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
             Tour speichern
@@ -204,7 +199,7 @@ const VerizonConnect = () => {
                   <Card.Header className="d-flex justify-content-between align-items-center">
                     <Card.Title>Geplante Tour</Card.Title>
                     <div>
-                      {tourChain.length > 1 && (
+                      {tourChain.length > 0 && (
                         <Button variant="outline-danger" size="sm" onClick={handleRemoveLastStop} className="me-2"><Trash2 size={14} /></Button>
                       )}
                       <Button variant="outline-secondary" size="sm" onClick={handleResetTour}><RefreshCw size={14} className="me-1" /> Zurücksetzen</Button>
@@ -213,14 +208,14 @@ const VerizonConnect = () => {
                   <ListGroup variant="flush" style={{ maxHeight: '25vh', overflowY: 'auto' }}>
                     {tourChain.map((order, index) => (
                       <ListGroup.Item key={order.id} active={index === 0}>
-                        <strong>{index === 0 ? 'Aktuell:' : `Stopp ${index + 1}:`}</strong> <NavLink to={`/freight-orders/edit/${order.id}`} className={index === 0 ? 'text-white' : ''}>{order.order_number}</NavLink>
+                        <strong>{index === 0 ? 'Start:' : `Stopp ${index + 1}:`}</strong> <NavLink to={`/freight-orders/edit/${order.id}`} className={index === 0 ? 'text-white' : ''}>{order.order_number}</NavLink>
                       </ListGroup.Item>
                     ))}
                   </ListGroup>
                 </Card>
               )}
 
-              {(isLoadingOrder || isLoadingFollowUp) && <div className="text-center"><Spinner /></div>}
+              {(isLoadingTour || isLoadingFollowUp) && <div className="text-center"><Spinner /></div>}
               
               {potentialFollowUps && (
                 <Card>

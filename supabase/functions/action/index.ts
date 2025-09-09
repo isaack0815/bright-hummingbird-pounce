@@ -53,7 +53,6 @@ serve(async (req) => {
     
     switch (action) {
       case 'login': {
-        // ... (existing login logic)
         const { username, password } = payload;
         if (!username || !password) {
           return new Response(JSON.stringify({ error: 'Benutzername und Passwort sind erforderlich' }), {
@@ -107,30 +106,28 @@ serve(async (req) => {
         });
       }
 
-      case 'get-active-order-for-vehicle': {
+      case 'get-planned-tour-for-vehicle': {
         const { vehicleId } = payload;
         if (!vehicleId) {
           return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
         }
 
-        const { data: order, error: orderError } = await supabaseAdmin
+        const { data: orders, error: orderError } = await supabaseAdmin
           .from('freight_orders')
           .select('*, freight_order_stops(*), cargo_items(*)')
           .eq('vehicle_id', vehicleId)
           .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+          .order('pickup_date', { ascending: true });
 
-        if (orderError && orderError.code !== 'PGRST116') {
-          throw orderError;
-        }
+        if (orderError) throw orderError;
         
-        if (order && order.freight_order_stops) {
-            order.freight_order_stops.sort((a: any, b: any) => a.position - b.position);
+        for (const order of orders) {
+            if (order.freight_order_stops) {
+                order.freight_order_stops.sort((a: any, b: any) => a.position - b.position);
+            }
         }
 
-        return new Response(JSON.stringify({ order: order || null }), {
+        return new Response(JSON.stringify({ tour: orders || [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
