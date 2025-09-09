@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Table, Alert, Spinner, Badge, Row, Col, Button, ListGroup } from 'react-bootstrap';
 import type { VerizonVehicle } from '@/types/verizon';
 import { VerizonMap } from '@/components/verizon/VerizonMap';
 import { showError } from '@/utils/toast';
-import { ArrowRight, Clock } from 'lucide-react';
+import { ArrowRight, Clock, RefreshCw } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
@@ -41,7 +41,8 @@ const fetchFollowUpOrders = async (currentOrderId: number) => {
 
 const VerizonConnect = () => {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [followUpOrders, setFollowUpOrders] = useState<any[] | null>(null);
+  const [tourChain, setTourChain] = useState<any[]>([]);
+  const [potentialFollowUps, setPotentialFollowUps] = useState<any[] | null>(null);
   const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
 
   const { data: vehicles, isLoading, error } = useQuery<VerizonVehicle[]>({
@@ -50,29 +51,59 @@ const VerizonConnect = () => {
     retry: false,
   });
 
-  const { data: activeOrder, isLoading: isLoadingOrder } = useQuery({
+  const { data: activeOrder, isLoading: isLoadingOrder, refetch: refetchActiveOrder } = useQuery({
       queryKey: ['activeOrderForVehicle', selectedVehicleId],
       queryFn: () => fetchActiveOrder(selectedVehicleId!),
-      enabled: !!selectedVehicleId,
+      enabled: false, // Manually trigger
   });
+
+  useEffect(() => {
+    if (selectedVehicleId) {
+      refetchActiveOrder();
+    } else {
+      setTourChain([]);
+      setPotentialFollowUps(null);
+    }
+  }, [selectedVehicleId, refetchActiveOrder]);
+
+  useEffect(() => {
+    if (activeOrder) {
+      setTourChain([activeOrder]);
+      handleFindFollowUpTrips(activeOrder.id);
+    } else if (selectedVehicleId) {
+      setTourChain([]);
+      setPotentialFollowUps(null);
+    }
+  }, [activeOrder, selectedVehicleId]);
 
   const handleVehicleSelect = (vehicleId: string) => {
     const newVehicleId = selectedVehicleId === vehicleId ? null : vehicleId;
     setSelectedVehicleId(newVehicleId);
-    setFollowUpOrders(null); // Reset follow-up orders when selection changes
   };
 
-  const handleFindFollowUpTrips = async () => {
-    if (!activeOrder) return;
+  const handleFindFollowUpTrips = async (orderId: number) => {
     setIsLoadingFollowUp(true);
-    setFollowUpOrders(null);
+    setPotentialFollowUps(null);
     try {
-      const orders = await fetchFollowUpOrders(activeOrder.id);
-      setFollowUpOrders(orders);
+      const orders = await fetchFollowUpOrders(orderId);
+      setPotentialFollowUps(orders);
     } catch (err: any) {
       showError(err.data?.error || err.message || "Fehler bei der Suche nach Folgeaufträgen.");
     } finally {
       setIsLoadingFollowUp(false);
+    }
+  };
+
+  const handleSelectFollowUp = (order: any) => {
+    const newTourChain = [...tourChain, order];
+    setTourChain(newTourChain);
+    handleFindFollowUpTrips(order.id);
+  };
+
+  const handleResetTour = () => {
+    if (activeOrder) {
+      setTourChain([activeOrder]);
+      handleFindFollowUpTrips(activeOrder.id);
     }
   };
 
@@ -96,15 +127,13 @@ const VerizonConnect = () => {
       {!isLoading && !error && vehicles && (
         <Row className="g-4">
           <Col lg={8}>
-            <VerizonMap vehicles={vehicles} activeOrderRoute={activeOrder} />
+            <VerizonMap vehicles={vehicles} tourChain={tourChain} />
           </Col>
           <Col lg={4}>
             <div className="d-flex flex-column gap-4">
               <Card>
-                <Card.Header>
-                  <Card.Title>Fahrzeugliste</Card.Title>
-                </Card.Header>
-                <Card.Body style={{ maxHeight: '40vh', overflowY: 'auto' }}>
+                <Card.Header><Card.Title>Fahrzeugliste</Card.Title></Card.Header>
+                <Card.Body style={{ maxHeight: '30vh', overflowY: 'auto' }}>
                   {vehicles.length > 0 ? (
                     <Table responsive hover size="sm">
                       <thead><tr><th>Kennzeichen</th><th>Fahrer</th><th>Geschw.</th></tr></thead>
@@ -122,33 +151,36 @@ const VerizonConnect = () => {
                     <p className="text-muted text-center py-4">Keine Fahrzeuge mit Verizon ID gefunden.</p>
                   )}
                 </Card.Body>
-                {selectedVehicleId && (
-                  <Card.Footer>
-                    {isLoadingOrder ? <Spinner size="sm" /> : activeOrder ? (
-                      <div>
-                        <p className="small mb-2"><strong>Aktiver Auftrag:</strong> <NavLink to={`/freight-orders/edit/${activeOrder.id}`}>{activeOrder.order_number}</NavLink></p>
-                        <Button size="sm" className="w-100" onClick={handleFindFollowUpTrips} disabled={isLoadingFollowUp}>
-                          {isLoadingFollowUp ? <Spinner size="sm" /> : 'Mögliche Folgeaufträge suchen'}
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="small text-muted text-center mb-0">Kein aktiver Auftrag für dieses Fahrzeug gefunden.</p>
-                    )}
-                  </Card.Footer>
-                )}
               </Card>
 
-              {isLoadingFollowUp && <div className="text-center"><Spinner /></div>}
-              {followUpOrders && (
+              {tourChain.length > 0 && (
+                <Card>
+                  <Card.Header className="d-flex justify-content-between align-items-center">
+                    <Card.Title>Geplante Tour</Card.Title>
+                    <Button variant="outline-secondary" size="sm" onClick={handleResetTour}><RefreshCw size={14} className="me-1" /> Zurücksetzen</Button>
+                  </Card.Header>
+                  <ListGroup variant="flush" style={{ maxHeight: '25vh', overflowY: 'auto' }}>
+                    {tourChain.map((order, index) => (
+                      <ListGroup.Item key={order.id} active={index === 0}>
+                        <strong>{index === 0 ? 'Aktuell:' : `Stopp ${index + 1}:`}</strong> <NavLink to={`/freight-orders/edit/${order.id}`} className={index === 0 ? 'text-white' : ''}>{order.order_number}</NavLink>
+                      </ListGroup.Item>
+                    ))}
+                  </ListGroup>
+                </Card>
+              )}
+
+              {(isLoadingOrder || isLoadingFollowUp) && <div className="text-center"><Spinner /></div>}
+              
+              {potentialFollowUps && (
                 <Card>
                   <Card.Header><Card.Title>Mögliche Folgeaufträge</Card.Title></Card.Header>
                   <Card.Body style={{ maxHeight: '30vh', overflowY: 'auto' }}>
-                    {followUpOrders.length > 0 ? (
+                    {potentialFollowUps.length > 0 ? (
                       <ListGroup variant="flush">
-                        {followUpOrders.map(order => (
-                          <ListGroup.Item key={order.id}>
+                        {potentialFollowUps.map(order => (
+                          <ListGroup.Item key={order.id} action onClick={() => handleSelectFollowUp(order)}>
                             <div className="d-flex justify-content-between align-items-center">
-                              <NavLink to={`/freight-orders/edit/${order.id}`}>{order.order_number}</NavLink>
+                              <span className="fw-bold">{order.order_number}</span>
                               <Badge bg="info"><Clock size={12} className="me-1" /> ~{order.travel_duration_hours}h Anfahrt</Badge>
                             </div>
                             <p className="small text-muted mb-0">{order.origin_address} <ArrowRight size={12} /> ...</p>

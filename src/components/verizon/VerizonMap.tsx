@@ -48,8 +48,15 @@ const fetchRoute = async (coordinates: LatLngTuple[]): Promise<LatLngTuple[] | n
 
 type VerizonMapProps = {
   vehicles: VerizonVehicle[];
-  activeOrderRoute: { origin_address: string; destination_address: string } | null;
+  tourChain: any[];
 };
+
+type RouteData = {
+    active: LatLngTuple[] | null;
+    approach: LatLngTuple[] | null;
+    followUp: LatLngTuple[] | null;
+    endPoints: LatLngTuple[];
+}
 
 const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }) => {
   const map = useMap();
@@ -61,32 +68,48 @@ const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }
   return null;
 };
 
-export const VerizonMap = ({ vehicles, activeOrderRoute }: VerizonMapProps) => {
-  const [routeCoordinates, setRouteCoordinates] = useState<LatLngTuple[] | null>(null);
-  const [routeEndPoints, setRouteEndPoints] = useState<[LatLngTuple, LatLngTuple] | null>(null);
+export const VerizonMap = ({ vehicles, tourChain }: VerizonMapProps) => {
+  const [routes, setRoutes] = useState<RouteData>({ active: null, approach: null, followUp: null, endPoints: [] });
 
   useEffect(() => {
-    const fetchAndSetRoute = async () => {
-      if (!activeOrderRoute?.origin_address || !activeOrderRoute?.destination_address) {
-        setRouteCoordinates(null);
-        setRouteEndPoints(null);
+    const fetchAndSetRoutes = async () => {
+      if (tourChain.length === 0) {
+        setRoutes({ active: null, approach: null, followUp: null, endPoints: [] });
         return;
       }
-      const [originCoords, destCoords] = await Promise.all([
-        geocodeAddress(activeOrderRoute.origin_address),
-        geocodeAddress(activeOrderRoute.destination_address)
-      ]);
-      if (originCoords && destCoords) {
-        setRouteEndPoints([originCoords, destCoords]);
-        const route = await fetchRoute([originCoords, destCoords]);
-        setRouteCoordinates(route);
+
+      const newRoutes: RouteData = { active: null, approach: null, followUp: null, endPoints: [] };
+
+      // Active Order
+      const activeOrder = tourChain[0];
+      const activeOrigin = await geocodeAddress(activeOrder.origin_address);
+      const activeDest = await geocodeAddress(activeOrder.destination_address);
+      if (activeOrigin && activeDest) {
+        newRoutes.active = await fetchRoute([activeOrigin, activeDest]);
+        newRoutes.endPoints.push(activeOrigin, activeDest);
       }
+
+      // Follow-up Order and Approach
+      if (tourChain.length > 1) {
+        const followUpOrder = tourChain[1];
+        const followUpOrigin = await geocodeAddress(followUpOrder.origin_address);
+        const followUpDest = await geocodeAddress(followUpOrder.destination_address);
+        
+        if (activeDest && followUpOrigin) {
+          newRoutes.approach = await fetchRoute([activeDest, followUpOrigin]);
+        }
+        if (followUpOrigin && followUpDest) {
+          newRoutes.followUp = await fetchRoute([followUpOrigin, followUpDest]);
+          newRoutes.endPoints.push(followUpOrigin, followUpDest);
+        }
+      }
+      setRoutes(newRoutes);
     };
-    fetchAndSetRoute();
-  }, [activeOrderRoute]);
+    fetchAndSetRoutes();
+  }, [tourChain]);
 
   const vehiclePositions = vehicles.filter(v => v.location?.latitude && v.location?.longitude).map(v => [v.location.latitude, v.location.longitude] as [number, number]);
-  const bounds = routeEndPoints ? [...vehiclePositions, ...routeEndPoints] : vehiclePositions;
+  const bounds = [...vehiclePositions, ...routes.endPoints];
 
   return (
     <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem' }}>
@@ -99,11 +122,16 @@ export const VerizonMap = ({ vehicles, activeOrderRoute }: VerizonMapProps) => {
           </Marker>
         );
       })}
-      {routeCoordinates && <Polyline positions={routeCoordinates} color="blue" weight={5} opacity={0.7} />}
-      {routeEndPoints && <>
-        <Marker position={routeEndPoints[0]} icon={createRouteMarkerIcon('start')}><Popup>Start: {activeOrderRoute?.origin_address}</Popup></Marker>
-        <Marker position={routeEndPoints[1]} icon={createRouteMarkerIcon('end')}><Popup>Ziel: {activeOrderRoute?.destination_address}</Popup></Marker>
-      </>}
+      {routes.active && <Polyline positions={routes.active} color="blue" weight={5} opacity={0.7} />}
+      {routes.approach && <Polyline positions={routes.approach} color="red" weight={5} opacity={0.7} dashArray="5, 10" />}
+      {routes.followUp && <Polyline positions={routes.followUp} color="green" weight={5} opacity={0.7} />}
+      
+      {routes.endPoints.map((point, index) => (
+          <Marker key={index} position={point} icon={createRouteMarkerIcon(index % 2 === 0 ? 'start' : 'end')}>
+              <Popup>{index === 0 ? 'Start (Aktuell)' : index === 1 ? 'Ziel (Aktuell)' : index === 2 ? 'Start (Folgeauftrag)' : 'Ziel (Folgeauftrag)'}</Popup>
+          </Marker>
+      ))}
+
       <FitBoundsToMarkers positions={bounds} />
     </MapContainer>
   );
