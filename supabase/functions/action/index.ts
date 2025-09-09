@@ -84,7 +84,7 @@ serve(async (req) => {
           .from('freight_orders')
           .select('origin_address, destination_address')
           .eq('vehicle_id', vehicleId)
-          .in('status', ['Geplant', 'Unterwegs'])
+          .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
