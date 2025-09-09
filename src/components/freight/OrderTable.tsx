@@ -110,7 +110,12 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
       </thead>
       <tbody>
         {orders.map((order) => (
-          <tr key={order.id} className={getRowClass(order)}>
+          <tr 
+            key={order.id} 
+            className={getRowClass(order)}
+            onDoubleClick={() => handleEditClick(order.id)}
+            style={{ cursor: 'pointer' }}
+          >
             {isBillingContext && (
               <td className="text-center align-middle">
                 <Form.Check 
@@ -133,7 +138,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
                 <Button
                   variant="link"
                   size="sm"
-                  onClick={() => toggleBilledMutation.mutate(order.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleBilledMutation.mutate(order.id); }}
                   disabled={toggleBilledMutation.isPending && toggleBilledMutation.variables === order.id}
                   className="p-0 text-decoration-none"
                 >
@@ -150,10 +155,10 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
             <td>{order.creator ? `${order.creator.first_name || ''} ${order.creator.last_name || ''}`.trim() : 'N/A'}</td>
             <td className="text-end">
               <div className="d-flex justify-content-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => handleEditClick(order.id)}>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditClick(order.id); }}>
                   <Edit size={16} />
                 </Button>
-                <Button variant="ghost" size="sm" className="text-danger" onClick={() => onDelete(order.id)}>
+                <Button variant="ghost" size="sm" className="text-danger" onClick={(e) => { e.stopPropagation(); onDelete(order.id); }}>
                   <Trash2 size={16} />
                 </Button>
               </div>
