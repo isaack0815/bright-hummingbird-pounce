@@ -6,31 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const VERIZON_SERVICE_NAME = 'verizon_connect';
-const VERIZON_TOKEN_URL = 'https://login.reveal.verizonconnect.com/identity/connect/token';
-const VERIZON_API_URL = 'https://api.reveal.verizonconnect.com/v1/vehicles';
-const CLIENT_ID = 'ec-api-partner';
-const CLIENT_SECRET = 'ec-api-partner-secret';
+const VERIZON_SERVICE_NAME = 'verizon_connect_fleetmatics';
+const VERIZON_TOKEN_URL = 'https://fim.api.eu.fleetmatics.com:443/token/';
+const VEHICLES_API_URL = 'https://fim.api.eu.fleetmatics.com:443/rad/v1/vehicles';
+const ATMOSPHERE_APP_ID = 'fleetmatics-p-eu-BcgrmZVK3NtIxyuoqVZMUQ8O0zp8kB20En9goyaK';
 
-// Helper function to get a valid access token
 async function getAccessToken(supabaseAdmin: any): Promise<string> {
-  // 1. Try to get a valid token from the database
-  const { data: tokenData, error: tokenError } = await supabaseAdmin
+  const { data: tokenData } = await supabaseAdmin
     .from('api_tokens')
     .select('access_token, expires_at')
     .eq('service_name', VERIZON_SERVICE_NAME)
     .single();
 
-  if (tokenError && tokenError.code !== 'PGRST116') { // Ignore "no rows found"
-    throw tokenError;
-  }
-
-  // Check if token exists and is not expired (with a 60-second buffer)
   if (tokenData && new Date(tokenData.expires_at) > new Date(Date.now() + 60000)) {
     return tokenData.access_token;
   }
 
-  // 2. If no valid token, fetch a new one
   const username = Deno.env.get('VERIZON_USERNAME');
   const password = Deno.env.get('VERIZON_PASSWORD');
 
@@ -39,17 +30,11 @@ async function getAccessToken(supabaseAdmin: any): Promise<string> {
   }
 
   const tokenResponse = await fetch(VERIZON_TOKEN_URL, {
-    method: 'POST',
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`,
+      'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
+      'Accept': 'application/json',
     },
-    body: new URLSearchParams({
-      grant_type: 'password',
-      username: username,
-      password: password,
-      scope: 'api',
-    }),
   });
 
   if (!tokenResponse.ok) {
@@ -57,29 +42,21 @@ async function getAccessToken(supabaseAdmin: any): Promise<string> {
     throw new Error(`Failed to get Verizon token: ${tokenResponse.status} - ${errorBody}`);
   }
 
-  const tokenJson = await tokenResponse.json();
-  const { access_token, expires_in } = tokenJson;
-
-  // 3. Save the new token to the database
-  const expires_at = new Date(Date.now() + (expires_in * 1000)).toISOString();
+  const accessToken = await tokenResponse.text();
   
-  const { error: upsertError } = await supabaseAdmin
+  // Verizon token does not have an expiry, so we set it for 24 hours for safety
+  const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  
+  await supabaseAdmin
     .from('api_tokens')
     .upsert({
       service_name: VERIZON_SERVICE_NAME,
-      access_token: access_token,
+      access_token: accessToken,
       expires_at: expires_at,
-      updated_at: new Date().toISOString(),
     });
 
-  if (upsertError) {
-    console.error("Failed to save new Verizon token:", upsertError);
-    // Continue with the new token even if saving failed, but log the error.
-  }
-
-  return access_token;
+  return accessToken;
 }
-
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -94,9 +71,9 @@ serve(async (req) => {
 
     const accessToken = await getAccessToken(supabaseAdmin);
 
-    const response = await fetch(VERIZON_API_URL, {
+    const response = await fetch(VEHICLES_API_URL, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Atmosphere atmosphere_app_id=${ATMOSPHERE_APP_ID}, Bearer ${accessToken}`,
         'Accept': 'application/json',
       },
     });
