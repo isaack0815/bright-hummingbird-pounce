@@ -115,7 +115,7 @@ serve(async (req) => {
 
         const { data: order, error: orderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('id, order_number, origin_address, destination_address, delivery_date, delivery_time_end')
+          .select('*, freight_order_stops(*, order!inner(id))')
           .eq('vehicle_id', vehicleId)
           .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
           .order('created_at', { ascending: false })
@@ -124,6 +124,10 @@ serve(async (req) => {
 
         if (orderError && orderError.code !== 'PGRST116') {
           throw orderError;
+        }
+        
+        if (order && order.freight_order_stops) {
+            order.freight_order_stops.sort((a: any, b: any) => a.position - b.position);
         }
 
         return new Response(JSON.stringify({ order: order || null }), {
@@ -140,17 +144,21 @@ serve(async (req) => {
 
         const { data: currentOrder, error: currentOrderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('destination_address, delivery_date, delivery_time_end')
+          .select('*, freight_order_stops(*, order!inner(id))')
           .eq('id', currentOrderId)
           .single();
         if (currentOrderError) throw currentOrderError;
+        
+        currentOrder.freight_order_stops.sort((a: any, b: any) => a.position - b.position);
+        const lastStop = currentOrder.freight_order_stops[currentOrder.freight_order_stops.length - 1];
+        if (!lastStop) throw new Error("Current order has no stops.");
 
-        const destinationCoords = await geocode(currentOrder.destination_address!);
-        if (!destinationCoords) throw new Error(`Could not geocode destination: ${currentOrder.destination_address}`);
+        const destinationCoords = await geocode(lastStop.address!);
+        if (!destinationCoords) throw new Error(`Could not geocode destination: ${lastStop.address}`);
 
         const { data: potentialOrders, error: potentialOrdersError } = await supabaseAdmin
           .from('freight_orders')
-          .select('id, order_number, origin_address, pickup_date, pickup_time_start')
+          .select('*, freight_order_stops(*, order!inner(id))')
           .eq('status', 'Angelegt')
           .is('vehicle_id', null)
           .neq('id', currentOrderId);
@@ -158,19 +166,22 @@ serve(async (req) => {
 
         const validFollowUps = [];
         for (const order of potentialOrders) {
-          if (!order.origin_address || !order.pickup_date) continue;
+          if (!order.freight_order_stops || order.freight_order_stops.length === 0) continue;
+          order.freight_order_stops.sort((a: any, b: any) => a.position - b.position);
+          const firstStop = order.freight_order_stops[0];
+          if (!firstStop.address || !firstStop.stop_date) continue;
           
-          const pickupCoords = await geocode(order.origin_address);
+          const pickupCoords = await geocode(firstStop.address);
           if (!pickupCoords) continue;
 
           const travelDurationSeconds = await getRouteDuration(destinationCoords, pickupCoords);
           if (travelDurationSeconds === null) continue;
 
-          const deliveryTimeStr = `${currentOrder.delivery_date}T${currentOrder.delivery_time_end || '23:59:59'}`;
+          const deliveryTimeStr = `${lastStop.stop_date}T${lastStop.time_end || '23:59:59'}`;
           const deliveryTimestamp = new Date(deliveryTimeStr).getTime();
           const arrivalAtPickupTimestamp = deliveryTimestamp + (travelDurationSeconds * 1000);
 
-          const pickupTimeStr = `${order.pickup_date}T${order.pickup_time_start || '00:00:00'}`;
+          const pickupTimeStr = `${firstStop.stop_date}T${firstStop.time_start || '00:00:00'}`;
           const pickupDeadlineTimestamp = new Date(pickupTimeStr).getTime();
 
           if (arrivalAtPickupTimestamp <= pickupDeadlineTimestamp) {

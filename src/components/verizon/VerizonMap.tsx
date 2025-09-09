@@ -3,7 +3,7 @@ import L, { DivIcon, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import type { VerizonVehicle } from '@/types/verizon';
 import { useEffect, useState } from 'react';
 import { ListGroup } from 'react-bootstrap';
-import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Package, Flag, Goal } from 'lucide-react';
+import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Flag, Goal } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import ReactDOMServer from 'react-dom/server';
@@ -21,9 +21,9 @@ const createVehicleIcon = (vehicleType: string | null): DivIcon => {
   return L.divIcon({ html: iconHtml, className: 'custom-vehicle-icon', iconSize: [34, 34], iconAnchor: [17, 17] });
 };
 
-const createRouteMarkerIcon = (type: 'start' | 'end'): DivIcon => {
-    const icon = type === 'start' ? <Flag color="white" size={16} /> : <Goal color="white" size={16} />;
-    const bgColor = type === 'start' ? '#198754' : '#dc3545';
+const createRouteMarkerIcon = (type: 'start' | 'end' | 'waypoint'): DivIcon => {
+    const icon = type === 'start' ? <Flag color="white" size={16} /> : type === 'end' ? <Goal color="white" size={16} /> : <MapPin color="white" size={16} />;
+    const bgColor = type === 'start' ? '#198754' : type === 'end' ? '#dc3545' : '#6c757d';
     const iconHtml = ReactDOMServer.renderToString(<div style={{ backgroundColor: bgColor, borderRadius: '50%', padding: '5px', display: 'flex', justifyContent: 'center', alignItems: 'center', border: '2px solid white', boxShadow: '0 2px 5px rgba(0,0,0,0.5)' }}>{icon}</div>);
     return L.divIcon({ html: iconHtml, className: 'custom-route-marker-icon', iconSize: [30, 30], iconAnchor: [15, 30] });
 }
@@ -55,7 +55,7 @@ type RouteData = {
     active: LatLngTuple[] | null;
     approach: LatLngTuple[] | null;
     followUp: LatLngTuple[] | null;
-    endPoints: LatLngTuple[];
+    endPoints: { pos: LatLngTuple, type: 'start' | 'end' | 'waypoint', label: string }[];
 }
 
 const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }) => {
@@ -79,29 +79,54 @@ export const VerizonMap = ({ vehicles, tourChain }: VerizonMapProps) => {
       }
 
       const newRoutes: RouteData = { active: null, approach: null, followUp: null, endPoints: [] };
-
-      // Active Order
-      const activeOrder = tourChain[0];
-      const activeOrigin = await geocodeAddress(activeOrder.origin_address);
-      const activeDest = await geocodeAddress(activeOrder.destination_address);
-      if (activeOrigin && activeDest) {
-        newRoutes.active = await fetchRoute([activeOrigin, activeDest]);
-        newRoutes.endPoints.push(activeOrigin, activeDest);
+      
+      const geocodeStops = async (stops: any[]) => {
+          const promises = stops.map(s => geocodeAddress(s.address));
+          const results = await Promise.all(promises);
+          return results.filter((r): r is LatLngTuple => r !== null);
       }
 
-      // Follow-up Order and Approach
-      if (tourChain.length > 1) {
-        const followUpOrder = tourChain[1];
-        const followUpOrigin = await geocodeAddress(followUpOrder.origin_address);
-        const followUpDest = await geocodeAddress(followUpOrder.destination_address);
-        
-        if (activeDest && followUpOrigin) {
-          newRoutes.approach = await fetchRoute([activeDest, followUpOrigin]);
-        }
-        if (followUpOrigin && followUpDest) {
-          newRoutes.followUp = await fetchRoute([followUpOrigin, followUpDest]);
-          newRoutes.endPoints.push(followUpOrigin, followUpDest);
-        }
+      // Process each order in the chain
+      for (let i = 0; i < tourChain.length; i++) {
+          const order = tourChain[i];
+          const stops = order.freight_order_stops;
+          if (!stops || stops.length === 0) continue;
+
+          const stopCoords = await geocodeStops(stops);
+          if (stopCoords.length > 0) {
+              stops.forEach((stop, idx) => {
+                  if (stopCoords[idx]) {
+                      const isFirst = idx === 0;
+                      const isLast = idx === stops.length - 1;
+                      newRoutes.endPoints.push({
+                          pos: stopCoords[idx],
+                          type: isFirst ? 'start' : isLast ? 'end' : 'waypoint',
+                          label: `${order.order_number}: ${stop.address}`
+                      });
+                  }
+              });
+          }
+          
+          if (stopCoords.length > 1) {
+              const route = await fetchRoute(stopCoords);
+              if (i === 0) newRoutes.active = route;
+              else newRoutes.followUp = [...(newRoutes.followUp || []), ...(route || [])];
+          }
+
+          // Calculate approach route to the next order in the chain
+          if (i < tourChain.length - 1) {
+              const nextOrder = tourChain[i+1];
+              const lastStopOfCurrent = stops[stops.length - 1];
+              const firstStopOfNext = nextOrder.freight_order_stops[0];
+              if (lastStopOfCurrent && firstStopOfNext) {
+                  const lastCoord = await geocodeAddress(lastStopOfCurrent.address);
+                  const firstCoord = await geocodeAddress(firstStopOfNext.address);
+                  if (lastCoord && firstCoord) {
+                      const approachRoute = await fetchRoute([lastCoord, firstCoord]);
+                      newRoutes.approach = [...(newRoutes.approach || []), ...(approachRoute || [])];
+                  }
+              }
+          }
       }
       setRoutes(newRoutes);
     };
@@ -109,7 +134,7 @@ export const VerizonMap = ({ vehicles, tourChain }: VerizonMapProps) => {
   }, [tourChain]);
 
   const vehiclePositions = vehicles.filter(v => v.location?.latitude && v.location?.longitude).map(v => [v.location.latitude, v.location.longitude] as [number, number]);
-  const bounds = [...vehiclePositions, ...routes.endPoints];
+  const bounds = [...vehiclePositions, ...routes.endPoints.map(p => p.pos)];
 
   return (
     <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem' }}>
@@ -127,8 +152,8 @@ export const VerizonMap = ({ vehicles, tourChain }: VerizonMapProps) => {
       {routes.followUp && <Polyline positions={routes.followUp} color="green" weight={5} opacity={0.7} />}
       
       {routes.endPoints.map((point, index) => (
-          <Marker key={index} position={point} icon={createRouteMarkerIcon(index % 2 === 0 ? 'start' : 'end')}>
-              <Popup>{index === 0 ? 'Start (Aktuell)' : index === 1 ? 'Ziel (Aktuell)' : index === 2 ? 'Start (Folgeauftrag)' : 'Ziel (Folgeauftrag)'}</Popup>
+          <Marker key={index} position={point.pos} icon={createRouteMarkerIcon(point.type)}>
+              <Popup>{point.label}</Popup>
           </Marker>
       ))}
 
