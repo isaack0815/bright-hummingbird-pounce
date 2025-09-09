@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Tooltip, useMapEvents } from 'react-leaflet';
 import L, { DivIcon, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import type { VerizonVehicle } from '@/types/verizon';
 import { ListGroup } from 'react-bootstrap';
@@ -93,9 +93,23 @@ const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }
   return null;
 };
 
+const MapEvents = ({ setZoomLevel }: { setZoomLevel: (zoom: number) => void }) => {
+  const map = useMapEvents({
+    zoomend: () => {
+      setZoomLevel(map.getZoom());
+    },
+    load: () => {
+      setZoomLevel(map.getZoom());
+    }
+  });
+  return null;
+};
+
 export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[], tourChain: any[] }) => {
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
   const [stopMarkers, setStopMarkers] = useState<StopMarker[]>([]);
+  const [zoomLevel, setZoomLevel] = useState(6); // Default zoom
+  const ZOOM_THRESHOLD = 8; // Zoom level to show labels
 
   useEffect(() => {
     const fetchAndSetRoutes = async () => {
@@ -109,7 +123,6 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
       const newMarkers: StopMarker[] = [];
       const allStopCoords: { stop: any, coords: LatLngTuple | null }[] = [];
 
-      // 1. Geocode all stops first
       for (const order of tourChain) {
         for (const stop of order.freight_order_stops) {
           const coords = await geocodeAddress(stop.address);
@@ -117,7 +130,6 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
         }
       }
 
-      // 2. Create stop markers
       allStopCoords.forEach(({ stop, coords }, index) => {
         if (coords) {
           const isFirst = index === 0;
@@ -131,7 +143,6 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
         }
       });
 
-      // 3. Create route segments between stops
       for (let i = 0; i < allStopCoords.length - 1; i++) {
         const start = allStopCoords[i];
         const end = allStopCoords[i + 1];
@@ -160,6 +171,8 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
   return (
     <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem' }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
+      <MapEvents setZoomLevel={setZoomLevel} />
+      
       {vehicles.map(vehicle => {
         if (!vehicle.location?.latitude || !vehicle.location?.longitude) return null;
         return (
@@ -171,18 +184,22 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
       
       {routeSegments.map((segment, index) => (
         <Polyline key={index} positions={segment.path} color="#0d6efd" weight={5} opacity={0.7}>
-          <Tooltip direction="center" permanent className="map-label-tooltip">
-            {segment.durationText}
-          </Tooltip>
+          {zoomLevel > ZOOM_THRESHOLD && (
+            <Tooltip direction="center" permanent className="map-label-tooltip">
+              {segment.durationText}
+            </Tooltip>
+          )}
         </Polyline>
       ))}
       
       {stopMarkers.map((marker, index) => (
           <Marker key={index} position={marker.pos} icon={createRouteMarkerIcon(marker.type)}>
               <Popup>{marker.label}</Popup>
-              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">
-                {marker.timeInfo}
-              </Tooltip>
+              {zoomLevel > ZOOM_THRESHOLD && (
+                <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">
+                  {marker.timeInfo}
+                </Tooltip>
+              )}
           </Marker>
       ))}
 
