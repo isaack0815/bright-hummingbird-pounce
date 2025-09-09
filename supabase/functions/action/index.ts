@@ -13,24 +13,22 @@ serve(async (req) => {
   }
 
   try {
-    const { action, user: username, pass } = await req.json();
+    const { action, payload } = await req.json();
+    const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
     
     switch (action) {
       case 'login': {
-        if (!username || !pass) {
+        const { username, password } = payload;
+        if (!username || !password) {
           return new Response(JSON.stringify({ error: 'Benutzername und Passwort sind erforderlich' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
           });
         }
 
-        // Use service role key to find user email from username
-        const supabaseAdmin = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-
-        // 1. Find profile by username
         const { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
             .select('id')
@@ -40,11 +38,10 @@ serve(async (req) => {
         if (profileError || !profile) {
             return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200, // Return 200 so client can parse the specific error message
+                status: 200,
             });
         }
 
-        // 2. Get user email from auth schema using the ID
         const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
 
         if (userError || !user || !user.email) {
@@ -54,7 +51,6 @@ serve(async (req) => {
             });
         }
 
-        // 3. Attempt to sign in with the found email and provided password
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -62,7 +58,7 @@ serve(async (req) => {
 
         const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
             email: user.email,
-            password: pass,
+            password: password,
         });
 
         if (signInError) {
@@ -72,8 +68,32 @@ serve(async (req) => {
             });
         }
 
-        // On success, return the session
         return new Response(JSON.stringify({ session: sessionData.session }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      case 'get-active-order-for-vehicle': {
+        const { vehicleId } = payload;
+        if (!vehicleId) {
+          return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
+        }
+
+        const { data: order, error: orderError } = await supabaseAdmin
+          .from('freight_orders')
+          .select('origin_address, destination_address')
+          .eq('vehicle_id', vehicleId)
+          .in('status', ['Geplant', 'Unterwegs'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (orderError && orderError.code !== 'PGRST116') { // Ignore "no rows found"
+          throw orderError;
+        }
+
+        return new Response(JSON.stringify({ order: order || null }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });

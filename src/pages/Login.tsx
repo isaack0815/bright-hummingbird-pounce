@@ -36,7 +36,10 @@ const Login = () => {
       // Username login via Edge Function
       const { data, error: invokeError } = await supabase.functions.invoke('action', {
         method: 'POST',
-        body: { action: 'login', user: loginIdentifier, pass: password },
+        body: { 
+          action: 'login', 
+          payload: { username: loginIdentifier, password: password } 
+        },
       });
 
       if (invokeError) {

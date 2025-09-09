@@ -15,8 +15,11 @@ const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
 };
 
 const fetchActiveOrder = async (vehicleId: string) => {
-    const { data, error } = await supabase.functions.invoke('get-active-order-for-vehicle', {
-        body: { vehicleId: parseInt(vehicleId, 10) }
+    const { data, error } = await supabase.functions.invoke('action', {
+        body: { 
+            action: 'get-active-order-for-vehicle',
+            payload: { vehicleId: parseInt(vehicleId, 10) }
+        }
     });
     if (error) throw error;
     return data.order;
