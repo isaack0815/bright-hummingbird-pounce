@@ -60,6 +60,12 @@ export type FreightOrder = {
   total_discount: number | null;
   total_discount_type: string | null;
 
+  vehicle_id: number | null;
+  vehicles: {
+    id: number;
+    license_plate: string;
+  } | null;
+
   customers: Pick<Customer, 'id' | 'company_name'> | null;
   freight_order_stops: Stop[];
   cargo_items: CargoItem[];

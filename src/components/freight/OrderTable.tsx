@@ -100,6 +100,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
           <th>Entladeort</th>
           <th>Auftragsnr.</th>
           <th>Auftraggeber</th>
+          <th>Fahrzeug</th>
           <th>Status</th>
           <th>Abholdatum</th>
           <th>Lieferdatum</th>
@@ -130,6 +131,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
             <td>{order.destination_address}</td>
             <td className="fw-medium">{order.order_number}</td>
             <td>{order.customers?.company_name || 'N/A'}</td>
+            <td>{order.vehicles?.license_plate || '-'}</td>
             <td><Badge bg="secondary">{order.status}</Badge></td>
             <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
             <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>

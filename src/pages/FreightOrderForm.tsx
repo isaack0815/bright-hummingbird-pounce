@@ -20,6 +20,7 @@ import TeamTab from '@/components/freight/TeamTab';
 import StatusHistoryTab from '@/components/freight/StatusHistoryTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
+import type { Vehicle } from '@/types/vehicle';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
@@ -46,6 +47,7 @@ const formSchema = z.object({
   description: z.string().optional(),
   stops: z.array(stopSchema).min(1, "Es muss mindestens ein Stopp vorhanden sein."),
   cargoItems: z.array(cargoItemSchema).optional(),
+  vehicle_id: z.coerce.number().nullable().optional(),
 });
 
 type FormSchemaType = z.infer<typeof formSchema>;
@@ -56,6 +58,12 @@ const fetchCustomers = async (): Promise<Customer[]> => {
   });
   if (error) throw new Error(error.message);
   return data.customers;
+};
+
+const fetchVehicles = async (): Promise<Vehicle[]> => {
+  const { data, error } = await supabase.functions.invoke('get-vehicles');
+  if (error) throw new Error(error.message);
+  return data.vehicles;
 };
 
 const fetchOrder = async (id: string): Promise<FreightOrder> => {
@@ -83,6 +91,11 @@ const FreightOrderForm = () => {
   const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: fetchCustomers,
+  });
+
+  const { data: vehicles, isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({
+    queryKey: ['vehicles'],
+    queryFn: fetchVehicles,
   });
 
   const { data: settingsArray, isLoading: isLoadingSettings } = useQuery<Setting[]>({
@@ -131,6 +144,7 @@ const FreightOrderForm = () => {
         description: existingOrder.description || '',
         stops: (existingOrder.freight_order_stops || []).map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })),
         cargoItems: existingOrder.cargo_items || [],
+        vehicle_id: existingOrder.vehicle_id || undefined,
       });
     }
   }, [existingOrder, isEditMode, form]);
@@ -200,7 +214,7 @@ const FreightOrderForm = () => {
     },
   });
 
-  if (isLoadingCustomers || isLoadingOrder || isLoadingSettings) {
+  if (isLoadingCustomers || isLoadingOrder || isLoadingSettings || isLoadingVehicles) {
       return <p>Lade Formulardaten...</p>
   }
 
@@ -330,6 +344,12 @@ const FreightOrderForm = () => {
                           </Form.Group>
                           <Form.Group><Form.Label>Externe Auftragsnummer</Form.Label><Form.Control {...form.register("external_order_number")} /></Form.Group>
                           <Form.Group><Form.Label>Status</Form.Label><Form.Select {...form.register("status")}><option value="Angelegt">Angelegt</option><option value="Geplant">Geplant</option><option value="Unterwegs">Unterwegs</option><option value="Zugestellt">Zugestellt</option><option value="Storniert">Storniert</option></Form.Select></Form.Group>
+                          <Form.Group><Form.Label>Fahrzeug</Form.Label>
+                            <Form.Select {...form.register("vehicle_id")} value={form.watch("vehicle_id") ?? ""}>
+                                <option value="">- Kein Fahrzeug -</option>
+                                {vehicles?.map(v => <option key={v.id} value={v.id}>{v.license_plate} ({v.brand} {v.model})</option>)}
+                            </Form.Select>
+                          </Form.Group>
                           <Form.Group><Form.Label>Preis (€)</Form.Label><Form.Control type="number" step="0.01" {...form.register("price")} /></Form.Group>
                           <Form.Group><Form.Label>Beschreibung / Notizen</Form.Label><Form.Control as="textarea" {...form.register("description")} /></Form.Group>
                       </Card.Body>
