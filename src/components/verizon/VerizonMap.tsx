@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Tooltip, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Tooltip } from 'react-leaflet';
 import L, { DivIcon, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import type { VerizonVehicle } from '@/types/verizon';
 import { ListGroup } from 'react-bootstrap';
@@ -89,27 +89,13 @@ const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }
     if (positions && Array.isArray(positions) && positions.length > 0) {
       map.fitBounds(positions, { padding: [50, 50] });
     }
-  }, [positions, map]);
-  return null;
-};
-
-const MapEvents = ({ setZoomLevel }: { setZoomLevel: (zoom: number) => void }) => {
-  const map = useMapEvents({
-    zoomend: () => {
-      setZoomLevel(map.getZoom());
-    },
-    load: () => {
-      setZoomLevel(map.getZoom());
-    }
-  });
+  }, [JSON.stringify(positions)]); // Depend on the stringified value to prevent re-renders
   return null;
 };
 
 export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[], tourChain: any[] }) => {
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]);
   const [stopMarkers, setStopMarkers] = useState<StopMarker[]>([]);
-  const [zoomLevel, setZoomLevel] = useState(6); // Default zoom
-  const ZOOM_THRESHOLD = 8; // Zoom level to show labels
 
   useEffect(() => {
     const fetchAndSetRoutes = async () => {
@@ -171,7 +157,6 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
   return (
     <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem' }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
-      <MapEvents setZoomLevel={setZoomLevel} />
       
       {vehicles.map(vehicle => {
         if (!vehicle.location?.latitude || !vehicle.location?.longitude) return null;
@@ -184,22 +169,18 @@ export const VerizonMap = ({ vehicles, tourChain }: { vehicles: VerizonVehicle[]
       
       {routeSegments.map((segment, index) => (
         <Polyline key={index} positions={segment.path} color="#0d6efd" weight={5} opacity={0.7}>
-          {zoomLevel > ZOOM_THRESHOLD && (
-            <Tooltip direction="center" permanent className="map-label-tooltip">
-              {segment.durationText}
-            </Tooltip>
-          )}
+          <Tooltip direction="center" permanent className="map-label-tooltip">
+            {segment.durationText}
+          </Tooltip>
         </Polyline>
       ))}
       
       {stopMarkers.map((marker, index) => (
           <Marker key={index} position={marker.pos} icon={createRouteMarkerIcon(marker.type)}>
               <Popup>{marker.label}</Popup>
-              {zoomLevel > ZOOM_THRESHOLD && (
-                <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">
-                  {marker.timeInfo}
-                </Tooltip>
-              )}
+              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">
+                {marker.timeInfo}
+              </Tooltip>
           </Marker>
       ))}
 
