@@ -64,10 +64,13 @@ const VerizonConnect = () => {
             throw new Error("Kein Fahrzeug ausgewählt oder keine Aufträge geplant.");
         }
         const orderIdsToUpdate = tourChain.map(order => order.id);
-        const { error } = await supabase.functions.invoke('assign-vehicle-to-orders', {
+        const { error } = await supabase.functions.invoke('action', {
             body: {
-                vehicleId: selectedVehicleId,
-                orderIds: orderIdsToUpdate,
+                action: 'assign-vehicle-to-orders',
+                payload: {
+                    vehicleId: selectedVehicleId,
+                    orderIds: orderIdsToUpdate,
+                }
             }
         });
         if (error) throw error;

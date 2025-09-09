@@ -169,6 +169,7 @@ serve(async (req) => {
           if (!order.freight_order_stops || order.freight_order_stops.length === 0) continue;
           order.freight_order_stops.sort((a: any, b: any) => a.position - b.position);
           const firstStop = order.freight_order_stops[0];
+          const lastStopOfFollowUp = order.freight_order_stops[order.freight_order_stops.length - 1];
           if (!firstStop.address || !firstStop.stop_date) continue;
           
           const pickupCoords = await geocode(firstStop.address);
@@ -195,6 +196,8 @@ serve(async (req) => {
           if (arrivalAtPickupTimestamp <= pickupDeadlineTimestamp) {
             validFollowUps.push({
               ...order,
+              origin_address: firstStop.address,
+              destination_address: lastStopOfFollowUp.address,
               travel_duration_hours: (travelDurationSeconds / 3600).toFixed(2),
               is_overweight: isOverweight,
             });
@@ -207,6 +210,31 @@ serve(async (req) => {
         });
       }
       
+      case 'assign-vehicle-to-orders': {
+        const { vehicleId, orderIds } = payload;
+        if (!vehicleId || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return new Response(JSON.stringify({ error: 'Vehicle ID and an array of Order IDs are required.' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+          });
+        }
+
+        const { error } = await supabaseAdmin
+          .from('freight_orders')
+          .update({ 
+            vehicle_id: vehicleId,
+            status: 'Geplant'
+          })
+          .in('id', orderIds);
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
       default:
         return new Response(JSON.stringify({ error: 'Ungültige Aktion' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
