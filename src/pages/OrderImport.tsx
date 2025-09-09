@@ -9,6 +9,7 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Customer } from '@/pages/CustomerManagement';
 import Select from 'react-select';
+import { FileUploader } from '@/components/FileUploader';
 
 const baseImportFields = [
   { key: 'external_order_number', label: 'Externe Auftragsnr.', required: false },
@@ -96,8 +97,7 @@ const OrderImport = () => {
     return [...baseImportFields, ...dynamicStopFields];
   }, [stopCount]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  const handleFileChange = (selectedFile: File | null) => {
     if (selectedFile) {
       setFile(selectedFile);
       const reader = new FileReader();
@@ -109,6 +109,10 @@ const OrderImport = () => {
         setStopCount(2);
       };
       reader.readAsArrayBuffer(selectedFile);
+    } else {
+      setFile(null);
+      setWorkbook(null);
+      setMapping({});
     }
   };
 
@@ -207,6 +211,8 @@ const OrderImport = () => {
   };
 
   const isMappingComplete = IMPORT_FIELDS.filter(f => f.required).every(f => mapping[f.key]);
+  const showMapping = !!file && !!selectedCustomerId;
+  const showPreview = showMapping && isMappingComplete;
 
   return (
     <>
@@ -214,103 +220,108 @@ const OrderImport = () => {
         <h1 className="h2">Auftragsimport via XLSX</h1>
         <p className="text-muted">Importieren Sie Kundenaufträge schnell und einfach aus einer Excel-Datei.</p>
       </div>
-      <Row className="g-4">
-        <Col lg={5} className="d-flex flex-column gap-4">
+      <div className="d-flex flex-column gap-4">
+        <Card className="shadow-sm">
+          <Card.Header className="d-flex align-items-center gap-2">
+            <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>1</div>
+            <Card.Title as="h6" className="mb-0">Einrichtung</Card.Title>
+          </Card.Header>
+          <Card.Body>
+            <Row className="g-3">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label className="d-flex align-items-center"><Upload size={16} className="me-2" />XLSX-Datei</Form.Label>
+                  <FileUploader onFileSelect={handleFileChange} />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                {file && (
+                  <Form.Group>
+                    <Form.Label className="d-flex align-items-center"><Users size={16} className="me-2" />Kunde</Form.Label>
+                    <CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} />
+                  </Form.Group>
+                )}
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
+
+        {showMapping && (
           <Card className="shadow-sm">
             <Card.Header className="d-flex align-items-center gap-2">
-              <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>1</div>
-              <Card.Title as="h6" className="mb-0">Einrichtung</Card.Title>
+              <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>2</div>
+              <Card.Title as="h6" className="mb-0">Zuordnung</Card.Title>
             </Card.Header>
-            <Card.Body>
+            <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               <Form.Group className="mb-3">
-                <Form.Label className="d-flex align-items-center"><Upload size={16} className="me-2" />XLSX-Datei</Form.Label>
-                <Form.Control type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
+                <Form.Label>Vorlage anwenden</Form.Label>
+                <InputGroup>
+                  <Select className="flex-grow-1" options={templates?.map(t => ({ value: t.id, label: t.template_name }))} isClearable placeholder="Vorlage auswählen..." value={templates?.map(t => ({ value: t.id, label: t.template_name })).find(o => o.value === selectedTemplateId) || null} onChange={(opt) => { const t = templates?.find(t => t.id === opt?.value); setSelectedTemplateId(opt?.value || null); setMapping(t ? t.mapping : {}); }} />
+                  <Button variant="outline-danger" onClick={() => selectedTemplateId && deleteTemplateMutation.mutate(selectedTemplateId)} disabled={!selectedTemplateId || deleteTemplateMutation.isPending}><Trash2 size={16} /></Button>
+                </InputGroup>
               </Form.Group>
-              {file && (
-                <Form.Group>
-                  <Form.Label className="d-flex align-items-center"><Users size={16} className="me-2" />Kunde</Form.Label>
-                  <CustomerCombobox customers={customers || []} value={selectedCustomerId} onChange={(val) => setSelectedCustomerId(val)} onAddNew={() => setIsAddCustomerDialogOpen(true)} />
-                </Form.Group>
-              )}
+              <hr />
+              <Accordion defaultActiveKey="0">
+                <Accordion.Item eventKey="0">
+                  <Accordion.Header>Allgemeine Auftragsdaten</Accordion.Header>
+                  <Accordion.Body>
+                    {baseImportFields.map(field => (<Form.Group className="mb-2" key={field.key}><Form.Label>{field.label}</Form.Label><Form.Control placeholder="z.B. B5" value={mapping[field.key] || ''} onChange={(e) => handleMappingChange(field.key, e.target.value)} /></Form.Group>))}
+                  </Accordion.Body>
+                </Accordion.Item>
+                <Accordion.Item eventKey="1">
+                  <Accordion.Header>Routen-Stopps</Accordion.Header>
+                  <Accordion.Body>
+                    {Array.from({ length: stopCount }).map((_, index) => (
+                      <div key={`stop-group-${index}`} className="mb-3 p-2 border rounded">
+                        <h6 className="small fw-bold">Stopp {index + 1}</h6>
+                        <Form.Group className="mb-2"><Form.Label>Adresse {index < 2 && <span className="text-danger">*</span>}</Form.Label><Form.Control placeholder="z.B. B12:B15" value={mapping[`stop_${index + 1}_address`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_address`, e.target.value)} /></Form.Group>
+                        <Form.Group className="mb-2"><Form.Label>Typ</Form.Label>
+                          <InputGroup>
+                            <Form.Select value={mapping[`stop_${index + 1}_type`]?.startsWith('=') ? mapping[`stop_${index + 1}_type`] : ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_type`, e.target.value)} disabled={!!mapping[`stop_${index + 1}_type_cell`]}>
+                              <option value="=Abholung">Abholung</option>
+                              <option value="=Teilladung">Teilladung</option>
+                              <option value="=Teillieferung">Teillieferung</option>
+                              <option value="=Lieferung">Lieferung</option>
+                            </Form.Select>
+                            <Form.Control placeholder="Oder Zelle (z.B. C5)" value={mapping[`stop_${index + 1}_type_cell`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_type_cell`, e.target.value)} />
+                          </InputGroup>
+                        </Form.Group>
+                        <Form.Group><Form.Label>Datum</Form.Label><Form.Control placeholder="z.B. C8" value={mapping[`stop_${index + 1}_date`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_date`, e.target.value)} /></Form.Group>
+                      </div>
+                    ))}
+                    <Button variant="link" size="sm" onClick={() => setStopCount(c => c + 1)}><PlusCircle size={14} className="me-1" /> Weiteren Stopp hinzufügen</Button>
+                  </Accordion.Body>
+                </Accordion.Item>
+              </Accordion>
+              <hr />
+              <Button variant="outline-secondary" size="sm" onClick={handleOpenSaveTemplateModal} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
             </Card.Body>
           </Card>
+        )}
 
-          {workbook && selectedCustomerId && (
-            <Card className="shadow-sm">
-              <Card.Header className="d-flex align-items-center gap-2">
-                <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>2</div>
-                <Card.Title as="h6" className="mb-0">Zuordnung</Card.Title>
-              </Card.Header>
-              <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Vorlage anwenden</Form.Label>
-                  <InputGroup>
-                    <Select className="flex-grow-1" options={templates?.map(t => ({ value: t.id, label: t.template_name }))} isClearable placeholder="Vorlage auswählen..." value={templates?.map(t => ({ value: t.id, label: t.template_name })).find(o => o.value === selectedTemplateId) || null} onChange={(opt) => { const t = templates?.find(t => t.id === opt?.value); setSelectedTemplateId(opt?.value || null); setMapping(t ? t.mapping : {}); }} />
-                    <Button variant="outline-danger" onClick={() => selectedTemplateId && deleteTemplateMutation.mutate(selectedTemplateId)} disabled={!selectedTemplateId || deleteTemplateMutation.isPending}><Trash2 size={16} /></Button>
-                  </InputGroup>
-                </Form.Group>
-                <hr />
-                <Accordion defaultActiveKey="0">
-                  <Accordion.Item eventKey="0">
-                    <Accordion.Header>Allgemeine Auftragsdaten</Accordion.Header>
-                    <Accordion.Body>
-                      {baseImportFields.map(field => (<Form.Group className="mb-2" key={field.key}><Form.Label>{field.label}</Form.Label><Form.Control placeholder="z.B. B5" value={mapping[field.key] || ''} onChange={(e) => handleMappingChange(field.key, e.target.value)} /></Form.Group>))}
-                    </Accordion.Body>
-                  </Accordion.Item>
-                  <Accordion.Item eventKey="1">
-                    <Accordion.Header>Routen-Stopps</Accordion.Header>
-                    <Accordion.Body>
-                      {Array.from({ length: stopCount }).map((_, index) => (
-                        <div key={`stop-group-${index}`} className="mb-3 p-2 border rounded">
-                          <h6 className="small fw-bold">Stopp {index + 1}</h6>
-                          <Form.Group className="mb-2"><Form.Label>Adresse {index < 2 && <span className="text-danger">*</span>}</Form.Label><Form.Control placeholder="z.B. B12:B15" value={mapping[`stop_${index + 1}_address`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_address`, e.target.value)} /></Form.Group>
-                          <Form.Group className="mb-2"><Form.Label>Typ</Form.Label><Form.Control placeholder="z.B. Abholung" value={mapping[`stop_${index + 1}_type`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_type`, e.target.value)} /></Form.Group>
-                          <Form.Group><Form.Label>Datum</Form.Label><Form.Control placeholder="z.B. C8" value={mapping[`stop_${index + 1}_date`] || ''} onChange={(e) => handleMappingChange(`stop_${index + 1}_date`, e.target.value)} /></Form.Group>
-                        </div>
-                      ))}
-                      <Button variant="link" size="sm" onClick={() => setStopCount(c => c + 1)}><PlusCircle size={14} className="me-1" /> Weiteren Stopp hinzufügen</Button>
-                    </Accordion.Body>
-                  </Accordion.Item>
-                </Accordion>
-                <hr />
-                <Button variant="outline-secondary" size="sm" onClick={handleOpenSaveTemplateModal} disabled={Object.keys(mapping).length === 0}><Save size={14} className="me-2" />Aktuelle Zuordnung als Vorlage speichern</Button>
-              </Card.Body>
-            </Card>
-          )}
-        </Col>
-        <Col lg={7}>
+        {showPreview && (
           <Card className="shadow-sm">
             <Card.Header className="d-flex align-items-center gap-2">
               <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px' }}>3</div>
               <Card.Title as="h6" className="mb-0">Vorschau & Import</Card.Title>
             </Card.Header>
             <Card.Body>
-              {!isMappingComplete || !selectedCustomerId ? (
-                <div className="text-center text-muted d-flex align-items-center justify-content-center" style={{ minHeight: '300px' }}>
-                  <p>Bitte laden Sie eine Datei hoch, wählen Sie einen Kunden und ordnen Sie alle Pflichtfelder (*) zu.</p>
-                </div>
-              ) : (
-                <>
-                  <Alert variant="info">Es werden <strong>{previewData.length}</strong> Aufträge für <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.</Alert>
-                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    <Table striped bordered hover size="sm">
-                      <thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead>
-                      <tbody>{previewData.map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody>
-                    </Table>
-                  </div>
-                </>
-              )}
+              <Alert variant="info">Es werden <strong>{previewData.length}</strong> Aufträge für <strong>{customers?.find(c => c.id === selectedCustomerId)?.company_name}</strong> importiert.</Alert>
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <Table striped bordered hover size="sm">
+                  <thead><tr>{IMPORT_FIELDS.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead>
+                  <tbody>{previewData.map((row, i) => (<tr key={i}>{IMPORT_FIELDS.map(f => <td key={f.key}>{String(row[f.key] ?? '')}</td>)}</tr>))}</tbody>
+                </Table>
+              </div>
             </Card.Body>
-            {isMappingComplete && selectedCustomerId && (
-              <Card.Footer className="text-end">
-                <Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>
-                  {importMutation.isPending ? <><Spinner size="sm" className="me-2" />Wird importiert...</> : `Import starten`}
-                </Button>
-              </Card.Footer>
-            )}
+            <Card.Footer className="text-end">
+              <Button onClick={() => importMutation.mutate()} disabled={importMutation.isPending}>
+                {importMutation.isPending ? <><Spinner size="sm" className="me-2" />Wird importiert...</> : `Import starten`}
+              </Button>
+            </Card.Footer>
           </Card>
-        </Col>
-      </Row>
+        )}
+      </div>
       <AddCustomerDialog show={isAddCustomerDialogOpen} onHide={() => setIsAddCustomerDialogOpen(false)} onCustomerCreated={(c) => { setSelectedCustomerId(c.id); setIsAddCustomerDialogOpen(false); }} />
       <Modal show={showSaveTemplateModal} onHide={() => setShowSaveTemplateModal(false)}>
         <Modal.Header closeButton><Modal.Title>Vorlage speichern</Modal.Title></Modal.Header>
