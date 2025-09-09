@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, Tooltip } from 'react-leaflet';
 import L, { DivIcon, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import type { VerizonVehicle } from '@/types/verizon';
-import { ListGroup } from 'react-bootstrap';
+import { ListGroup, Spinner } from 'react-bootstrap';
 import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Flag, Goal } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { de } from 'date-fns/locale';
 import ReactDOMServer from 'react-dom/server';
 import { supabase } from '@/lib/supabase';
@@ -80,7 +80,7 @@ const formatStopTime = (stop: any): string => {
     return parts.join(' ');
 }
 
-type RouteSegment = { path: LatLngTuple[], midpoint: LatLngTuple, durationText: string };
+type RouteSegment = { path: LatLngTuple[], midpoint: LatLngTuple, durationText: string, color: string };
 type StopMarker = { pos: LatLngTuple, type: 'start' | 'end' | 'waypoint', label: string, timeInfo: string };
 
 const FitBoundsToMarkers = ({ positions }: { positions: LatLngBoundsExpression }) => {
@@ -98,6 +98,7 @@ export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: Ve
   const [stopMarkers, setStopMarkers] = useState<StopMarker[]>([]);
   const [previewRouteSegments, setPreviewRouteSegments] = useState<RouteSegment[]>([]);
   const [previewStopMarkers, setPreviewStopMarkers] = useState<StopMarker[]>([]);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   useEffect(() => {
     const fetchAndSetRoutes = async () => {
@@ -106,15 +107,18 @@ export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: Ve
         setStopMarkers([]);
         return;
       }
+      setIsCalculating(true);
       const newSegments: RouteSegment[] = [];
       const newMarkers: StopMarker[] = [];
       const allStopCoords: { stop: any, coords: LatLngTuple | null }[] = [];
+
       for (const order of tourChain) {
         for (const stop of order.freight_order_stops) {
           const coords = await geocodeAddress(stop.address);
           allStopCoords.push({ stop, coords });
         }
       }
+
       allStopCoords.forEach(({ stop, coords }, index) => {
         if (coords) {
           const isFirst = index === 0;
@@ -122,19 +126,33 @@ export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: Ve
           newMarkers.push({ pos: coords, type: isFirst ? 'start' : isLast ? 'end' : 'waypoint', label: `${stop.address}`, timeInfo: formatStopTime(stop) });
         }
       });
+
       for (let i = 0; i < allStopCoords.length - 1; i++) {
         const start = allStopCoords[i];
         const end = allStopCoords[i + 1];
         if (start.coords && end.coords) {
           const routeData = await fetchRoute([start.coords, end.coords]);
           if (routeData) {
+            let color = '#0d6efd'; // Default blue
+            const nextStop = end.stop;
+            if (nextStop.stop_type === 'Abholung' || nextStop.stop_type === 'Teilladung') {
+                if (nextStop.stop_date) {
+                    const pickupDate = parseISO(nextStop.stop_date);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const daysUntilPickup = differenceInCalendarDays(pickupDate, today);
+                    if (daysUntilPickup <= 0) color = '#dc3545'; // Red
+                    else if (daysUntilPickup <= 7) color = '#ffc107'; // Yellow
+                }
+            }
             const midpointIndex = Math.floor(routeData.route.length / 2);
-            newSegments.push({ path: routeData.route, midpoint: routeData.route[midpointIndex], durationText: formatDuration(routeData.duration) });
+            newSegments.push({ path: routeData.route, midpoint: routeData.route[midpointIndex], durationText: formatDuration(routeData.duration), color });
           }
         }
       }
       setStopMarkers(newMarkers);
       setRouteSegments(newSegments);
+      setIsCalculating(false);
     };
     fetchAndSetRoutes();
   }, [tourChain]);
@@ -146,9 +164,13 @@ export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: Ve
         setPreviewStopMarkers([]);
         return;
       }
+      setIsCalculating(true);
       const lastConfirmedStop = tourChain[tourChain.length - 1].freight_order_stops.slice(-1)[0];
       const lastConfirmedCoords = await geocodeAddress(lastConfirmedStop.address);
-      if (!lastConfirmedCoords) return;
+      if (!lastConfirmedCoords) {
+        setIsCalculating(false);
+        return;
+      }
 
       const previewStops = previewOrder.freight_order_stops;
       const allPreviewStopCoords: { stop: any, coords: LatLngTuple | null }[] = [];
@@ -174,11 +196,12 @@ export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: Ve
           const routeData = await fetchRoute([start.coords, end.coords]);
           if (routeData) {
             const midpointIndex = Math.floor(routeData.route.length / 2);
-            newPreviewSegments.push({ path: routeData.route, midpoint: routeData.route[midpointIndex], durationText: formatDuration(routeData.duration) });
+            newPreviewSegments.push({ path: routeData.route, midpoint: routeData.route[midpointIndex], durationText: formatDuration(routeData.duration), color: '#6c757d' });
           }
         }
       }
       setPreviewRouteSegments(newPreviewSegments);
+      setIsCalculating(false);
     };
     fetchPreviewRoute();
   }, [previewOrder, tourChain]);
@@ -187,39 +210,46 @@ export const VerizonMap = ({ vehicles, tourChain, previewOrder }: { vehicles: Ve
   const bounds = [...vehiclePositions, ...stopMarkers.map(p => p.pos)];
 
   return (
-    <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem' }}>
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
-      {vehicles.map(vehicle => {
-        if (!vehicle.location?.latitude || !vehicle.location?.longitude) return null;
-        return (
-          <Marker key={vehicle.id} position={[vehicle.location.latitude, vehicle.location.longitude]} icon={createVehicleIcon(vehicle.vehicleType)}>
-            <Popup><div style={{minWidth: '250px'}}><h6 className="mb-2">{vehicle.licensePlate || vehicle.vehicleName}</h6><ListGroup variant="flush"><ListGroup.Item className="d-flex align-items-center p-1"><User size={14} className="me-2" /> {vehicle.driverName || 'Kein Fahrer'}</ListGroup.Item><ListGroup.Item className="d-flex align-items-center p-1"><Gauge size={14} className="me-2" /> {vehicle.speed.value} {vehicle.speed.unit}</ListGroup.Item><ListGroup.Item className="d-flex align-items-center p-1"><Clock size={14} className="me-2" /> {vehicle.lastContactTime ? format(parseISO(vehicle.lastContactTime), 'dd.MM HH:mm', { locale: de }) : '-'}</ListGroup.Item><ListGroup.Item className="d-flex align-items-start p-1"><MapPin size={14} className="me-2 mt-1" /> {vehicle.location.address}</ListGroup.Item></ListGroup></div></Popup>
-          </Marker>
-        );
-      })}
-      {routeSegments.map((segment, index) => (
-        <Polyline key={index} positions={segment.path} color="#0d6efd" weight={5} opacity={0.7}>
-          <Tooltip direction="center" permanent className="map-label-tooltip">{segment.durationText}</Tooltip>
-        </Polyline>
-      ))}
-      {stopMarkers.map((marker, index) => (
-          <Marker key={index} position={marker.pos} icon={createRouteMarkerIcon(marker.type)}>
-              <Popup>{marker.label}</Popup>
-              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">{marker.timeInfo}</Tooltip>
-          </Marker>
-      ))}
-      {previewRouteSegments.map((segment, index) => (
-        <Polyline key={`preview-${index}`} positions={segment.path} color="#6c757d" weight={5} opacity={0.7} dashArray="5, 10">
-          <Tooltip direction="center" permanent className="map-label-tooltip">{segment.durationText}</Tooltip>
-        </Polyline>
-      ))}
-      {previewStopMarkers.map((marker, index) => (
-          <Marker key={`preview-marker-${index}`} position={marker.pos} icon={createRouteMarkerIcon(marker.type)} opacity={0.7}>
-              <Popup>{marker.label}</Popup>
-              <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">{marker.timeInfo}</Tooltip>
-          </Marker>
-      ))}
-      <FitBoundsToMarkers positions={bounds} />
-    </MapContainer>
+    <div className="position-relative">
+      {isCalculating && (
+        <div className="position-absolute top-50 start-50 translate-middle" style={{ zIndex: 1001 }}>
+          <Spinner animation="border" variant="primary" />
+        </div>
+      )}
+      <MapContainer center={[51.1657, 10.4515]} zoom={6} style={{ height: '70vh', width: '100%', borderRadius: '0.375rem', opacity: isCalculating ? 0.5 : 1 }}>
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
+        {vehicles.map(vehicle => {
+          if (!vehicle.location?.latitude || !vehicle.location?.longitude) return null;
+          return (
+            <Marker key={vehicle.id} position={[vehicle.location.latitude, vehicle.location.longitude]} icon={createVehicleIcon(vehicle.vehicleType)}>
+              <Popup><div style={{minWidth: '250px'}}><h6 className="mb-2">{vehicle.licensePlate || vehicle.vehicleName}</h6><ListGroup variant="flush"><ListGroup.Item className="d-flex align-items-center p-1"><User size={14} className="me-2" /> {vehicle.driverName || 'Kein Fahrer'}</ListGroup.Item><ListGroup.Item className="d-flex align-items-center p-1"><Gauge size={14} className="me-2" /> {vehicle.speed.value} {vehicle.speed.unit}</ListGroup.Item><ListGroup.Item className="d-flex align-items-center p-1"><Clock size={14} className="me-2" /> {vehicle.lastContactTime ? format(parseISO(vehicle.lastContactTime), 'dd.MM HH:mm', { locale: de }) : '-'}</ListGroup.Item><ListGroup.Item className="d-flex align-items-start p-1"><MapPin size={14} className="me-2 mt-1" /> {vehicle.location.address}</ListGroup.Item></ListGroup></div></Popup>
+            </Marker>
+          );
+        })}
+        {routeSegments.map((segment, index) => (
+          <Polyline key={index} positions={segment.path} color={segment.color} weight={5} opacity={0.7}>
+            <Tooltip direction="center" permanent className="map-label-tooltip">{segment.durationText}</Tooltip>
+          </Polyline>
+        ))}
+        {stopMarkers.map((marker, index) => (
+            <Marker key={index} position={marker.pos} icon={createRouteMarkerIcon(marker.type)}>
+                <Popup>{marker.label}</Popup>
+                <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">{marker.timeInfo}</Tooltip>
+            </Marker>
+        ))}
+        {previewRouteSegments.map((segment, index) => (
+          <Polyline key={`preview-${index}`} positions={segment.path} color={segment.color} weight={5} opacity={0.7} dashArray="5, 10">
+            <Tooltip direction="center" permanent className="map-label-tooltip">{segment.durationText}</Tooltip>
+          </Polyline>
+        ))}
+        {previewStopMarkers.map((marker, index) => (
+            <Marker key={`preview-marker-${index}`} position={marker.pos} icon={createRouteMarkerIcon(marker.type)} opacity={0.7}>
+                <Popup>{marker.label}</Popup>
+                <Tooltip direction="bottom" offset={[0, 20]} permanent className="map-label-tooltip">{marker.timeInfo}</Tooltip>
+            </Marker>
+        ))}
+        <FitBoundsToMarkers positions={bounds} />
+      </MapContainer>
+    </div>
   );
 };
