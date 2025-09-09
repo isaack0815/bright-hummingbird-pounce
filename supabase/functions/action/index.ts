@@ -212,22 +212,42 @@ serve(async (req) => {
       
       case 'assign-vehicle-to-orders': {
         const { vehicleId, orderIds } = payload;
-        if (!vehicleId || !Array.isArray(orderIds) || orderIds.length === 0) {
+        if (!vehicleId || !Array.isArray(orderIds)) {
           return new Response(JSON.stringify({ error: 'Vehicle ID and an array of Order IDs are required.' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
           });
         }
 
-        const { error } = await supabaseAdmin
+        // Get all orders currently assigned to this vehicle
+        const { data: currentAssignments, error: fetchError } = await supabaseAdmin
           .from('freight_orders')
-          .update({ 
-            vehicle_id: vehicleId,
-            status: 'Geplant'
-          })
-          .in('id', orderIds);
+          .select('id')
+          .eq('vehicle_id', vehicleId);
+        if (fetchError) throw fetchError;
+        const currentOrderIds = currentAssignments.map(o => o.id);
 
-        if (error) throw error;
+        // Determine which orders to unassign
+        const idsToUnassign = currentOrderIds.filter(id => !orderIds.includes(id));
+        if (idsToUnassign.length > 0) {
+          const { error: unassignError } = await supabaseAdmin
+            .from('freight_orders')
+            .update({ vehicle_id: null, status: 'Angelegt' })
+            .in('id', idsToUnassign);
+          if (unassignError) throw unassignError;
+        }
+
+        // Assign/update the new set of orders
+        if (orderIds.length > 0) {
+            const { error } = await supabaseAdmin
+            .from('freight_orders')
+            .update({ 
+                vehicle_id: vehicleId,
+                status: 'Geplant'
+            })
+            .in('id', orderIds);
+            if (error) throw error;
+        }
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

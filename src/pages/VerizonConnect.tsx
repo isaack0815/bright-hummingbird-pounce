@@ -60,8 +60,8 @@ const VerizonConnect = () => {
 
   const saveTourMutation = useMutation({
     mutationFn: async () => {
-        if (!selectedVehicleId || tourChain.length === 0) {
-            throw new Error("Kein Fahrzeug ausgewählt oder keine Aufträge geplant.");
+        if (!selectedVehicleId) {
+            throw new Error("Kein Fahrzeug ausgewählt.");
         }
         const orderIdsToUpdate = tourChain.map(order => order.id);
         const { error } = await supabase.functions.invoke('action', {
@@ -148,7 +148,7 @@ const VerizonConnect = () => {
         <h1 className="h2">Tourenplanung Fracht</h1>
         <Button 
             onClick={() => saveTourMutation.mutate()} 
-            disabled={tourChain.length === 0 || saveTourMutation.isPending}
+            disabled={!selectedVehicleId || saveTourMutation.isPending}
         >
             {saveTourMutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
             Tour speichern
