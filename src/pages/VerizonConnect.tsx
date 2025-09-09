@@ -1,29 +1,45 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Table, Alert, Spinner, Badge, Row, Col } from 'react-bootstrap';
-import TablePlaceholder from '@/components/TablePlaceholder';
 import type { VerizonVehicle } from '@/types/verizon';
-import { format, parseISO } from 'date-fns';
-import { de } from 'date-fns/locale';
 import { VerizonMap } from '@/components/verizon/VerizonMap';
 
 const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
   const { data, error } = await supabase.functions.invoke('get-verizon-vehicles');
   if (error) {
-    if (data && data.error) {
-      throw new Error(data.error);
-    }
+    if (data && data.error) throw new Error(data.error);
     throw new Error(error.message);
   }
   return data.vehicles;
 };
 
+const fetchActiveOrder = async (vehicleId: string) => {
+    const { data, error } = await supabase.functions.invoke('get-active-order-for-vehicle', {
+        body: { vehicleId: parseInt(vehicleId, 10) }
+    });
+    if (error) throw error;
+    return data.order;
+}
+
 const VerizonConnect = () => {
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+
   const { data: vehicles, isLoading, error } = useQuery<VerizonVehicle[]>({
     queryKey: ['verizonVehicles'],
     queryFn: fetchVerizonVehicles,
     retry: false,
   });
+
+  const { data: activeOrder, isLoading: isLoadingOrder } = useQuery({
+      queryKey: ['activeOrderForVehicle', selectedVehicleId],
+      queryFn: () => fetchActiveOrder(selectedVehicleId!),
+      enabled: !!selectedVehicleId,
+  });
+
+  const handleVehicleSelect = (vehicleId: string) => {
+    setSelectedVehicleId(prevId => prevId === vehicleId ? null : vehicleId);
+  };
 
   return (
     <div>
@@ -45,12 +61,12 @@ const VerizonConnect = () => {
       {!isLoading && !error && vehicles && (
         <Row>
           <Col lg={8}>
-            <VerizonMap vehicles={vehicles} />
+            <VerizonMap vehicles={vehicles} activeOrderRoute={activeOrder} />
           </Col>
           <Col lg={4}>
             <Card>
               <Card.Header>
-                <Card.Title>Fahrzeugliste</Card.Title>
+                <Card.Title>Fahrzeugliste {isLoadingOrder && <Spinner size="sm" />}</Card.Title>
               </Card.Header>
               <Card.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 {vehicles.length > 0 ? (
@@ -64,7 +80,12 @@ const VerizonConnect = () => {
                     </thead>
                     <tbody>
                       {vehicles.map((vehicle) => (
-                        <tr key={vehicle.id}>
+                        <tr 
+                          key={vehicle.id} 
+                          onClick={() => handleVehicleSelect(vehicle.id)}
+                          className={vehicle.id === selectedVehicleId ? 'table-primary' : ''}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <td className="fw-medium"><Badge bg="light" text="dark" className="border">{vehicle.licensePlate}</Badge></td>
                           <td>{vehicle.driverName || '-'}</td>
                           <td>{vehicle.speed.value} {vehicle.speed.unit}</td>
@@ -77,8 +98,9 @@ const VerizonConnect = () => {
                 )}
               </Card.Body>
             </Card>
-          </Col>
-        </Row>
+          </Card>
+        </Col>
+      </Row>
       )}
     </div>
   );
