@@ -151,11 +151,7 @@ const FreightOrderForm = () => {
 
   const mutation = useMutation({
     mutationFn: async (values: FormSchemaType): Promise<FreightOrder> => {
-      const cleanedOrderData = Object.fromEntries(
-        Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
-      );
-      
-      const { stops, cargoItems, ...orderData } = cleanedOrderData as FormSchemaType;
+      const { stops, cargoItems, ...orderData } = values;
 
       const cleanedStops = Array.isArray(stops) ? stops.map((stop: z.infer<typeof stopSchema>) => ({
         ...stop,
@@ -164,22 +160,31 @@ const FreightOrderForm = () => {
         time_end: stop.time_end || null,
       })) : [];
 
-      const firstStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[0] : null;
-      const lastStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1] : null;
+      const firstStop = cleanedStops.length > 0 ? cleanedStops[0] : null;
+      const lastStop = cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1] : null;
+
+      const finalOrderData = {
+        ...orderData,
+        vehicle_id: orderData.vehicle_id ? Number(orderData.vehicle_id) : null,
+        origin_address: firstStop ? firstStop.address : null,
+        destination_address: lastStop ? lastStop.address : null,
+        pickup_date: firstStop ? firstStop.stop_date : null,
+        pickup_time_start: firstStop ? firstStop.time_start : null,
+        pickup_time_end: firstStop ? firstStop.time_end : null,
+        delivery_date: lastStop ? lastStop.stop_date : null,
+        delivery_time_start: lastStop ? lastStop.time_start : null,
+        delivery_time_end: lastStop ? lastStop.time_end : null,
+        created_by: isEditMode ? existingOrder?.created_by : user?.id,
+      };
+
+      Object.keys(finalOrderData).forEach(key => {
+        if ((finalOrderData as any)[key] === '') {
+          (finalOrderData as any)[key] = null;
+        }
+      });
 
       const payload = {
-        orderData: {
-            ...orderData,
-            origin_address: firstStop ? firstStop.address : null,
-            destination_address: lastStop ? lastStop.address : null,
-            pickup_date: firstStop ? firstStop.stop_date : null,
-            pickup_time_start: firstStop ? firstStop.time_start : null,
-            pickup_time_end: firstStop ? firstStop.time_end : null,
-            delivery_date: lastStop ? lastStop.stop_date : null,
-            delivery_time_start: lastStop ? lastStop.time_start : null,
-            delivery_time_end: lastStop ? lastStop.time_end : null,
-            created_by: isEditMode ? existingOrder?.created_by : user?.id,
-        },
+        orderData: finalOrderData,
         stops: cleanedStops,
         cargoItems,
       };
