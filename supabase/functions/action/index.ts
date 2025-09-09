@@ -115,7 +115,7 @@ serve(async (req) => {
 
         const { data: order, error: orderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('*, freight_order_stops(*)')
+          .select('*, freight_order_stops(*), cargo_items(*)')
           .eq('vehicle_id', vehicleId)
           .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
           .order('created_at', { ascending: false })
@@ -144,7 +144,7 @@ serve(async (req) => {
 
         const { data: currentOrder, error: currentOrderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('*, freight_order_stops(*)')
+          .select('*, freight_order_stops(*), cargo_items(*), vehicles(max_payload_kg)')
           .eq('id', currentOrderId)
           .single();
         if (currentOrderError) throw currentOrderError;
@@ -158,11 +158,14 @@ serve(async (req) => {
 
         const { data: potentialOrders, error: potentialOrdersError } = await supabaseAdmin
           .from('freight_orders')
-          .select('*, freight_order_stops(*)')
+          .select('*, freight_order_stops(*), cargo_items(*)')
           .eq('status', 'Angelegt')
           .is('vehicle_id', null)
           .neq('id', currentOrderId);
         if (potentialOrdersError) throw potentialOrdersError;
+
+        const maxPayload = currentOrder.vehicles?.max_payload_kg;
+        const currentWeight = currentOrder.cargo_items.reduce((sum: number, item: any) => sum + (item.weight || 0), 0);
 
         const validFollowUps = [];
         for (const order of potentialOrders) {
@@ -184,10 +187,19 @@ serve(async (req) => {
           const pickupTimeStr = `${firstStop.stop_date}T${firstStop.time_start || '00:00:00'}`;
           const pickupDeadlineTimestamp = new Date(pickupTimeStr).getTime();
 
+          let isOverweight = false;
+          if (maxPayload) {
+              const followUpWeight = order.cargo_items.reduce((sum: number, item: any) => sum + (item.weight || 0), 0);
+              if (currentWeight + followUpWeight > maxPayload) {
+                  isOverweight = true;
+              }
+          }
+
           if (arrivalAtPickupTimestamp <= pickupDeadlineTimestamp) {
             validFollowUps.push({
               ...order,
               travel_duration_hours: (travelDurationSeconds / 3600).toFixed(2),
+              is_overweight: isOverweight,
             });
           }
         }

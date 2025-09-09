@@ -34,6 +34,7 @@ export type Vehicle = {
   notes: string | null;
   created_at: string;
   loading_area: number | null;
+  max_payload_kg: number | null;
   next_service_date: string | null;
   gas_inspection_due_date: string | null;
   driver_id: string | null;

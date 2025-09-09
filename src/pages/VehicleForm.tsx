@@ -24,6 +24,7 @@ const formSchema = z.object({
   status: z.string(),
   notes: z.string().optional(),
   loading_area: z.coerce.number().optional(),
+  max_payload_kg: z.coerce.number().optional(),
   next_service_date: z.string().optional(),
   gas_inspection_due_date: z.string().optional(),
   driver_id: z.string().uuid().nullable().optional(),
@@ -104,6 +105,7 @@ const VehicleForm = () => {
         status: existingVehicle.status,
         notes: existingVehicle.notes || "",
         loading_area: existingVehicle.loading_area || undefined,
+        max_payload_kg: existingVehicle.max_payload_kg || undefined,
         next_service_date: existingVehicle.next_service_date || "",
         gas_inspection_due_date: existingVehicle.gas_inspection_due_date || "",
         driver_id: existingVehicle.driver_id || null,
@@ -204,8 +206,9 @@ const VehicleForm = () => {
                   <Col md={6}><Form.Group><Form.Label>Modell</Form.Label><Form.Control {...form.register("model")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Fahrzeugtyp</Form.Label><Form.Select {...form.register("type")}><option value="Sattelzugmaschine">Sattelzugmaschine</option><option value="Anhänger">Anhänger</option><option value="Transporter">Transporter</option><option value="LKW">LKW</option><option value="PKW">PKW</option></Form.Select></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Fahrgestellnummer (VIN)</Form.Label><Form.Control {...form.register("vin")} /></Form.Group></Col>
-                  <Col md={6}><Form.Group><Form.Label>Baujahr</Form.Label><Form.Control type="number" {...form.register("year_of_manufacture")} /></Form.Group></Col>
-                  <Col md={6}><Form.Group><Form.Label>Ladefläche (m²)</Form.Label><Form.Control type="number" step="0.01" {...form.register("loading_area")} /></Form.Group></Col>
+                  <Col md={4}><Form.Group><Form.Label>Baujahr</Form.Label><Form.Control type="number" {...form.register("year_of_manufacture")} /></Form.Group></Col>
+                  <Col md={4}><Form.Group><Form.Label>Ladefläche (m²)</Form.Label><Form.Control type="number" step="0.01" {...form.register("loading_area")} /></Form.Group></Col>
+                  <Col md={4}><Form.Group><Form.Label>Zuladung (kg)</Form.Label><Form.Control type="number" step="0.01" {...form.register("max_payload_kg")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Nächste HU</Form.Label><Form.Control type="date" {...form.register("inspection_due_date")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Nächster Service</Form.Label><Form.Control type="date" {...form.register("next_service_date")} /></Form.Group></Col>
                   <Col md={6}><Form.Group><Form.Label>Nächste Gasdurchsicht</Form.Label><Form.Control type="date" {...form.register("gas_inspection_due_date")} /></Form.Group></Col>

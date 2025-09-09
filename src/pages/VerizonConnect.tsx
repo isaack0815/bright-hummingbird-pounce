@@ -5,7 +5,7 @@ import { Card, Table, Alert, Spinner, Badge, Row, Col, Button, ListGroup } from 
 import type { VerizonVehicle } from '@/types/verizon';
 import { VerizonMap } from '@/components/verizon/VerizonMap';
 import { showError } from '@/utils/toast';
-import { ArrowRight, Clock, RefreshCw } from 'lucide-react';
+import { ArrowRight, Clock, RefreshCw, Trash2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
@@ -100,6 +100,14 @@ const VerizonConnect = () => {
     handleFindFollowUpTrips(order.id);
   };
 
+  const handleRemoveLastStop = () => {
+    if (tourChain.length <= 1) return;
+    const newTourChain = tourChain.slice(0, -1);
+    setTourChain(newTourChain);
+    const lastOrder = newTourChain[newTourChain.length - 1];
+    handleFindFollowUpTrips(lastOrder.id);
+  };
+
   const handleResetTour = () => {
     if (activeOrder) {
       setTourChain([activeOrder]);
@@ -157,7 +165,12 @@ const VerizonConnect = () => {
                 <Card>
                   <Card.Header className="d-flex justify-content-between align-items-center">
                     <Card.Title>Geplante Tour</Card.Title>
-                    <Button variant="outline-secondary" size="sm" onClick={handleResetTour}><RefreshCw size={14} className="me-1" /> Zurücksetzen</Button>
+                    <div>
+                      {tourChain.length > 1 && (
+                        <Button variant="outline-danger" size="sm" onClick={handleRemoveLastStop} className="me-2"><Trash2 size={14} /></Button>
+                      )}
+                      <Button variant="outline-secondary" size="sm" onClick={handleResetTour}><RefreshCw size={14} className="me-1" /> Zurücksetzen</Button>
+                    </div>
                   </Card.Header>
                   <ListGroup variant="flush" style={{ maxHeight: '25vh', overflowY: 'auto' }}>
                     {tourChain.map((order, index) => (
@@ -178,12 +191,15 @@ const VerizonConnect = () => {
                     {potentialFollowUps.length > 0 ? (
                       <ListGroup variant="flush">
                         {potentialFollowUps.map(order => (
-                          <ListGroup.Item key={order.id} action onClick={() => handleSelectFollowUp(order)}>
+                          <ListGroup.Item key={order.id} action onClick={() => handleSelectFollowUp(order)} disabled={order.is_overweight}>
                             <div className="d-flex justify-content-between align-items-center">
                               <span className="fw-bold">{order.order_number}</span>
-                              <Badge bg="info"><Clock size={12} className="me-1" /> ~{order.travel_duration_hours}h Anfahrt</Badge>
+                              <div>
+                                {order.is_overweight && <Badge bg="danger" className="me-2">Zu schwer</Badge>}
+                                <Badge bg="info"><Clock size={12} className="me-1" /> ~{order.travel_duration_hours}h Anfahrt</Badge>
+                              </div>
                             </div>
-                            <p className="small text-muted mb-0">{order.origin_address} <ArrowRight size={12} /> ...</p>
+                            <p className="small text-muted mb-0">{order.origin_address} <ArrowRight size={12} /> {order.destination_address}</p>
                           </ListGroup.Item>
                         ))}
                       </ListGroup>
