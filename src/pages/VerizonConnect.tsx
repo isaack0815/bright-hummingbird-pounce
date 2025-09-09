@@ -7,6 +7,7 @@ import { VerizonMap } from '@/components/verizon/VerizonMap';
 import { showError, showSuccess } from '@/utils/toast';
 import { ArrowRight, Clock, RefreshCw, Trash2, Save } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 
 const fetchVerizonVehicles = async (): Promise<VerizonVehicle[]> => {
   const { data, error } = await supabase.functions.invoke('get-verizon-vehicles');
@@ -38,6 +39,28 @@ const fetchFollowUpOrders = async (currentOrderId: number) => {
     if (error) throw error;
     return data.followUpOrders;
 }
+
+const getTourItemVariant = (order: any): string | undefined => {
+  if (order.status === 'Zugestellt' || order.status === 'Storniert' || order.status === 'Unterwegs') {
+    return undefined;
+  }
+  if (!order.pickup_date) {
+    return undefined;
+  }
+  try {
+    const pickupDate = parseISO(order.pickup_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysUntilPickup = differenceInCalendarDays(pickupDate, today);
+
+    if (daysUntilPickup <= 0) return 'danger';
+    if (daysUntilPickup <= 7) return 'warning';
+  } catch (e) {
+    console.error("Error parsing date for tour item:", order.id, order.pickup_date, e);
+    return undefined;
+  }
+  return undefined;
+};
 
 const VerizonConnect = () => {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -209,11 +232,15 @@ const VerizonConnect = () => {
                     </div>
                   </Card.Header>
                   <ListGroup variant="flush" style={{ maxHeight: '25vh', overflowY: 'auto' }}>
-                    {tourChain.map((order, index) => (
-                      <ListGroup.Item key={order.id} active={index === 0}>
-                        <strong>{index === 0 ? 'Start:' : `Stopp ${index + 1}:`}</strong> <NavLink to={`/freight-orders/edit/${order.id}`} className={index === 0 ? 'text-white' : ''}>{order.order_number}</NavLink>
-                      </ListGroup.Item>
-                    ))}
+                    {tourChain.map((order, index) => {
+                      const variant = getTourItemVariant(order);
+                      const linkClassName = variant ? 'text-white' : '';
+                      return (
+                        <ListGroup.Item key={order.id} variant={variant}>
+                          <strong>{index === 0 ? 'Start:' : `Stopp ${index + 1}:`}</strong> <NavLink to={`/freight-orders/edit/${order.id}`} className={linkClassName}>{order.order_number}</NavLink>
+                        </ListGroup.Item>
+                      );
+                    })}
                   </ListGroup>
                 </Card>
               )}
