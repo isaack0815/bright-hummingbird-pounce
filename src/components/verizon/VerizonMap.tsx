@@ -7,6 +7,7 @@ import { User, Gauge, Clock, MapPin, Truck, Car, Caravan, Package, Flag, Goal } 
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import ReactDOMServer from 'react-dom/server';
+import { supabase } from '@/lib/supabase';
 
 const createVehicleIcon = (vehicleType: string | null): DivIcon => {
   let iconComponent;
@@ -27,7 +28,22 @@ const createRouteMarkerIcon = (type: 'start' | 'end'): DivIcon => {
     return L.divIcon({ html: iconHtml, className: 'custom-route-marker-icon', iconSize: [30, 30], iconAnchor: [15, 30] });
 }
 
-const geocodeAddress = async (address: string): Promise<LatLngTuple | null> => { try { const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`); if (!response.ok) return null; const data = await response.json(); if (data && data.length > 0) { return [parseFloat(data[0].lat), parseFloat(data[0].lon)]; } return null; } catch (error) { console.error("Geocoding error:", error); return null; } };
+const geocodeAddress = async (address: string): Promise<LatLngTuple | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('geocode-address', {
+      body: { address },
+    });
+    if (error) throw error;
+    if (data && data.lat && data.lng) {
+      return [data.lat, data.lng];
+    }
+    return null;
+  } catch (error) {
+    console.error("Geocoding error:", error);
+    return null;
+  }
+};
+
 const fetchRoute = async (coordinates: LatLngTuple[]): Promise<LatLngTuple[] | null> => { if (coordinates.length < 2) return null; const coordsString = coordinates.map(c => `${c[1]},${c[0]}`).join(';'); const url = `https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`; try { const response = await fetch(url); if (!response.ok) return null; const data = await response.json(); if (data.routes && data.routes.length > 0) { const routeCoords = data.routes[0].geometry.coordinates; return routeCoords.map((c: [number, number]) => [c[1], c[0]] as LatLngTuple); } return null; } catch (error) { console.error("Routing error:", error); return null; } };
 
 type VerizonMapProps = {

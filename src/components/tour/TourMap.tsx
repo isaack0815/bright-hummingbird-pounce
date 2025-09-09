@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { TourStop } from '@/types/tour';
+import { supabase } from '@/lib/supabase';
 
 // Fix for default icon issue with webpack
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -24,11 +25,12 @@ type MapProps = {
 
 const geocodeAddress = async (address: string): Promise<LatLngTuple | null> => {
   try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (data && data.length > 0) {
-      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    const { data, error } = await supabase.functions.invoke('geocode-address', {
+      body: { address },
+    });
+    if (error) throw error;
+    if (data && data.lat && data.lng) {
+      return [data.lat, data.lng];
     }
     return null;
   } catch (error) {
@@ -82,14 +84,10 @@ export const TourMap = ({ stops }: MapProps) => {
       }
       setIsLoading(true);
       
-      const coords: LatLngTuple[] = [];
-      for (const stop of stops) {
-        const coord = await geocodeAddress(stop.address);
-        if (coord) {
-          coords.push(coord);
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      const coordsPromises = stops.map(stop => geocodeAddress(stop.address));
+      const coordsResults = await Promise.all(coordsPromises);
+      const coords = coordsResults.filter((c): c is LatLngTuple => c !== null);
+      
       setMarkerCoordinates(coords);
 
       if (coords.length > 1) {
