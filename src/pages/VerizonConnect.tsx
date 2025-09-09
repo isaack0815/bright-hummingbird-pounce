@@ -122,21 +122,20 @@ const VerizonConnect = () => {
                     <p className="text-muted text-center py-4">Keine Fahrzeuge mit Verizon ID gefunden.</p>
                   )}
                 </Card.Body>
-              </Card>
-              {selectedVehicleId && (
-                <Card.Footer>
-                  {isLoadingOrder ? <Spinner size="sm" /> : activeOrder ? (
-                    <div>
-                      <p className="small mb-2"><strong>Aktiver Auftrag:</strong> <NavLink to={`/freight-orders/edit/${activeOrder.id}`}>{activeOrder.order_number}</NavLink></p>
-                      <Button size="sm" className="w-100" onClick={handleFindFollowUpTrips} disabled={isLoadingFollowUp}>
-                        {isLoadingFollowUp ? <Spinner size="sm" /> : 'Mögliche Folgeaufträge suchen'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="small text-muted text-center mb-0">Kein aktiver Auftrag für dieses Fahrzeug gefunden.</p>
-                  )}
-                </Card.Footer>
-              )}
+                {selectedVehicleId && (
+                  <Card.Footer>
+                    {isLoadingOrder ? <Spinner size="sm" /> : activeOrder ? (
+                      <div>
+                        <p className="small mb-2"><strong>Aktiver Auftrag:</strong> <NavLink to={`/freight-orders/edit/${activeOrder.id}`}>{activeOrder.order_number}</NavLink></p>
+                        <Button size="sm" className="w-100" onClick={handleFindFollowUpTrips} disabled={isLoadingFollowUp}>
+                          {isLoadingFollowUp ? <Spinner size="sm" /> : 'Mögliche Folgeaufträge suchen'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="small text-muted text-center mb-0">Kein aktiver Auftrag für dieses Fahrzeug gefunden.</p>
+                    )}
+                  </Card.Footer>
+                )}
               </Card>
 
               {isLoadingFollowUp && <div className="text-center"><Spinner /></div>}
