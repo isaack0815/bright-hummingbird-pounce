@@ -6,8 +6,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// --- Helper Functions ---
+
+const geocode = async (address: string): Promise<{lat: number, lng: number} | null> => {
+    if (!address) return null;
+    const apiKey = Deno.env.get('GOOGLE_API_KEY');
+    if (!apiKey) throw new Error('GOOGLE_API_KEY is not set.');
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.status === 'OK' && data.results.length > 0) {
+        return data.results[0].geometry.location;
+    }
+    return null;
+};
+
+const getRouteDuration = async (from: {lat: number, lng: number}, to: {lat: number, lng: number}): Promise<number | null> => {
+    const url = `http://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=false`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+            return data.routes[0].duration; // Duration in seconds
+        }
+        return null;
+    } catch (e) {
+        console.error("OSRM routing error:", e);
+        return null;
+    }
+};
+
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -21,6 +53,7 @@ serve(async (req) => {
     
     switch (action) {
       case 'login': {
+        // ... (existing login logic)
         const { username, password } = payload;
         if (!username || !password) {
           return new Response(JSON.stringify({ error: 'Benutzername und Passwort sind erforderlich' }), {
@@ -82,18 +115,73 @@ serve(async (req) => {
 
         const { data: order, error: orderError } = await supabaseAdmin
           .from('freight_orders')
-          .select('origin_address, destination_address')
+          .select('id, order_number, origin_address, destination_address, delivery_date, delivery_time_end')
           .eq('vehicle_id', vehicleId)
           .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
 
-        if (orderError && orderError.code !== 'PGRST116') { // Ignore "no rows found"
+        if (orderError && orderError.code !== 'PGRST116') {
           throw orderError;
         }
 
         return new Response(JSON.stringify({ order: order || null }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      case 'get-follow-up-freight': {
+        const { currentOrderId } = payload;
+        if (!currentOrderId) {
+          return new Response(JSON.stringify({ error: 'Current Order ID is required' }), { status: 400 });
+        }
+
+        const { data: currentOrder, error: currentOrderError } = await supabaseAdmin
+          .from('freight_orders')
+          .select('destination_address, delivery_date, delivery_time_end')
+          .eq('id', currentOrderId)
+          .single();
+        if (currentOrderError) throw currentOrderError;
+
+        const destinationCoords = await geocode(currentOrder.destination_address!);
+        if (!destinationCoords) throw new Error(`Could not geocode destination: ${currentOrder.destination_address}`);
+
+        const { data: potentialOrders, error: potentialOrdersError } = await supabaseAdmin
+          .from('freight_orders')
+          .select('id, order_number, origin_address, pickup_date, pickup_time_start')
+          .eq('status', 'Angelegt')
+          .is('vehicle_id', null)
+          .neq('id', currentOrderId);
+        if (potentialOrdersError) throw potentialOrdersError;
+
+        const validFollowUps = [];
+        for (const order of potentialOrders) {
+          if (!order.origin_address || !order.pickup_date) continue;
+          
+          const pickupCoords = await geocode(order.origin_address);
+          if (!pickupCoords) continue;
+
+          const travelDurationSeconds = await getRouteDuration(destinationCoords, pickupCoords);
+          if (travelDurationSeconds === null) continue;
+
+          const deliveryTimeStr = `${currentOrder.delivery_date}T${currentOrder.delivery_time_end || '23:59:59'}`;
+          const deliveryTimestamp = new Date(deliveryTimeStr).getTime();
+          const arrivalAtPickupTimestamp = deliveryTimestamp + (travelDurationSeconds * 1000);
+
+          const pickupTimeStr = `${order.pickup_date}T${order.pickup_time_start || '00:00:00'}`;
+          const pickupDeadlineTimestamp = new Date(pickupTimeStr).getTime();
+
+          if (arrivalAtPickupTimestamp <= pickupDeadlineTimestamp) {
+            validFollowUps.push({
+              ...order,
+              travel_duration_hours: (travelDurationSeconds / 3600).toFixed(2),
+            });
+          }
+        }
+
+        return new Response(JSON.stringify({ followUpOrders: validFollowUps }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
