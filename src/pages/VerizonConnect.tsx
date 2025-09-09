@@ -42,7 +42,7 @@ const VerizonConnect = () => {
               <p>{error.message}</p>
               <hr />
               <p className="mb-0">
-                Stellen Sie sicher, dass der API-Schlüssel `VERIZON_CONNECT_API_KEY` in den Supabase Secrets korrekt hinterlegt ist.
+                Stellen Sie sicher, dass die Secrets `VERIZON_USERNAME` und `VERIZON_PASSWORD` in den Supabase-Projekteinstellungen korrekt hinterlegt sind.
               </p>
             </Alert>
           )}
