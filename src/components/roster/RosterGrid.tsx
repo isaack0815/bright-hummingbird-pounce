@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Table, Spinner, Button } from 'react-bootstrap';
+import { Card, Table, Spinner } from 'react-bootstrap';
 import { eachDayOfInterval, format, isWeekend } from 'date-fns';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Tour } from '@/types/tour';
@@ -161,17 +161,14 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
                       }).join(', ');
 
                       return (
-                        <td key={tour.id}>
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            className="w-100 mb-1"
-                            onClick={() => handleOpenModal(date, tour.id, tour.name)}
-                          >
-                            Bearbeiten
-                          </Button>
-                          <div className="small text-muted mt-1">
-                            {userNames}
+                        <td 
+                          key={tour.id} 
+                          onClick={() => handleOpenModal(date, tour.id, tour.name)}
+                          className="roster-cell"
+                          style={{ cursor: 'pointer', minHeight: '40px' }}
+                        >
+                          <div className="small text-muted">
+                            {userNames || <>&nbsp;</>}
                           </div>
                         </td>
                       );

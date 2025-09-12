@@ -10,3 +10,7 @@ body {
 .menu-item-row:hover .menu-item-actions {
   opacity: 1;
 }
+
+.roster-cell:hover {
+  background-color: #e9ecef;
+}
