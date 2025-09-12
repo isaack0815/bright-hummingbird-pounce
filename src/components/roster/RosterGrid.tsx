@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Table, Spinner, Button } from 'react-bootstrap';
 import { eachDayOfInterval, format, isWeekend } from 'date-fns';
-import { Save, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { Tour } from '@/types/tour';
 import { AssignUsersToTourDialog } from './AssignUsersToTourDialog';
@@ -65,43 +64,28 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
     }
   }, [rosterData]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const entries: { user_id: string; duty_date: string; tour_id: number }[] = [];
-      Object.entries(assignments).forEach(([date, tours]) => {
-        Object.entries(tours).forEach(([tourId, userIds]) => {
-          userIds.forEach(userId => {
-            if (userId && tourId) {
-              entries.push({
-                user_id: userId,
-                duty_date: date,
-                tour_id: Number(tourId),
-              });
-            }
-          });
-        });
-      });
-      const { error } = await supabase.functions.invoke('manage-rosters', { body: { action: 'update-entries', rosterId, entries } });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess("Dienstplan gespeichert!");
-      queryClient.invalidateQueries({ queryKey: ['rosterDetailsForMonth', workGroupId, rosterId] });
-    },
-    onError: (err: any) => showError(err.message || "Fehler beim Speichern."),
-  });
+  const saveDayMutation = useMutation({
+    mutationFn: async ({ date, assignmentsForDay }: { date: Date; assignmentsForDay: Record<number, string[]> }) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const assignmentsPayload = Object.entries(assignmentsForDay).flatMap(([tourId, userIds]) => 
+            userIds.map(userId => ({ user_id: userId, tour_id: Number(tourId) }))
+        );
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-        if (!window.confirm("Sind Sie sicher, dass Sie diesen Plan löschen möchten?")) throw new Error("Löschen abgebrochen");
-        const { error } = await supabase.functions.invoke('manage-rosters', { body: { action: 'delete', rosterId } });
+        const { error } = await supabase.functions.invoke('manage-rosters', {
+            body: {
+                action: 'update-entries-for-day',
+                rosterId,
+                date: dateStr,
+                assignments: assignmentsPayload,
+            },
+        });
         if (error) throw error;
     },
-    onSuccess: () => {
-        showSuccess("Dienstplan gelöscht!");
-        queryClient.invalidateQueries({ queryKey: ['workGroupsWithRosters'] });
+    onSuccess: (_, variables) => {
+        showSuccess(`Änderungen für ${format(variables.date, 'dd.MM.yyyy')} gespeichert!`);
+        queryClient.invalidateQueries({ queryKey: ['rosterDetailsForMonth', workGroupId, rosterId] });
     },
-    onError: (err: any) => showError(err.message || "Fehler beim Löschen."),
+    onError: (err: any) => showError(err.message || "Fehler beim Speichern des Tages."),
   });
 
   const handleOpenModal = (date: Date, tourId: number, tourName: string) => {
@@ -111,10 +95,12 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
   const handleSaveAssignments = (newUserIds: string[]) => {
     if (!modalData) return;
     const dateStr = format(modalData.date, 'yyyy-MM-dd');
-    setAssignments(prev => {
-      const newAssignmentsForDate = { ...prev[dateStr], [modalData.tourId]: newUserIds };
-      return { ...prev, [dateStr]: newAssignmentsForDate };
-    });
+    
+    const newAssignmentsForDate = { ...(assignments[dateStr] || {}), [modalData.tourId]: newUserIds };
+    const newAssignments = { ...assignments, [dateStr]: newAssignmentsForDate };
+    setAssignments(newAssignments);
+
+    saveDayMutation.mutate({ date: modalData.date, assignmentsForDay: newAssignmentsForDate });
   };
 
   const dates = useMemo(() => {
@@ -145,22 +131,11 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
   return (
     <>
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <div>
-            <Card.Title>{rosterData.work_groups?.name}</Card.Title>
-            <Card.Text className="text-muted small mb-0">
-              {format(new Date(rosterData.start_date), 'dd.MM.yyyy')} - {format(new Date(rosterData.end_date), 'dd.MM.yyyy')}
-            </Card.Text>
-          </div>
-          <div>
-              <Button variant="outline-danger" size="sm" className="me-2" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
-                  <Trash2 size={16} />
-              </Button>
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                  <Save size={16} className="me-2" />
-                  {saveMutation.isPending ? 'Speichern...' : 'Speichern'}
-              </Button>
-          </div>
+        <Card.Header>
+          <Card.Title>{rosterData.work_groups?.name}</Card.Title>
+          <Card.Text className="text-muted small mb-0">
+            {format(new Date(rosterData.start_date), 'dd.MM.yyyy')} - {format(new Date(rosterData.end_date), 'dd.MM.yyyy')}
+          </Card.Text>
         </Card.Header>
         <Card.Body className="table-responsive">
           <Table bordered hover>
