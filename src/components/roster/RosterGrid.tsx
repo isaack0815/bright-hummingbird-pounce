@@ -125,6 +125,20 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
   const members = rosterData?.members || [];
   const membersMap = useMemo(() => new Map(members.map((m: Member) => [m.id, m])), [members]);
 
+  const unavailableUserIdsForModal = useMemo(() => {
+    if (!modalData) return [];
+    const dateStr = format(modalData.date, 'yyyy-MM-dd');
+    const assignmentsForDay = assignments[dateStr] || {};
+    const busyUserIds = new Set<string>();
+    for (const tourIdStr in assignmentsForDay) {
+      const tourId = Number(tourIdStr);
+      if (tourId !== modalData.tourId) {
+        assignmentsForDay[tourId].forEach(userId => busyUserIds.add(userId));
+      }
+    }
+    return Array.from(busyUserIds);
+  }, [modalData, assignments]);
+
   if (isLoading || isLoadingTours) return <div className="text-center p-5"><Spinner /></div>;
   if (!rosterData || !tours) return <p>Dienstplandaten konnten nicht geladen werden.</p>;
 
@@ -202,6 +216,7 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
           availableMembers={members}
           selectedUserIds={assignments[format(modalData.date, 'yyyy-MM-dd')]?.[modalData.tourId] || []}
           onSave={handleSaveAssignments}
+          unavailableUserIds={unavailableUserIdsForModal}
         />
       )}
     </>

@@ -12,9 +12,10 @@ type AssignUsersToTourDialogProps = {
   availableMembers: Member[];
   selectedUserIds: string[];
   onSave: (newUserIds: string[]) => void;
+  unavailableUserIds: string[];
 };
 
-export function AssignUsersToTourDialog({ show, onHide, tourName, availableMembers, selectedUserIds, onSave }: AssignUsersToTourDialogProps) {
+export function AssignUsersToTourDialog({ show, onHide, tourName, availableMembers, selectedUserIds, onSave, unavailableUserIds }: AssignUsersToTourDialogProps) {
   const { control, handleSubmit, reset } = useForm({
     defaultValues: {
       userIds: [] as { value: string; label: string }[],
@@ -59,6 +60,7 @@ export function AssignUsersToTourDialog({ show, onHide, tourName, availableMembe
                   options={memberOptions}
                   placeholder="Mitarbeiter auswählen..."
                   classNamePrefix="select"
+                  isOptionDisabled={(option) => unavailableUserIds.includes(option.value)}
                 />
               )}
             />
