@@ -20,7 +20,7 @@ const fetchRosterDetailsForMonth = async (workGroupId: number, year: number, mon
 
 const fetchTours = async (): Promise<Tour[]> => {
   const { data, error } = await supabase.functions.invoke('get-tours');
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data.tours;
 };
 
@@ -166,6 +166,11 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
                     {tours.map(tour => {
                       const assignedUserIds = assignments[dateStr]?.[tour.id] || [];
                       const assignedUsers = assignedUserIds.map(id => membersMap.get(id)).filter(Boolean) as Member[];
+                      const userNames = assignedUsers.map(user => {
+                        const firstNameInitial = user.first_name ? `${user.first_name.charAt(0)}.` : '';
+                        return `${user.last_name || ''} ${firstNameInitial}`.trim();
+                      }).join(', ');
+
                       return (
                         <td key={tour.id}>
                           <Button
@@ -177,9 +182,7 @@ export const RosterGrid = ({ workGroupId, rosterId }: { workGroupId: number, ros
                             Bearbeiten
                           </Button>
                           <div className="small text-muted mt-1">
-                            {assignedUsers.map(user => (
-                              <div key={user.id}>{user.first_name} {user.last_name}</div>
-                            ))}
+                            {userNames}
                           </div>
                         </td>
                       );
