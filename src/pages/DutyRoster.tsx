@@ -2,10 +2,10 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Container, Card, Button, Spinner, Form } from 'react-bootstrap';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CreateRosterDialog } from '@/components/roster/CreateRosterDialog';
 import { RosterGrid } from '@/components/roster/RosterGrid';
-import { startOfMonth, endOfMonth, isWithinInterval, format, parseISO } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, format, parseISO, addMonths, subMonths } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { showSuccess, showError } from '@/utils/toast';
 
@@ -60,6 +60,17 @@ const DutyRoster = () => {
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h1 className="h2">Dienstplan</h1>
           <div className="d-flex align-items-center gap-3">
+            <div className="d-flex align-items-center gap-2">
+                <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                    <ChevronLeft size={16} />
+                </Button>
+                <h5 className="mb-0 fw-normal" style={{width: '150px', textAlign: 'center'}}>
+                    {format(currentMonth, 'MMMM yyyy', { locale: de })}
+                </h5>
+                <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                    <ChevronRight size={16} />
+                </Button>
+            </div>
             {isLoading ? <Spinner size="sm" /> : (
               <Form.Select 
                 style={{width: '250px'}} 
