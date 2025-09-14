@@ -396,7 +396,7 @@ serve(async (req) => {
           user_id: userId,
           start_date: date,
           end_date: date,
-          status: 'approved',
+          status: 'work_free',
           approved_by: user.id,
           approved_at: new Date().toISOString(),
         }).select().single();

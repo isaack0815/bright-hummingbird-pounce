@@ -66,7 +66,7 @@ const VacationRequestManagement = () => {
     },
     onSuccess: (_, variables) => {
       if (variables.action === 'create-vacation-request') {
-        showSuccess(`Urlaubstag eingetragen.`);
+        showSuccess(`Eintrag erstellt.`);
       } else if (variables.action === 'update-vacation-request') {
         showSuccess("Urlaub erfolgreich aktualisiert!");
       } else {
@@ -94,7 +94,7 @@ const VacationRequestManagement = () => {
 
   const handleCellClick = (userId: string, date: Date) => {
     if (!canManage) {
-      showError("Nur Manager können direkt Urlaub eintragen.");
+      showError("Nur Manager können direkt Einträge erstellen.");
       return;
     }
     manageRequestMutation.mutate({

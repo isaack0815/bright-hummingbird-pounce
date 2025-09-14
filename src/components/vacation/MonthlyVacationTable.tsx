@@ -66,7 +66,8 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
       case 'approved': return 'bg-success';
       case 'pending': return 'bg-warning';
       case 'rejected': return 'bg-danger';
-      default: return 'bg-secondary';
+      case 'work_free': return 'bg-secondary';
+      default: return 'bg-dark';
     }
   };
 
@@ -99,6 +100,15 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
       setEditingRequest(null);
     } else {
       onCellClick(userId, date);
+    }
+  };
+
+  const getBarText = (status: string) => {
+    switch (status) {
+      case 'approved': return 'Urlaub';
+      case 'pending': return 'Beantragt';
+      case 'work_free': return 'Arbeitsfrei';
+      default: return 'Abgelehnt';
     }
   };
 
@@ -161,7 +171,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                     onClick={(e) => { e.stopPropagation(); setEditingRequest(isEditing ? null : vacation); }}
                     title={isEditing ? "Wählen Sie ein neues Start- oder Enddatum" : `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`}
                   >
-                    <span>{isEditing ? 'Bearbeiten...' : (vacation.status === 'pending' ? 'Beantragt' : 'Urlaub')}</span>
+                    <span>{isEditing ? 'Bearbeiten...' : getBarText(vacation.status)}</span>
                     {!isEditing && (
                       <Button 
                         variant="link" 
