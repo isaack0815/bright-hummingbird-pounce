@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Spinner } from 'react-bootstrap';
+import { Button, Spinner } from 'react-bootstrap';
 import { PlayCircle, StopCircle } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -34,30 +34,32 @@ export const TimeClock = ({ status, isLoading, onClockIn, onClockOut, isMutating
   }, [status]);
 
   if (isLoading) {
-    return <Card.Body className="text-center"><Spinner size="sm" /></Card.Body>;
+    return <Spinner size="sm" />;
   }
 
   return (
-    <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center">
+    <div className="d-flex align-items-center gap-3">
       {status ? (
         <>
-          <h5 className="text-success">Eingestempelt</h5>
-          <p className="display-6 fw-bold">{elapsedTime}</p>
-          <Button variant="danger" onClick={onClockOut} disabled={isMutating}>
-            <StopCircle className="me-2" />
-            {isMutating ? 'Wird gestoppt...' : 'Ausstempeln'}
+          <div className="text-end">
+            <span className="text-success small">Eingestempelt</span>
+            <div className="fw-bold">{elapsedTime}</div>
+          </div>
+          <Button variant="danger" size="sm" onClick={onClockOut} disabled={isMutating}>
+            <StopCircle size={16} />
           </Button>
         </>
       ) : (
         <>
-          <h5 className="text-muted">Ausgestempelt</h5>
-          <p className="display-6 text-muted">--:--:--</p>
-          <Button variant="success" onClick={onClockIn} disabled={isMutating}>
-            <PlayCircle className="me-2" />
-            {isMutating ? 'Wird gestartet...' : 'Einstempeln'}
+          <div className="text-end">
+            <span className="text-muted small">Ausgestempelt</span>
+            <div className="fw-bold text-muted">--:--:--</div>
+          </div>
+          <Button variant="success" size="sm" onClick={onClockIn} disabled={isMutating}>
+            <PlayCircle size={16} />
           </Button>
         </>
       )}
-    </Card.Body>
+    </div>
   );
 };

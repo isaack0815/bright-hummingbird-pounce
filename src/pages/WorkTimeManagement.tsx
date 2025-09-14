@@ -77,47 +77,41 @@ const WorkTimeManagement = () => {
   return (
     <>
       <h1 className="h2 mb-4">Meine Zeiterfassung</h1>
-      <Row className="g-4">
-        <Col lg={4}>
-          <Card className="h-100">
-            <Card.Header><Card.Title>Stempeluhr</Card.Title></Card.Header>
-            <TimeClock
-              status={statusData?.status}
-              isLoading={isLoadingStatus}
-              onClockIn={() => mutation.mutate({ action: 'clock-in' })}
-              onClockOut={() => mutation.mutate({ action: 'clock-out' })}
-              isMutating={mutation.isPending}
-            />
-          </Card>
-        </Col>
-        <Col lg={8}>
-          <WorkTimeSummary 
-            sessions={historyData?.history || []}
-            targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
-            month={currentMonth}
+      <WorkTimeSummary 
+        sessions={historyData?.history || []}
+        targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
+        month={currentMonth}
+      />
+      <Card>
+        <Card.Header className="d-flex justify-content-between align-items-center">
+          <div className="d-flex align-items-center gap-3">
+            <Card.Title className="mb-0">Verlauf für {format(currentMonth, 'MMMM yyyy', { locale: de })}</Card.Title>
+            <div className="d-flex gap-2">
+              <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft /></Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight /></Button>
+            </div>
+          </div>
+          <TimeClock
+            status={statusData?.status}
+            isLoading={isLoadingStatus}
+            onClockIn={() => mutation.mutate({ action: 'clock-in' })}
+            onClockOut={() => mutation.mutate({ action: 'clock-out' })}
+            isMutating={mutation.isPending}
           />
-          <Card>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <Card.Title className="mb-0">Verlauf für {format(currentMonth, 'MMMM yyyy', { locale: de })}</Card.Title>
-              <div className="d-flex gap-2">
-                <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft /></Button>
-                <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight /></Button>
-              </div>
-            </Card.Header>
-            <Card.Body>
-              {isLoadingHistory ? <div className="text-center"><Spinner /></div> : (
-                <WorkTimeHistory
-                  sessions={historyData?.history || []}
-                  onEdit={setEditSession}
-                  onDelete={handleDelete}
-                  month={currentMonth}
-                  targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
-                />
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+        </Card.Header>
+        <Card.Body>
+          {isLoadingHistory ? <div className="text-center"><Spinner /></div> : (
+            <WorkTimeHistory
+              sessions={historyData?.history || []}
+              onEdit={setEditSession}
+              onDelete={handleDelete}
+              month={currentMonth}
+              targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
+              onSave={handleSave}
+            />
+          )}
+        </Card.Body>
+      </Card>
       <EditWorkTimeDialog
         show={!!editSession}
         onHide={() => setEditSession(null)}
