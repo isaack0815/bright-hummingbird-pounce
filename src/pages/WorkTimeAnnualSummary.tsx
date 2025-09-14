@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card, Spinner, Button, Form, Row, Col, Table } from 'react-bootstrap';
 import { showError } from '@/utils/toast';
-import { format, startOfYear, eachMonthOfInterval, endOfYear, getDaysInMonth, isWeekend, parseISO } from 'date-fns';
+import { format, startOfYear, eachMonthOfInterval, endOfYear, getDaysInMonth, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { ArrowLeft, Clock, Calendar, Briefcase, TrendingUp } from 'lucide-react';
 import { useSearchParams, NavLink } from 'react-router-dom';
