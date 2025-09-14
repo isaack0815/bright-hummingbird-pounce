@@ -337,6 +337,23 @@ serve(async (req) => {
       }
       case 'delete-work-time': {
         const { id } = payload;
+        if (!id) throw new Error("Session ID is required.");
+
+        const { data: sessionToDelete, error: fetchError } = await supabaseAdmin
+            .from('work_sessions')
+            .select('user_id')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) throw new Error(`Could not find work session to delete: ${fetchError.message}`);
+
+        const isOwner = user.id === sessionToDelete.user_id;
+        const isAdmin = await checkAdminPermission();
+
+        if (!isOwner && !isAdmin) {
+            throw new Error("Permission denied. You can only delete your own entries or you need 'work_time.manage' permission.");
+        }
+
         const { error } = await supabase.from('work_sessions').delete().eq('id', id);
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
