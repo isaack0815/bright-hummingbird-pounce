@@ -409,6 +409,20 @@ serve(async (req) => {
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
       }
+      case 'update-vacation-request': {
+        const { requestId, startDate, endDate, notes } = payload;
+        if (!requestId || !startDate || !endDate) {
+            throw new Error('Request ID, start date, and end date are required');
+        }
+        const { error } = await supabase.rpc('update_vacation_request', {
+          p_request_id: requestId,
+          p_start_date: startDate,
+          p_end_date: endDate,
+          p_notes: notes || '',
+        });
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
 
       default:
         return new Response(JSON.stringify({ error: 'Ungültige Aktion' }), {

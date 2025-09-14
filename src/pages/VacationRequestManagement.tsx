@@ -72,26 +72,14 @@ const VacationRequestManagement = () => {
     onSuccess: (_, variables) => {
       if (variables.action === 'create-vacation-request') {
         showSuccess(`Urlaubstag eingetragen.`);
+      } else if (variables.action === 'update-vacation-request') {
+        showSuccess("Urlaub erfolgreich aktualisiert!");
       } else {
         showSuccess(`Aktion erfolgreich ausgeführt.`);
       }
       queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
     },
     onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
-  });
-
-  const updateRequestMutation = useMutation({
-    mutationFn: async ({ requestId, startDate, endDate }: { requestId: number, startDate: string, endDate: string }) => {
-      const { error } = await supabase.functions.invoke('update-vacation-request', {
-        body: { requestId, startDate, endDate, notes: '' },
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess("Urlaub erfolgreich aktualisiert!");
-      queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
-    },
-    onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
   });
 
   const updateStatusMutation = useMutation({
@@ -128,7 +116,10 @@ const VacationRequestManagement = () => {
   };
 
   const handleUpdateRequest = (requestId: number, startDate: string, endDate: string) => {
-    updateRequestMutation.mutate({ requestId, startDate, endDate });
+    manageRequestMutation.mutate({
+      action: 'update-vacation-request',
+      payload: { requestId, startDate, endDate, notes: '' },
+    });
   };
 
   const pendingRequests = useMemo(() => {
