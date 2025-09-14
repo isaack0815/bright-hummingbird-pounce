@@ -59,15 +59,11 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
 
-    const checkPermission = async (permission: string) => {
+    const checkAdminPermission = async () => {
         const { data, error } = await supabase.rpc('get_my_permissions');
         if (error) throw error;
         const permissions = data.map((p: any) => p.permission_name);
-        // Super admin check: if user can manage roles and users, they can do anything.
-        if (permissions.includes('roles.manage') && permissions.includes('users.manage')) {
-            return true;
-        }
-        return permissions.includes(permission);
+        return permissions.includes('work_time.manage');
     };
 
     switch (action) {
@@ -272,7 +268,7 @@ serve(async (req) => {
       // Work Time Actions
       case 'get-work-time-status': {
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkPermission('work_time.manage'))) {
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
             throw new Error("Permission denied");
         }
         const { data, error } = await supabase.from('work_sessions').select('*').eq('user_id', targetUserId).is('end_time', null).maybeSingle();
@@ -295,7 +291,7 @@ serve(async (req) => {
       }
       case 'get-work-time-history': {
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkPermission('work_time.manage'))) {
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
             throw new Error("Permission denied");
         }
         const { startDate, endDate } = payload;
@@ -308,7 +304,7 @@ serve(async (req) => {
       }
       case 'get-user-work-details': {
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkPermission('work_time.manage'))) {
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
             throw new Error("Permission denied");
         }
         const { data, error } = await supabaseAdmin.from('work_hours_history').select('hours_per_week').eq('user_id', targetUserId).order('effective_date', { ascending: false }).limit(1).single();
@@ -317,7 +313,7 @@ serve(async (req) => {
       }
       case 'create-work-time': {
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkPermission('work_time.manage'))) {
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
             throw new Error("Permission denied");
         }
         const { start_time, end_time, break_duration_minutes, notes } = payload;
@@ -341,29 +337,12 @@ serve(async (req) => {
       }
       case 'delete-work-time': {
         const { id } = payload;
-        if (!id) throw new Error("Session ID is required.");
-
-        const { data: sessionToDelete, error: fetchError } = await supabaseAdmin
-            .from('work_sessions')
-            .select('user_id')
-            .eq('id', id)
-            .single();
-
-        if (fetchError) throw new Error(`Could not find work session to delete: ${fetchError.message}`);
-
-        const isOwner = user.id === sessionToDelete.user_id;
-        const isAdmin = await checkPermission('work_time.manage');
-
-        if (!isOwner && !isAdmin) {
-            throw new Error("Permission denied. You can only delete your own entries or you need 'work_time.manage' permission.");
-        }
-
         const { error } = await supabase.from('work_sessions').delete().eq('id', id);
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
       }
       case 'delete-work-hour-history': {
-        if (!(await checkPermission('personnel_files.manage'))) {
+        if (!(await checkAdminPermission())) {
             throw new Error("Permission denied. You need 'personnel_files.manage' permission.");
         }
         const { id } = payload;
@@ -371,6 +350,33 @@ serve(async (req) => {
         const { error } = await supabaseAdmin.from('work_hours_history').delete().eq('id', id);
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
+      }
+      case 'get-annual-work-time-summary': {
+        if (!(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { userId, year } = payload;
+        if (!userId || !year) throw new Error("User ID and year are required.");
+
+        const startDate = new Date(year, 0, 1).toISOString();
+        const endDate = new Date(year + 1, 0, 1).toISOString();
+
+        const { data: sessions, error: sessionsError } = await supabaseAdmin
+            .from('work_sessions')
+            .select('start_time, end_time, break_duration_minutes')
+            .eq('user_id', userId)
+            .gte('start_time', startDate)
+            .lt('start_time', endDate);
+        if (sessionsError) throw sessionsError;
+
+        const { data: history, error: historyError } = await supabaseAdmin
+            .from('work_hours_history')
+            .select('hours_per_week, effective_date')
+            .eq('user_id', userId)
+            .order('effective_date', { ascending: true });
+        if (historyError) throw historyError;
+
+        return new Response(JSON.stringify({ sessions, workHoursHistory: history }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       default:

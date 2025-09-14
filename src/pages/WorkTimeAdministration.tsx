@@ -8,9 +8,10 @@ import { WorkTimeSummary } from '@/components/work-time/WorkTimeSummary';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfYear } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react';
 import Select from 'react-select';
 import type { ChatUser } from '@/types/chat';
+import { useNavigate } from 'react-router-dom';
 
 type WorkSession = {
   id: number;
@@ -39,6 +40,7 @@ const WorkTimeAdministration = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
     queryKey: ['chatUsers'],
@@ -123,14 +125,24 @@ const WorkTimeAdministration = () => {
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h2">Personal-Zeiterfassung</h1>
-        <div style={{ width: '300px' }}>
-          <Select
-            options={userOptions}
-            isLoading={isLoadingUsers}
-            onChange={(opt) => setSelectedUserId(opt?.value || null)}
-            placeholder="Mitarbeiter auswählen..."
-            isClearable
-          />
+        <div className="d-flex align-items-center gap-2">
+            <Button 
+                variant="outline-secondary" 
+                disabled={!selectedUserId}
+                onClick={() => navigate(`/work-time-admin/annual-summary?userId=${selectedUserId}`)}
+            >
+                <BarChart3 size={16} className="me-2" />
+                Jahresübersicht
+            </Button>
+            <div style={{ width: '300px' }}>
+                <Select
+                    options={userOptions}
+                    isLoading={isLoadingUsers}
+                    onChange={(opt) => setSelectedUserId(opt?.value || null)}
+                    placeholder="Mitarbeiter auswählen..."
+                    isClearable
+                />
+            </div>
         </div>
       </div>
 
