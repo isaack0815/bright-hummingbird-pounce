@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { Table, Button } from 'react-bootstrap';
-import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays } from 'date-fns';
+import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays, isBefore, isAfter } from 'date-fns';
 import type { VacationRequest } from '@/types/vacation';
 import type { ChatUser } from '@/types/chat';
 import { Trash2 } from 'lucide-react';
@@ -12,13 +12,14 @@ type MonthlyVacationTableProps = {
   users: ChatUser[];
   onCellClick: (userId: string, date: Date) => void;
   onDeleteRequest: (requestId: number) => void;
+  onUpdateRequest: (requestId: number, startDate: string, endDate: string) => void;
 };
 
-export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick, onDeleteRequest }: MonthlyVacationTableProps) => {
+export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick, onDeleteRequest, onUpdateRequest }: MonthlyVacationTableProps) => {
   const headerRef = useRef<HTMLTableSectionElement>(null);
   const [cellWidth, setCellWidth] = useState(35);
   const [firstColWidth, setFirstColWidth] = useState(150);
-  const [hoveredVacationId, setHoveredVacationId] = useState<number | null>(null);
+  const [editingRequest, setEditingRequest] = useState<VacationRequest | null>(null);
 
   useEffect(() => {
     const calculateWidths = () => {
@@ -60,12 +61,33 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
     })).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
   }, [requests, users]);
 
-  const getStatusClass = (status: string) => {
+  const getStatusClass = (status: string, isEditing: boolean) => {
+    if (isEditing) return 'bg-primary';
     switch (status) {
       case 'approved': return 'bg-success';
       case 'pending': return 'bg-warning';
       case 'rejected': return 'bg-danger';
       default: return 'bg-secondary';
+    }
+  };
+
+  const handleCellClick = (userId: string, date: Date) => {
+    if (editingRequest) {
+      const startDate = parseISO(editingRequest.start_date);
+      const newDate = date;
+      
+      let newStart = startDate;
+      let newEnd = newDate;
+
+      if (isBefore(newDate, startDate)) {
+        newStart = newDate;
+        newEnd = startDate;
+      }
+      
+      onUpdateRequest(editingRequest.id, format(newStart, 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
+      setEditingRequest(null);
+    } else {
+      onCellClick(userId, date);
     }
   };
 
@@ -92,7 +114,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                 <td 
                   key={day.getDate()} 
                   className={`text-center p-1 ${isWeekend(day) ? 'table-info' : ''}`}
-                  onClick={() => onCellClick(user.userId, day)}
+                  onClick={() => handleCellClick(user.userId, day)}
                   style={{ cursor: 'pointer' }}
                 />
               ))}
@@ -110,11 +132,12 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                 const left = firstColWidth + (effectiveStart.getDate() - 1) * cellWidth;
                 const duration = differenceInCalendarDays(effectiveEnd, effectiveStart) + 1;
                 const width = duration * cellWidth - 2;
+                const isEditing = editingRequest?.id === vacation.id;
 
                 return (
                   <div
                     key={vacation.id}
-                    className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 vacation-bar ${getStatusClass(vacation.status)}`}
+                    className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 vacation-bar ${getStatusClass(vacation.status, isEditing)}`}
                     style={{
                       top: '5px',
                       left: `${left + 1}px`,
@@ -122,25 +145,28 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                       height: '30px',
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      border: isEditing ? '2px solid #0d6efd' : 'none',
                     }}
-                    onMouseEnter={() => setHoveredVacationId(vacation.id)}
-                    onMouseLeave={() => setHoveredVacationId(null)}
-                    title={`${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`}
+                    onClick={(e) => { e.stopPropagation(); setEditingRequest(isEditing ? null : vacation); }}
+                    title={isEditing ? "Wählen Sie ein neues Start- oder Enddatum" : `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`}
                   >
-                    <span>{vacation.status === 'pending' ? 'Beantragt' : 'Urlaub'}</span>
-                    <Button 
-                      variant="link" 
-                      size="sm" 
-                      className="p-0 text-white position-absolute end-0 me-2 vacation-bar-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm("Möchten Sie diesen Eintrag wirklich löschen?")) {
-                          onDeleteRequest(vacation.id);
-                        }
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
+                    <span>{isEditing ? 'Bearbeiten...' : (vacation.status === 'pending' ? 'Beantragt' : 'Urlaub')}</span>
+                    {!isEditing && (
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="p-0 text-white position-absolute end-0 me-2 vacation-bar-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm("Möchten Sie diesen Eintrag wirklich löschen?")) {
+                            onDeleteRequest(vacation.id);
+                          }
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
                   </div>
                 );
               })}

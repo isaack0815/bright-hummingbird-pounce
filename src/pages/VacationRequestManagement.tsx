@@ -70,11 +70,7 @@ const VacationRequestManagement = () => {
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
-      if (variables.action === 'create-vacation-request') {
-        showSuccess(`Urlaubstag eingetragen.`);
-      } else {
-        showSuccess(`Aktion erfolgreich ausgeführt.`);
-      }
+      showSuccess(`Aktion "${variables.action}" erfolgreich ausgeführt.`);
       queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
     },
     onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
@@ -110,6 +106,13 @@ const VacationRequestManagement = () => {
     manageRequestMutation.mutate({
       action: 'delete-vacation-request',
       payload: { requestId },
+    });
+  };
+
+  const handleUpdateRequest = (requestId: number, startDate: string, endDate: string) => {
+    manageRequestMutation.mutate({
+      action: 'update-vacation-request',
+      payload: { requestId, startDate, endDate, notes: '' },
     });
   };
 
@@ -153,7 +156,7 @@ const VacationRequestManagement = () => {
                     users={users}
                     onCellClick={handleCellClick}
                     onDeleteRequest={handleDeleteRequest}
-                    onRequestClick={() => {}} // No longer opens a modal
+                    onUpdateRequest={handleUpdateRequest}
                   />
                 </Card.Body>
               </Card>
