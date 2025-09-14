@@ -7,11 +7,39 @@ import { YearView } from '@/components/vacation/YearView';
 import type { UserVacations } from '@/types/vacation';
 
 const fetchVacations = async (year: number): Promise<UserVacations[]> => {
-  const { data, error } = await supabase.functions.invoke('get-vacations-for-year', {
-    body: { year },
-  });
+  const startDate = `${year}-01-01`;
+  const endDate = `${year}-12-31`;
+
+  const { data: requests, error } = await supabase
+    .from('vacation_requests')
+    .select('user_id, start_date, end_date, profiles(id, first_name, last_name)')
+    .eq('status', 'approved')
+    .lte('start_date', endDate)
+    .gte('end_date', startDate);
+
   if (error) throw new Error(error.message);
-  return data.vacations;
+  if (!requests) return [];
+
+  // Group by user
+  const vacationsByUser = requests.reduce((acc: any, req: any) => {
+    if (!req.profiles) return acc;
+    const userId = req.user_id;
+    if (!acc[userId]) {
+      acc[userId] = {
+        userId,
+        firstName: req.profiles.first_name,
+        lastName: req.profiles.last_name,
+        vacations: [],
+      };
+    }
+    acc[userId].vacations.push({
+      start: req.start_date,
+      end: req.end_date,
+    });
+    return acc;
+  }, {});
+
+  return Object.values(vacationsByUser);
 };
 
 const VacationCalendar = () => {
