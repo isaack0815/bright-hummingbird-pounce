@@ -36,7 +36,81 @@ serve(async (req) => {
     }
 
     switch (action) {
-      // ... existing cases
+      case 'get-planned-tour-for-vehicle': {
+        const { vehicleId } = payload;
+        if (!vehicleId) return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
+        const { data, error } = await supabaseAdmin
+          .from('freight_orders')
+          .select('*, freight_order_stops(*)')
+          .eq('vehicle_id', vehicleId)
+          .in('status', ['Angelegt', 'Geplant', 'Unterwegs'])
+          .order('pickup_date', { ascending: true });
+        if (error) throw error;
+        return new Response(JSON.stringify({ tour: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-follow-up-freight': {
+        const { currentOrderId } = payload;
+        if (!currentOrderId) return new Response(JSON.stringify({ error: 'Current Order ID is required' }), { status: 400 });
+
+        const { data: currentOrder, error: currentOrderError } = await supabaseAdmin
+          .from('freight_orders')
+          .select('destination_address, delivery_date, vehicle_id')
+          .eq('id', currentOrderId)
+          .single();
+        if (currentOrderError) throw currentOrderError;
+
+        const { data: vehicle, error: vehicleError } = await supabaseAdmin
+          .from('vehicles')
+          .select('max_payload_kg')
+          .eq('id', currentOrder.vehicle_id)
+          .single();
+        if (vehicleError) throw vehicleError;
+
+        const { data: potentialOrders, error: ordersError } = await supabaseAdmin
+          .from('freight_orders')
+          .select('*, freight_order_stops(*), cargo_items(weight)')
+          .eq('status', 'Angelegt')
+          .is('vehicle_id', null);
+        if (ordersError) throw ordersError;
+
+        const followUpOrders = [];
+        for (const order of potentialOrders) {
+          const totalWeight = order.cargo_items.reduce((sum: number, item: any) => sum + (item.weight || 0), 0);
+          const isOverweight = vehicle.max_payload_kg ? totalWeight > vehicle.max_payload_kg : false;
+          
+          // Simplified logic without geocoding for now to ensure performance
+          followUpOrders.push({
+            ...order,
+            is_overweight: isOverweight,
+            travel_duration_hours: 'N/A', // Placeholder
+          });
+        }
+
+        return new Response(JSON.stringify({ followUpOrders }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'assign-vehicle-to-orders': {
+        const { vehicleId, orderIds } = payload;
+        if (!vehicleId || !orderIds) return new Response(JSON.stringify({ error: 'Vehicle ID and Order IDs are required' }), { status: 400 });
+        
+        // Unassign from old orders
+        await supabaseAdmin
+          .from('freight_orders')
+          .update({ vehicle_id: null })
+          .eq('vehicle_id', vehicleId)
+          .not('id', 'in', `(${orderIds.join(',')})`);
+
+        // Assign to new tour
+        const { error } = await supabaseAdmin
+          .from('freight_orders')
+          .update({ vehicle_id: vehicleId })
+          .in('id', orderIds);
+        if (error) throw error;
+
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
       case 'login': {
         const { username, password } = payload;
         if (!username || !password) {
