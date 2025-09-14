@@ -110,6 +110,8 @@ const WorkTimeManagement = () => {
                   sessions={historyData?.history || []}
                   onEdit={setEditSession}
                   onDelete={handleDelete}
+                  month={currentMonth}
+                  targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
                 />
               )}
             </Card.Body>
