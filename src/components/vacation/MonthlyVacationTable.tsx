@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { Table, Button } from 'react-bootstrap';
-import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays, isBefore } from 'date-fns';
+import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays, isAfter } from 'date-fns';
 import type { VacationRequest } from '@/types/vacation';
 import type { ChatUser } from '@/types/chat';
 import { Trash2 } from 'lucide-react';
@@ -72,15 +72,27 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
 
   const handleCellClick = (userId: string, date: Date) => {
     if (editingRequest && editingRequest.user_id === userId) {
-      const startDate = parseISO(editingRequest.start_date);
+      const originalStart = parseISO(editingRequest.start_date);
+      const originalEnd = parseISO(editingRequest.end_date);
       const newDate = date;
-      
-      let newStart = startDate;
-      let newEnd = newDate;
 
-      if (isBefore(newDate, startDate)) {
+      // Decide whether to move the start or end date based on which is closer
+      const diffToStart = Math.abs(differenceInCalendarDays(newDate, originalStart));
+      const diffToEnd = Math.abs(differenceInCalendarDays(newDate, originalEnd));
+
+      let newStart, newEnd;
+
+      if (diffToStart <= diffToEnd) {
         newStart = newDate;
-        newEnd = startDate;
+        newEnd = originalEnd;
+      } else {
+        newStart = originalStart;
+        newEnd = newDate;
+      }
+
+      // Ensure start is always before end
+      if (isAfter(newStart, newEnd)) {
+        [newStart, newEnd] = [newEnd, newStart];
       }
       
       onUpdateRequest(editingRequest.id, format(newStart, 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
@@ -138,10 +150,10 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                     key={vacation.id}
                     className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 vacation-bar ${getStatusClass(vacation.status)} ${isEditing ? 'is-editing' : ''}`}
                     style={{
-                      top: '5px',
+                      top: '8px',
                       left: `${left + 1}px`,
                       width: `${width}px`,
-                      height: '30px',
+                      height: '24px',
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
                       cursor: 'pointer',
