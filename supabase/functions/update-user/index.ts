@@ -7,40 +7,47 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log("--- [update-user] Function invoked ---");
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
+    const { data: permissions, error: permError } = await userClient.rpc('get_my_permissions');
+    if (permError) throw permError;
+
+    const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
+    const canManageUsers = permissionNames.includes('users.manage');
+    const canManagePersonnel = permissionNames.includes('personnel_files.manage');
+
+    if (!canManageUsers && !canManagePersonnel) {
+        return new Response(JSON.stringify({ error: 'Forbidden: You do not have permission to update user data.' }), { status: 403 });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const body = await req.json()
-    console.log("[update-user] Step 1: Received request body:", body);
     const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate, workGroupIds, entryDate, exitDate } = body;
 
     if (!userId) {
-      console.error("[update-user] Error: User ID is missing.");
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
     }
-    console.log(`[update-user] Step 2: Processing update for user ID: ${userId}`);
-
-    // 1. Update user metadata in auth.users
-    console.log("[update-user] Step 3: Updating auth.users metadata...");
+    
     await supabaseAdmin.auth.admin.updateUserById(
       userId,
       { user_metadata: { first_name: firstName, last_name: lastName, username } }
     )
-    console.log("[update-user] Step 3.1: auth.users metadata updated.");
     
-    // 2. Upsert profile data
-    console.log("[update-user] Step 4: Upserting public.profiles data...");
     await supabaseAdmin
       .from('profiles')
       .upsert({ 
@@ -54,11 +61,8 @@ serve(async (req) => {
         entry_date: entryDate || null,
         exit_date: exitDate || null,
       })
-    console.log("[update-user] Step 4.1: public.profiles data upserted.");
 
-    // 3. Handle work hours history
     if (hoursPerWeek !== null && hoursPerWeek !== undefined) {
-      console.log(`[update-user] Step 5: Handling work hours. Received: ${hoursPerWeek}`);
       const { data: latestHours, error: latestHoursError } = await supabaseAdmin
         .from('work_hours_history')
         .select('hours_per_week')
@@ -67,61 +71,47 @@ serve(async (req) => {
         .limit(1)
         .single();
 
-      if (latestHoursError && latestHoursError.code !== 'PGRST116') { // Ignore "no rows found" error
+      if (latestHoursError && latestHoursError.code !== 'PGRST116') {
         throw latestHoursError;
       }
 
-      if (!latestHours || latestHours.hours_per_week !== hoursPerWeek) {
-        console.log("[update-user] Step 5.1: New work hours detected. Inserting new history record.");
+      if (!latestHours || Number(latestHours.hours_per_week) !== hoursPerWeek) {
         await supabaseAdmin.from('work_hours_history').insert({
           user_id: userId,
           hours_per_week: hoursPerWeek,
-          effective_date: new Date().toISOString().split('T')[0], // Today's date
+          effective_date: new Date().toISOString().split('T')[0],
         });
-        console.log("[update-user] Step 5.2: New history record inserted.");
-      } else {
-        console.log("[update-user] Step 5.1: Work hours are unchanged. Skipping history insert.");
       }
     }
 
-    // 4. Update user roles, ONLY if roleIds are provided in the request
     if (roleIds !== undefined) {
-      console.log(`[update-user] Step 6: Updating user roles. Received role IDs: ${roleIds}`);
       await supabaseAdmin.from('user_roles').delete().eq('user_id', userId)
-      console.log("[update-user] Step 6.1: Existing roles deleted.");
       if (roleIds && roleIds.length > 0) {
         const rolesToInsert = roleIds.map((roleId: number) => ({
           user_id: userId,
           role_id: roleId,
         }));
         await supabaseAdmin.from('user_roles').insert(rolesToInsert)
-        console.log("[update-user] Step 6.2: New roles inserted.");
       }
     }
 
-    // 5. Update user work groups, ONLY if workGroupIds are provided
     if (workGroupIds !== undefined) {
-      console.log(`[update-user] Step 7: Updating user work groups. Received group IDs: ${workGroupIds}`);
       await supabaseAdmin.from('user_work_groups').delete().eq('user_id', userId)
-      console.log("[update-user] Step 7.1: Existing work groups deleted.");
       if (workGroupIds && workGroupIds.length > 0) {
         const groupsToInsert = workGroupIds.map((groupId: number) => ({
           user_id: userId,
           work_group_id: groupId,
         }));
         await supabaseAdmin.from('user_work_groups').insert(groupsToInsert)
-        console.log("[update-user] Step 7.2: New work groups inserted.");
       }
     }
 
-    console.log("--- [update-user] Function finished successfully ---");
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (e) {
-    console.error("--- [update-user] FUNCTION CRASHED ---", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

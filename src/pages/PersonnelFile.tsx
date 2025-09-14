@@ -12,14 +12,24 @@ import { format, parseISO } from 'date-fns';
 import { EmailAccountForm } from '@/components/user/EmailAccountForm';
 import { GarnishmentsTab } from '@/components/user/GarnishmentsTab';
 
+const numberPreprocess = z.preprocess(
+  (val) => (String(val).trim() === '' ? null : Number(val)),
+  z.number({ invalid_type_error: "Muss eine Zahl sein." }).nullable().optional()
+);
+
+const intPreprocess = z.preprocess(
+  (val) => (String(val).trim() === '' ? null : Number(val)),
+  z.number({ invalid_type_error: "Muss eine Zahl sein." }).int("Muss eine ganze Zahl sein.").nullable().optional()
+);
+
 const formSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
   lastName: z.string().min(1, "Nachname ist erforderlich."),
   username: z.string().min(3, "Benutzername muss mind. 3 Zeichen haben.").regex(/^[a-zA-Z0-9_]+$/, "Nur Buchstaben, Zahlen und Unterstriche."),
   birthDate: z.string().nullable().optional(),
-  vacationDays: z.coerce.number().int("Muss eine ganze Zahl sein.").optional().nullable(),
-  commuteKm: z.coerce.number().int("Muss eine ganze Zahl sein.").optional().nullable(),
-  hoursPerWeek: z.coerce.number().optional().nullable(),
+  vacationDays: intPreprocess,
+  commuteKm: intPreprocess,
+  hoursPerWeek: numberPreprocess,
   entryDate: z.string().nullable().optional(),
   exitDate: z.string().nullable().optional(),
 });
@@ -77,11 +87,16 @@ const PersonnelFile = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern."),
   });
 
+  const onFormErrors = (errors: any) => {
+    console.error("Form validation errors:", errors);
+    showError("Bitte überprüfen Sie Ihre Eingaben. Einige Felder sind fehlerhaft.");
+  };
+
   if (isLoading) return <p>Lade Personalakte...</p>;
   if (!user) return <p>Benutzer nicht gefunden.</p>;
 
   return (
-    <Form onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+    <Form onSubmit={form.handleSubmit((v) => mutation.mutate(v), onFormErrors)}>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div className="d-flex align-items-center gap-3">
           <NavLink to="/users" className="btn btn-outline-secondary p-2 lh-1"><ArrowLeft size={16} /></NavLink>
