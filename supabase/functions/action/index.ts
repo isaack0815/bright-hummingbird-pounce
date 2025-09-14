@@ -423,6 +423,27 @@ serve(async (req) => {
         if (error) throw error;
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
+      case 'toggle-vacation-status': {
+        const permissionNames = await getPermissions();
+        if (!permissionNames.includes('vacations.manage')) {
+            throw new Error("Permission denied.");
+        }
+        const { requestId } = payload;
+        if (!requestId) throw new Error("Request ID is required.");
+        
+        const { data: request, error: fetchError } = await supabaseAdmin.from('vacation_requests').select('status').eq('id', requestId).single();
+        if (fetchError) throw fetchError;
+
+        let newStatus;
+        if (request.status === 'approved') newStatus = 'work_free';
+        else if (request.status === 'work_free') newStatus = 'approved';
+        else return new Response(JSON.stringify({ success: false, message: "Status can only be toggled for approved/work_free requests." }), { status: 200, headers: corsHeaders });
+
+        const { error: updateError } = await supabaseAdmin.from('vacation_requests').update({ status: newStatus }).eq('id', requestId);
+        if (updateError) throw updateError;
+
+        return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+      }
 
       default:
         return new Response(JSON.stringify({ error: 'Ungültige Aktion' }), {

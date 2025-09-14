@@ -13,9 +13,10 @@ type MonthlyVacationTableProps = {
   onCellClick: (userId: string, date: Date) => void;
   onDeleteRequest: (requestId: number) => void;
   onUpdateRequest: (requestId: number, startDate: string, endDate: string) => void;
+  onToggleStatus: (requestId: number) => void;
 };
 
-export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick, onDeleteRequest, onUpdateRequest }: MonthlyVacationTableProps) => {
+export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick, onDeleteRequest, onUpdateRequest, onToggleStatus }: MonthlyVacationTableProps) => {
   const headerRef = useRef<HTMLTableSectionElement>(null);
   const [cellWidth, setCellWidth] = useState(35);
   const [firstColWidth, setFirstColWidth] = useState(150);
@@ -77,7 +78,6 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
       const originalEnd = parseISO(editingRequest.end_date);
       const newDate = date;
 
-      // Decide whether to move the start or end date based on which is closer
       const diffToStart = Math.abs(differenceInCalendarDays(newDate, originalStart));
       const diffToEnd = Math.abs(differenceInCalendarDays(newDate, originalEnd));
 
@@ -91,7 +91,6 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
         newEnd = newDate;
       }
 
-      // Ensure start is always before end
       if (isAfter(newStart, newEnd)) {
         [newStart, newEnd] = [newEnd, newStart];
       }
@@ -169,6 +168,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                       cursor: 'pointer',
                     }}
                     onClick={(e) => { e.stopPropagation(); setEditingRequest(isEditing ? null : vacation); }}
+                    onDoubleClick={(e) => { e.stopPropagation(); onToggleStatus(vacation.id); }}
                     title={isEditing ? "Wählen Sie ein neues Start- oder Enddatum" : `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`}
                   >
                     <span>{isEditing ? 'Bearbeiten...' : getBarText(vacation.status)}</span>

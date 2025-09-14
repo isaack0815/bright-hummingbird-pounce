@@ -69,6 +69,8 @@ const VacationRequestManagement = () => {
         showSuccess(`Eintrag erstellt.`);
       } else if (variables.action === 'update-vacation-request') {
         showSuccess("Urlaub erfolgreich aktualisiert!");
+      } else if (variables.action === 'toggle-vacation-status') {
+        showSuccess("Status geändert.");
       } else {
         showSuccess(`Aktion erfolgreich ausgeführt.`);
       }
@@ -117,6 +119,17 @@ const VacationRequestManagement = () => {
     });
   };
 
+  const handleToggleStatus = (requestId: number) => {
+    if (!canManage) {
+      showError("Nur Manager können den Status ändern.");
+      return;
+    }
+    manageRequestMutation.mutate({
+      action: 'toggle-vacation-status',
+      payload: { requestId },
+    });
+  };
+
   const pendingRequests = useMemo(() => {
     return requests?.filter(r => r.status === 'pending') || [];
   }, [requests]);
@@ -158,6 +171,7 @@ const VacationRequestManagement = () => {
                     onCellClick={handleCellClick}
                     onDeleteRequest={handleDeleteRequest}
                     onUpdateRequest={handleUpdateRequest}
+                    onToggleStatus={handleToggleStatus}
                   />
                 </Card.Body>
               </Card>
