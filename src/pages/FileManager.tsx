@@ -12,6 +12,7 @@ import { SendFileDialog } from '@/components/file-manager/SendFileDialog';
 import { FileHistoryModal } from '@/components/file-manager/FileHistoryModal';
 import type { OrderFileWithDetails, VehicleFileWithDetails } from '@/types/files';
 import TablePlaceholder from '@/components/TablePlaceholder';
+import type { VehicleFileCategory } from '@/types/vehicle';
 
 const fetchAllFiles = async (): Promise<{ orderFiles: OrderFileWithDetails[], vehicleFiles: VehicleFileWithDetails[] }> => {
   const [orderFilesRes, vehicleFilesRes] = await Promise.all([
@@ -33,6 +34,14 @@ const fetchParentEntities = async () => {
   return { orders: ordersRes.data.orders, vehicles: vehiclesRes.data.vehicles };
 };
 
+const fetchVehicleFileCategories = async (): Promise<VehicleFileCategory[]> => {
+    const { data, error } = await supabase.functions.invoke('action', {
+      body: { action: 'get-vehicle-file-categories' }
+    });
+    if (error) throw new Error(error.message);
+    return data.categories;
+};
+
 const FileManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -43,11 +52,13 @@ const FileManager = () => {
   const [fileToShowHistory, setFileToShowHistory] = useState<OrderFileWithDetails | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<{ type: 'order' | 'vehicle', id: number } | null>(null);
   const [draggedOverFolder, setDraggedOverFolder] = useState<{ type: 'order' | 'vehicle', id: number } | null>(null);
+  const [selectedVehicleCategoryId, setSelectedVehicleCategoryId] = useState<number | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: allFiles, isLoading } = useQuery({ queryKey: ['allFiles'], queryFn: fetchAllFiles });
   const { data: parentEntities, isLoading: isLoadingParents } = useQuery({ queryKey: ['parentEntities'], queryFn: fetchParentEntities });
+  const { data: vehicleFileCategories } = useQuery({ queryKey: ['vehicleFileCategories'], queryFn: fetchVehicleFileCategories });
 
   const deleteMutation = useMutation({
     mutationFn: async (file: OrderFileWithDetails | VehicleFileWithDetails) => {
@@ -152,29 +163,22 @@ const FileManager = () => {
     return { orderFolders, vehicleFolders };
   }, [allFiles]);
 
-  const filteredOrderFolders = useMemo(() => {
-    const orderEntries = Array.from(orderFolders.entries());
-    if (!searchTerm) return orderEntries;
-    const lowerCaseSearch = searchTerm.toLowerCase();
-    return orderEntries.filter(([, data]) =>
-      (data.name || '').toLowerCase().includes(lowerCaseSearch)
-    );
-  }, [orderFolders, searchTerm]);
-
-  const filteredVehicleFolders = useMemo(() => {
-    const vehicleEntries = Array.from(vehicleFolders.entries());
-    if (!searchTerm) return vehicleEntries;
-    const lowerCaseSearch = searchTerm.toLowerCase();
-    return vehicleEntries.filter(([, data]) =>
-      (data.name || '').toLowerCase().includes(lowerCaseSearch)
-    );
-  }, [vehicleFolders, searchTerm]);
+  const filteredOrderFolders = useMemo(() => Array.from(orderFolders.entries()).filter(([, data]) => (data.name || '').toLowerCase().includes(searchTerm.toLowerCase())), [orderFolders, searchTerm]);
+  const filteredVehicleFolders = useMemo(() => Array.from(vehicleFolders.entries()).filter(([, data]) => (data.name || '').toLowerCase().includes(searchTerm.toLowerCase())), [vehicleFolders, searchTerm]);
 
   const selectedFiles = useMemo(() => {
     if (!selectedFolder) return [];
-    if (selectedFolder.type === 'order') return orderFolders.get(selectedFolder.id)?.files || [];
-    return vehicleFolders.get(selectedFolder.id)?.files || [];
-  }, [selectedFolder, orderFolders, vehicleFolders]);
+    let files: (OrderFileWithDetails | VehicleFileWithDetails)[] = [];
+    if (selectedFolder.type === 'order') {
+      files = orderFolders.get(selectedFolder.id)?.files || [];
+    } else {
+      files = vehicleFolders.get(selectedFolder.id)?.files || [];
+      if (selectedVehicleCategoryId) {
+        files = files.filter(file => (file as VehicleFileWithDetails & { category_id?: number }).category_id === selectedVehicleCategoryId);
+      }
+    }
+    return files;
+  }, [selectedFolder, orderFolders, vehicleFolders, selectedVehicleCategoryId]);
 
   const orderOptions = parentEntities?.orders.map((o: any) => ({ value: o.id, label: o.order_number })) || [];
   const vehicleOptions = parentEntities?.vehicles.map((v: any) => ({ value: v.id, label: v.license_plate })) || [];
@@ -225,7 +229,19 @@ const FileManager = () => {
         </Col>
         <Col md={8}>
           <Card>
-            <Card.Header><Card.Title>{selectedFolder ? `Dateien für ${selectedFolder.type === 'order' ? orderFolders.get(selectedFolder.id)?.name : vehicleFolders.get(selectedFolder.id)?.name}` : 'Dateien'}</Card.Title></Card.Header>
+            <Card.Header>
+                <div className="d-flex justify-content-between align-items-center">
+                    <Card.Title className="mb-0">{selectedFolder ? `Dateien für ${selectedFolder.type === 'order' ? orderFolders.get(selectedFolder.id)?.name : vehicleFolders.get(selectedFolder.id)?.name}` : 'Dateien'}</Card.Title>
+                    {selectedFolder?.type === 'vehicle' && (
+                        <div style={{width: '250px'}}>
+                            <Form.Select size="sm" value={selectedVehicleCategoryId || ''} onChange={e => setSelectedVehicleCategoryId(Number(e.target.value) || null)}>
+                                <option value="">Alle Kategorien</option>
+                                {vehicleFileCategories?.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                            </Form.Select>
+                        </div>
+                    )}
+                </div>
+            </Card.Header>
             <Card.Body>
               {isLoading ? <TablePlaceholder /> : !selectedFolder ? <div className="text-center text-muted py-5">Bitte wählen Sie links einen Ordner aus.</div> : (
                 <Table responsive hover>
