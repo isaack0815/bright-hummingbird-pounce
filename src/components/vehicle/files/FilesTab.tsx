@@ -37,7 +37,7 @@ const FilesTab = ({ vehicleId }: { vehicleId: number | null }) => {
     }
     setUploading(true);
     try {
-      const filePath = `vehicle-files/${vehicleId}/${uuidv4()}-${selectedFile.name}`;
+      const filePath = `${vehicleId}/${uuidv4()}-${selectedFile.name}`;
       const { error: uploadError } = await supabase.storage.from('vehicle-files').upload(filePath, selectedFile);
       if (uploadError) throw uploadError;
 
