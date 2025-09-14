@@ -10,7 +10,9 @@ import type { CloudFolder, CloudFile } from '@/types/cloud';
 import { CreateFolderModal } from '@/components/cloud/CreateFolderModal';
 
 const fetchFileStructure = async (): Promise<{ folders: CloudFolder[], files: CloudFile[] }> => {
-  const { data, error } = await supabase.functions.invoke('get-file-structure');
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-file-structure' }
+  });
   if (error) throw new Error(error.message);
   return data;
 };
