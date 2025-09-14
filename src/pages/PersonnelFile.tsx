@@ -20,6 +20,8 @@ const formSchema = z.object({
   vacationDays: z.coerce.number().optional(),
   commuteKm: z.coerce.number().optional(),
   hoursPerWeek: z.coerce.number().optional(),
+  entryDate: z.string().nullable().optional(),
+  exitDate: z.string().nullable().optional(),
 });
 
 const fetchUserDetails = async (userId: string) => {
@@ -54,6 +56,8 @@ const PersonnelFile = () => {
         vacationDays: user.vacation_days_per_year || undefined,
         commuteKm: user.commute_km || undefined,
         hoursPerWeek: user.work_hours_history?.[0]?.hours_per_week || undefined,
+        entryDate: user.entry_date ? format(parseISO(user.entry_date), 'yyyy-MM-dd') : "",
+        exitDate: user.exit_date ? format(parseISO(user.exit_date), 'yyyy-MM-dd') : "",
       });
     }
   }, [user, form]);
@@ -106,6 +110,8 @@ const PersonnelFile = () => {
                 <Col md={4}><Form.Group><Form.Label>Urlaubstage / Jahr</Form.Label><Form.Control type="number" {...form.register("vacationDays")} /></Form.Group></Col>
                 <Col md={4}><Form.Group><Form.Label>Anfahrt (km)</Form.Label><Form.Control type="number" {...form.register("commuteKm")} /></Form.Group></Col>
                 <Col md={4}><Form.Group><Form.Label>Aktuelle Stunden / Woche</Form.Label><Form.Control type="number" step="0.01" {...form.register("hoursPerWeek")} /></Form.Group></Col>
+                <Col md={6}><Form.Group><Form.Label>Eintrittsdatum</Form.Label><Form.Control type="date" {...form.register("entryDate")} /></Form.Group></Col>
+                <Col md={6}><Form.Group><Form.Label>Austrittsdatum</Form.Label><Form.Control type="date" {...form.register("exitDate")} /></Form.Group></Col>
               </Row>
             </Tab>
             <Tab eventKey="garnishments" title="Pfändungen">

@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const body = await req.json()
     console.log("[update-user] Step 1: Received request body:", body);
-    const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate, workGroupIds } = body;
+    const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate, workGroupIds, entryDate, exitDate } = body;
 
     if (!userId) {
       console.error("[update-user] Error: User ID is missing.");
@@ -51,6 +51,8 @@ serve(async (req) => {
         vacation_days_per_year: vacationDays,
         commute_km: commuteKm,
         birth_date: birthDate || null,
+        entry_date: entryDate || null,
+        exit_date: exitDate || null,
       })
     console.log("[update-user] Step 4.1: public.profiles data upserted.");
 

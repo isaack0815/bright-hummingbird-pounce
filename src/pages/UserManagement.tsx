@@ -19,6 +19,7 @@ type User = {
   username?: string | null;
   roles: { id: number; name: string }[];
   work_groups: { id: number; name: string }[];
+  entry_date?: string | null;
 };
 
 const fetchUsers = async (): Promise<User[]> => {
@@ -106,7 +107,7 @@ const UserManagement = () => {
                   <th>Email</th>
                   <th>Berechtigung</th>
                   <th>Arbeitsgruppen</th>
-                  <th>Erstellt am</th>
+                  <th>Eintritt</th>
                   <th className="text-end">Aktionen</th>
                 </tr>
               </thead>
@@ -136,7 +137,7 @@ const UserManagement = () => {
                         )}
                       </div>
                     </td>
-                    <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                    <td>{user.entry_date ? new Date(user.entry_date).toLocaleDateString() : '-'}</td>
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
                         {hasPermission('personnel_files.manage') && (
