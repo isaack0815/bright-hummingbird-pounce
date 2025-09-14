@@ -222,9 +222,31 @@ serve(async (req) => {
       case 'get-file-shares': {
         const { fileId } = payload;
         if (!fileId) return new Response(JSON.stringify({ error: 'File ID is required' }), { status: 400 });
-        const { data, error } = await supabase.from('file_shares').select('shared_with_user_id, profiles:shared_with_user_id(first_name, last_name)').eq('file_id', fileId);
-        if (error) throw error;
-        return new Response(JSON.stringify({ shares: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        
+        const { data: shares, error: sharesError } = await supabase
+          .from('file_shares')
+          .select('shared_with_user_id')
+          .eq('file_id', fileId);
+        if (sharesError) throw sharesError;
+        if (!shares || shares.length === 0) {
+            return new Response(JSON.stringify({ shares: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+
+        const userIds = shares.map(s => s.shared_with_user_id);
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', userIds);
+        if (profilesError) throw profilesError;
+
+        const profilesMap = new Map(profiles.map(p => [p.id, p]));
+        const combinedShares = shares.map(share => ({
+            ...share,
+            profiles: profilesMap.get(share.shared_with_user_id) || null
+        }));
+
+        return new Response(JSON.stringify({ shares: combinedShares }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
       case 'share-file': {
