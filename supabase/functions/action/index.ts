@@ -79,54 +79,6 @@ serve(async (req) => {
         });
       }
 
-      case 'get-file-structure': {
-        if (!user) throw new Error("User not found")
-
-        const { data: folders, error: foldersError } = await supabase
-          .from('folders')
-          .select('*')
-          .eq('created_by', user.id)
-
-        if (foldersError) throw foldersError
-
-        const { data: files, error: filesError } = await supabase
-          .from('files')
-          .select('*')
-          .eq('created_by', user.id)
-
-        if (filesError) throw filesError
-
-        return new Response(JSON.stringify({ folders, files }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
-      }
-
-      case 'create-folder': {
-        if (!user) throw new Error("User not found")
-        const { name, parent_folder_id } = payload;
-
-        if (!name) {
-          return new Response(JSON.stringify({ error: 'Folder name is required' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-          })
-        }
-
-        const { data, error } = await supabase
-          .from('folders')
-          .insert({ name, parent_folder_id: parent_folder_id || null })
-          .select()
-          .single()
-
-        if (error) throw error
-
-        return new Response(JSON.stringify({ folder: data }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 201,
-        })
-      }
-
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
