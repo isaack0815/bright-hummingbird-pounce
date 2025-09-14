@@ -63,6 +63,10 @@ serve(async (req) => {
         const { data, error } = await supabase.rpc('get_my_permissions');
         if (error) throw error;
         const permissions = data.map((p: any) => p.permission_name);
+        // Super admin check: if user can manage roles and users, they can do anything.
+        if (permissions.includes('roles.manage') && permissions.includes('users.manage')) {
+            return true;
+        }
         return permissions.includes(permission);
     };
 
