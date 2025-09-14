@@ -152,8 +152,23 @@ const FileManager = () => {
     return { orderFolders, vehicleFolders };
   }, [allFiles]);
 
-  const filteredOrderFolders = useMemo(() => Array.from(orderFolders.entries()).filter(([, data]) => data.name.toLowerCase().includes(searchTerm.toLowerCase())), [orderFolders, searchTerm]);
-  const filteredVehicleFolders = useMemo(() => Array.from(vehicleFolders.entries()).filter(([, data]) => data.name.toLowerCase().includes(searchTerm.toLowerCase())), [vehicleFolders, searchTerm]);
+  const filteredOrderFolders = useMemo(() => {
+    const orderEntries = Array.from(orderFolders.entries());
+    if (!searchTerm) return orderEntries;
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    return orderEntries.filter(([, data]) =>
+      (data.name || '').toLowerCase().includes(lowerCaseSearch)
+    );
+  }, [orderFolders, searchTerm]);
+
+  const filteredVehicleFolders = useMemo(() => {
+    const vehicleEntries = Array.from(vehicleFolders.entries());
+    if (!searchTerm) return vehicleEntries;
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    return vehicleEntries.filter(([, data]) =>
+      (data.name || '').toLowerCase().includes(lowerCaseSearch)
+    );
+  }, [vehicleFolders, searchTerm]);
 
   const selectedFiles = useMemo(() => {
     if (!selectedFolder) return [];
