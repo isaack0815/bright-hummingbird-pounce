@@ -16,13 +16,26 @@ const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> =>
   const endDate = `${year}-12-31`;
 
   const { data: requests, error } = await supabase
-    .from('vacation_requests')
-    .select('*, profiles(id, first_name, last_name)')
+    .from('vacation_requests_with_profiles')
+    .select('*')
     .lte('start_date', endDate)
     .gte('end_date', startDate);
   
   if (error) throw error;
-  return requests || [];
+
+  // Reshape the data to match the expected type structure
+  const formattedRequests = requests?.map(req => {
+    const { first_name, last_name, ...rest } = req;
+    return {
+      ...rest,
+      profiles: {
+        first_name,
+        last_name,
+      }
+    };
+  }) || [];
+
+  return formattedRequests as VacationRequest[];
 };
 
 const VacationRequestManagement = () => {
