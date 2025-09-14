@@ -5,12 +5,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Card, Row, Col, Button, Form, Spinner, Tabs, Tab, Table } from 'react-bootstrap';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { EmailAccountForm } from '@/components/user/EmailAccountForm';
 import { GarnishmentsTab } from '@/components/user/GarnishmentsTab';
+import { useAuth } from '@/contexts/AuthContext';
 
 const numberPreprocess = z.preprocess(
   (val) => (String(val).trim() === '' ? null : Number(val)),
@@ -45,6 +46,7 @@ const fetchUserDetails = async (userId: string) => {
 const PersonnelFile = () => {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
 
   const { data: user, isLoading } = useQuery({
     queryKey: ['userDetails', id],
@@ -86,6 +88,26 @@ const PersonnelFile = () => {
     },
     onError: (err: any) => showError(err.message || "Fehler beim Speichern."),
   });
+
+  const deleteHistoryMutation = useMutation({
+    mutationFn: async (historyId: number) => {
+        const { error } = await supabase.functions.invoke('action', {
+            body: { action: 'delete-work-hour-history', payload: { id: historyId } }
+        });
+        if (error) throw error;
+    },
+    onSuccess: () => {
+        showSuccess("Historien-Eintrag gelöscht.");
+        queryClient.invalidateQueries({ queryKey: ['userDetails', id] });
+    },
+    onError: (err: any) => showError(err.message || "Fehler beim Löschen des Eintrags."),
+  });
+
+  const handleDeleteHistory = (historyId: number) => {
+    if (window.confirm("Möchten Sie diesen Eintrag wirklich löschen?")) {
+        deleteHistoryMutation.mutate(historyId);
+    }
+  };
 
   const onFormErrors = (errors: any) => {
     console.error("Form validation errors:", errors);
@@ -137,12 +159,19 @@ const PersonnelFile = () => {
             <Tab eventKey="history" title="Stundenhistorie">
               <div className="pt-3">
                 <Table striped bordered hover size="sm">
-                  <thead><tr><th>Stunden / Woche</th><th>Gültig ab</th></tr></thead>
+                  <thead><tr><th>Stunden / Woche</th><th>Gültig ab</th>{hasPermission('personnel_files.manage') && <th>Aktionen</th>}</tr></thead>
                   <tbody>
                     {user.work_hours_history?.map((entry: any) => (
                       <tr key={entry.id}>
                         <td>{entry.hours_per_week}</td>
                         <td>{new Date(entry.effective_date).toLocaleDateString('de-DE')}</td>
+                        {hasPermission('personnel_files.manage') && (
+                            <td className="text-center">
+                                <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDeleteHistory(entry.id)}>
+                                    <Trash2 size={16} />
+                                </Button>
+                            </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
