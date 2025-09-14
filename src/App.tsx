@@ -40,6 +40,7 @@ const DutyRoster = lazy(() => import('@/pages/DutyRoster'));
 const OrderImport = lazy(() => import('@/pages/OrderImport'));
 const VerizonConnect = lazy(() => import('@/pages/VerizonConnect'));
 const WorkTimeManagement = lazy(() => import('@/pages/WorkTimeManagement'));
+const WorkTimeAdministration = lazy(() => import('@/pages/WorkTimeAdministration'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -86,6 +87,7 @@ const AppRoutes = () => {
             <Route path="/order-import" element={<ProtectedRoute><OrderImport /></ProtectedRoute>} />
             <Route path="/verizon-connect" element={<ProtectedRoute><VerizonConnect /></ProtectedRoute>} />
             <Route path="/work-time" element={<WorkTimeManagement />} />
+            <Route path="/work-time-admin" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAdministration /></ProtectedRoute>} />
             <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<NotFound />} />

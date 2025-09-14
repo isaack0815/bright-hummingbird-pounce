@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Spinner, Button } from 'react-bootstrap';
-import { TimeClock } from '@/components/work-time/TimeClock';
+import { Card, Row, Col, Spinner, Button, Form } from 'react-bootstrap';
 import { WorkTimeHistory } from '@/components/work-time/WorkTimeHistory';
 import { EditWorkTimeDialog } from '@/components/work-time/EditWorkTimeDialog';
 import { WorkTimeSummary } from '@/components/work-time/WorkTimeSummary';
@@ -10,6 +9,8 @@ import { showError, showSuccess } from '@/utils/toast';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Select from 'react-select';
+import type { ChatUser } from '@/types/chat';
 
 type WorkSession = {
   id: number;
@@ -27,35 +28,44 @@ const manageWorkTime = async (action: string, payload: any = {}) => {
   return data;
 };
 
-const WorkTimeManagement = () => {
+const fetchUsers = async (): Promise<ChatUser[]> => {
+  const { data, error } = await supabase.functions.invoke('get-chat-users');
+  if (error) throw new Error(error.message);
+  return data.users;
+};
+
+const WorkTimeAdministration = () => {
   const [editSession, setEditSession] = useState<WorkSession | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: statusData, isLoading: isLoadingStatus } = useQuery({
-    queryKey: ['workTimeStatus'],
-    queryFn: () => manageWorkTime('get-status'),
+  const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
+    queryKey: ['chatUsers'],
+    queryFn: fetchUsers,
   });
 
   const monthRange = useMemo(() => ({
     startDate: startOfMonth(currentMonth).toISOString(),
     endDate: endOfMonth(currentMonth).toISOString(),
-  }), [currentMonth]);
+    userId: selectedUserId,
+  }), [currentMonth, selectedUserId]);
 
   const { data: historyData, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['workTimeHistory', monthRange],
     queryFn: () => manageWorkTime('get-history', monthRange),
+    enabled: !!selectedUserId,
   });
 
-  const { data: workDetails } = useQuery({
-    queryKey: ['userWorkDetails'],
-    queryFn: () => manageWorkTime('get-user-work-details'),
+  const { data: workDetails, isLoading: isLoadingDetails } = useQuery({
+    queryKey: ['userWorkDetails', selectedUserId],
+    queryFn: () => manageWorkTime('get-user-work-details', { userId: selectedUserId }),
+    enabled: !!selectedUserId,
   });
 
   const mutation = useMutation({
     mutationFn: ({ action, payload }: { action: string, payload?: any }) => manageWorkTime(action, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workTimeStatus'] });
       queryClient.invalidateQueries({ queryKey: ['workTimeHistory', monthRange] });
       setEditSession(null);
     },
@@ -74,23 +84,25 @@ const WorkTimeManagement = () => {
     }
   };
 
+  const userOptions = users?.map(u => ({ value: u.id, label: `${u.first_name} ${u.last_name}` }));
+
   return (
     <>
-      <h1 className="h2 mb-4">Meine Zeiterfassung</h1>
-      <Row className="g-4">
-        <Col lg={4}>
-          <Card className="h-100">
-            <Card.Header><Card.Title>Stempeluhr</Card.Title></Card.Header>
-            <TimeClock
-              status={statusData?.status}
-              isLoading={isLoadingStatus}
-              onClockIn={() => mutation.mutate({ action: 'clock-in' })}
-              onClockOut={() => mutation.mutate({ action: 'clock-out' })}
-              isMutating={mutation.isPending}
-            />
-          </Card>
-        </Col>
-        <Col lg={8}>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="h2">Personal-Zeiterfassung</h1>
+        <div style={{ width: '300px' }}>
+          <Select
+            options={userOptions}
+            isLoading={isLoadingUsers}
+            onChange={(opt) => setSelectedUserId(opt?.value || null)}
+            placeholder="Mitarbeiter auswählen..."
+            isClearable
+          />
+        </div>
+      </div>
+
+      {selectedUserId ? (
+        <>
           <WorkTimeSummary 
             sessions={historyData?.history || []}
             targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
@@ -105,7 +117,7 @@ const WorkTimeManagement = () => {
               </div>
             </Card.Header>
             <Card.Body>
-              {isLoadingHistory ? <div className="text-center"><Spinner /></div> : (
+              {isLoadingHistory || isLoadingDetails ? <div className="text-center"><Spinner /></div> : (
                 <WorkTimeHistory
                   sessions={historyData?.history || []}
                   onEdit={setEditSession}
@@ -114,8 +126,11 @@ const WorkTimeManagement = () => {
               )}
             </Card.Body>
           </Card>
-        </Col>
-      </Row>
+        </>
+      ) : (
+        <Card><Card.Body className="text-center text-muted py-5">Bitte wählen Sie einen Mitarbeiter aus.</Card.Body></Card>
+      )}
+
       <EditWorkTimeDialog
         show={!!editSession}
         onHide={() => setEditSession(null)}
@@ -126,4 +141,4 @@ const WorkTimeManagement = () => {
   );
 };
 
-export default WorkTimeManagement;
+export default WorkTimeAdministration;

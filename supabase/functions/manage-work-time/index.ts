@@ -22,14 +22,21 @@ serve(async (req) => {
 
     const { action, payload } = await req.json();
 
+    // Admin check for actions on other users
+    const checkAdminPermission = async () => {
+        const { data, error } = await supabase.rpc('get_my_permissions');
+        if (error) throw error;
+        const permissions = data.map((p: any) => p.permission_name);
+        return permissions.includes('work_time.manage');
+    };
+
     switch (action) {
       case 'get-status': {
-        const { data, error } = await supabase
-          .from('work_sessions')
-          .select('*')
-          .eq('user_id', user.id)
-          .is('end_time', null)
-          .maybeSingle();
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { data, error } = await supabase.from('work_sessions').select('*').eq('user_id', targetUserId).is('end_time', null).maybeSingle();
         if (error) throw error;
         return new Response(JSON.stringify({ status: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -48,13 +55,26 @@ serve(async (req) => {
         return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       case 'get-history': {
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
         const { startDate, endDate } = payload;
-        let query = supabase.from('work_sessions').select('*').eq('user_id', user.id).order('start_time', { ascending: false });
+        let query = supabase.from('work_sessions').select('*').eq('user_id', targetUserId).order('start_time', { ascending: false });
         if (startDate) query = query.gte('start_time', startDate);
         if (endDate) query = query.lte('start_time', endDate);
         const { data, error } = await query;
         if (error) throw error;
         return new Response(JSON.stringify({ history: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      case 'get-user-work-details': {
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { data, error } = await supabase.from('work_hours_history').select('hours_per_week').eq('user_id', targetUserId).order('effective_date', { ascending: false }).limit(1).single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return new Response(JSON.stringify({ details: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       case 'update': {
         const { id, ...updateData } = payload;
