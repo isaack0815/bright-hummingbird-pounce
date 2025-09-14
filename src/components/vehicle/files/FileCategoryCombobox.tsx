@@ -5,7 +5,9 @@ import type { VehicleFileCategory } from "@/types/vehicle"
 import CreatableSelect from 'react-select/creatable';
 
 const fetchCategories = async (): Promise<VehicleFileCategory[]> => {
-  const { data, error } = await supabase.functions.invoke('get-vehicle-file-categories');
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-vehicle-file-categories' }
+  });
   if (error) throw new Error(error.message);
   return data.categories;
 };
@@ -25,7 +27,9 @@ export function FileCategoryCombobox({ value, onChange }: FileCategoryComboboxPr
 
   const createMutation = useMutation({
     mutationFn: async (name: string): Promise<VehicleFileCategory> => {
-      const { data, error } = await supabase.functions.invoke('create-vehicle-file-category', { body: { name } });
+      const { data, error } = await supabase.functions.invoke('action', {
+        body: { action: 'create-vehicle-file-category', payload: { name } }
+      });
       if (error) throw error;
       return data.category;
     },

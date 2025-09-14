@@ -16,7 +16,9 @@ export const FileListItem = ({ file }: FileListItemProps) => {
 
   const deleteMutation = useMutation({
     mutationFn: async (fileId: number) => {
-      const { error } = await supabase.functions.invoke('delete-vehicle-file', { body: { fileId } });
+      const { error } = await supabase.functions.invoke('action', {
+        body: { action: 'delete-vehicle-file', payload: { fileId } }
+      });
       if (error) throw error;
     },
     onSuccess: () => {

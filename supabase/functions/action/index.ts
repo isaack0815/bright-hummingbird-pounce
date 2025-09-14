@@ -26,6 +26,14 @@ serve(async (req) => {
     
     const { data: { user } } = await supabase.auth.getUser()
 
+    const checkPermission = async (permission: string) => {
+        const { data: permissions, error } = await supabase.rpc('get_my_permissions');
+        if (error) throw error;
+        const permissionNames = permissions.map((p: any) => p.permission_name);
+        const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+        return isSuperAdmin || permissionNames.includes(permission);
+    }
+
     switch (action) {
       case 'login': {
         const { username, password } = payload;
@@ -77,6 +85,48 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
+      }
+
+      case 'get-vehicle-file-categories': {
+        if (!await checkPermission('vehicles.manage')) throw new Error('Forbidden');
+        const { data, error } = await supabaseAdmin.from('vehicle_file_categories').select('*').order('name');
+        if (error) throw error;
+        return new Response(JSON.stringify({ categories: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'create-vehicle-file-category': {
+        if (!await checkPermission('vehicles.manage')) throw new Error('Forbidden');
+        const { name } = payload;
+        if (!name) return new Response(JSON.stringify({ error: 'Category name is required' }), { status: 400 });
+        const { data, error } = await supabaseAdmin.from('vehicle_file_categories').insert({ name }).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ category: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'get-vehicle-files': {
+        if (!await checkPermission('vehicles.manage')) throw new Error('Forbidden');
+        const { vehicleId } = payload;
+        if (!vehicleId) return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
+        const { data, error } = await supabaseAdmin.from('vehicle_files_with_details').select('*').eq('vehicle_id', vehicleId).order('created_at', { ascending: false });
+        if (error) throw error;
+        return new Response(JSON.stringify({ files: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'delete-vehicle-file': {
+        if (!await checkPermission('vehicles.manage')) throw new Error('Forbidden');
+        const { fileId } = payload;
+        if (!fileId) return new Response(JSON.stringify({ error: 'File ID is required' }), { status: 400 });
+        
+        const { data: file, error: fetchError } = await supabaseAdmin.from('vehicle_files').select('file_path').eq('id', fileId).single();
+        if (fetchError) throw fetchError;
+
+        const { error: storageError } = await supabaseAdmin.storage.from('vehicle-files').remove([file.file_path]);
+        if (storageError) throw storageError;
+
+        const { error: dbError } = await supabaseAdmin.from('vehicle_files').delete().eq('id', fileId);
+        if (dbError) throw dbError;
+
+        return new Response(null, { status: 204, headers: corsHeaders });
       }
 
       default:

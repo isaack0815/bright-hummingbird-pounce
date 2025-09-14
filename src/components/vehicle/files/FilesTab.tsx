@@ -10,7 +10,9 @@ import { FileCategoryCombobox } from "./FileCategoryCombobox";
 import { FileListItem } from "./FileListItem";
 
 const fetchFiles = async (vehicleId: number): Promise<VehicleFile[]> => {
-  const { data, error } = await supabase.functions.invoke('get-vehicle-files', { body: { vehicleId } });
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-vehicle-files', payload: { vehicleId } }
+  });
   if (error) throw error;
   return data.files;
 };
