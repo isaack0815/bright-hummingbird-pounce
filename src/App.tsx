@@ -85,7 +85,7 @@ const AppRoutes = () => {
             <Route path="/menus" element={<MenuManagement />} />
             <Route path="/email" element={<EmailClient />} />
             <Route path="/simple-email" element={<SimpleEmailClient />} />
-            <Route path="/file-manager" element={<ProtectedRoute requiredPermission="files.manage"><FileManager /></ProtectedRoute>} />
+            <Route path="/file-manager" element={<ProtectedRoute requiredPermission="file_manager.access"><FileManager /></ProtectedRoute>} />
             <Route path="/order-import" element={<ProtectedRoute><OrderImport /></ProtectedRoute>} />
             <Route path="/verizon-connect" element={<ProtectedRoute><VerizonConnect /></ProtectedRoute>} />
             <Route path="/work-time" element={<WorkTimeManagement />} />
