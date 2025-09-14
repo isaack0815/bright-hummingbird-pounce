@@ -20,7 +20,7 @@ type WorkSession = {
 };
 
 const manageWorkTime = async (action: string, payload: any = {}) => {
-  const { data, error } = await supabase.functions.invoke('manage-work-time', {
+  const { data, error } = await supabase.functions.invoke('action', {
     body: { action, payload },
   });
   if (error) throw error;
@@ -34,7 +34,7 @@ const WorkTimeManagement = () => {
 
   const { data: statusData, isLoading: isLoadingStatus } = useQuery({
     queryKey: ['workTimeStatus'],
-    queryFn: () => manageWorkTime('get-status'),
+    queryFn: () => manageWorkTime('get-work-time-status'),
   });
 
   const monthRange = useMemo(() => ({
@@ -44,7 +44,7 @@ const WorkTimeManagement = () => {
 
   const { data: historyData, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['workTimeHistory', monthRange],
-    queryFn: () => manageWorkTime('get-history', monthRange),
+    queryFn: () => manageWorkTime('get-work-time-history', monthRange),
   });
 
   const { data: workDetails } = useQuery({
@@ -63,13 +63,13 @@ const WorkTimeManagement = () => {
   });
 
   const handleSave = (id: number, data: any) => {
-    mutation.mutate({ action: 'update', payload: { id, ...data } });
+    mutation.mutate({ action: 'update-work-time', payload: { id, ...data } });
     showSuccess("Eintrag gespeichert!");
   };
 
   const handleDelete = (id: number) => {
     if (window.confirm("Möchten Sie diesen Zeiteintrag wirklich löschen?")) {
-      mutation.mutate({ action: 'delete', payload: { id } });
+      mutation.mutate({ action: 'delete-work-time', payload: { id } });
       showSuccess("Eintrag gelöscht!");
     }
   };

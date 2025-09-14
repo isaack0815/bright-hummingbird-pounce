@@ -51,6 +51,21 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("User not found")
+
+    const checkAdminPermission = async () => {
+        const { data, error } = await supabase.rpc('get_my_permissions');
+        if (error) throw error;
+        const permissions = data.map((p: any) => p.permission_name);
+        return permissions.includes('work_time.manage');
+    };
+
     switch (action) {
       case 'login': {
         const { username, password } = payload;
@@ -74,22 +89,17 @@ serve(async (req) => {
             });
         }
 
-        const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+        const { data: { user: authUser }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
 
-        if (userError || !user || !user.email) {
+        if (userError || !authUser || !authUser.email) {
             return new Response(JSON.stringify({ error: 'Ungültige Anmeldedaten' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
         }
 
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-        );
-
         const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: user.email,
+            email: authUser.email,
             password: password,
         });
 
@@ -253,6 +263,65 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
+      }
+
+      // Work Time Actions
+      case 'get-work-time-status': {
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { data, error } = await supabase.from('work_sessions').select('*').eq('user_id', targetUserId).is('end_time', null).maybeSingle();
+        if (error) throw error;
+        return new Response(JSON.stringify({ status: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      case 'clock-in': {
+        const { data: existing, error: existingError } = await supabase.from('work_sessions').select('id').eq('user_id', user.id).is('end_time', null).single();
+        if (existingError && existingError.code !== 'PGRST116') throw existingError;
+        if (existing) throw new Error("Bereits eingestempelt.");
+        
+        const { data, error } = await supabase.from('work_sessions').insert({ user_id: user.id, start_time: new Date().toISOString() }).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+      case 'clock-out': {
+        const { data, error } = await supabase.from('work_sessions').update({ end_time: new Date().toISOString() }).eq('user_id', user.id).is('end_time', null).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      case 'get-work-time-history': {
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { startDate, endDate } = payload;
+        let query = supabase.from('work_sessions').select('*').eq('user_id', targetUserId).order('start_time', { ascending: false });
+        if (startDate) query = query.gte('start_time', startDate);
+        if (endDate) query = query.lte('start_time', endDate);
+        const { data, error } = await query;
+        if (error) throw error;
+        return new Response(JSON.stringify({ history: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      case 'get-user-work-details': {
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { data, error } = await supabase.from('work_hours_history').select('hours_per_week').eq('user_id', targetUserId).order('effective_date', { ascending: false }).limit(1).single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return new Response(JSON.stringify({ details: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      case 'update-work-time': {
+        const { id, ...updateData } = payload;
+        const { data, error } = await supabase.from('work_sessions').update(updateData).eq('id', id).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      case 'delete-work-time': {
+        const { id } = payload;
+        const { error } = await supabase.from('work_sessions').delete().eq('id', id);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
       }
 
       default:
