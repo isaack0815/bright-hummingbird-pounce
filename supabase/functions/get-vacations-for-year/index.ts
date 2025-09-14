@@ -27,22 +27,40 @@ serve(async (req) => {
 
     const { data: requests, error } = await supabase
       .from('vacation_requests')
-      .select('user_id, start_date, end_date, profiles(id, first_name, last_name)')
+      .select('user_id, start_date, end_date')
       .eq('status', 'approved')
       .lte('start_date', endDate)
       .gte('end_date', startDate);
 
     if (error) throw error;
+    if (!requests || requests.length === 0) {
+        return new Response(JSON.stringify({ vacations: [] }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
+
+    const userIds = [...new Set(requests.map(req => req.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+    
+    if (profilesError) throw profilesError;
+
+    const profilesMap = new Map(profiles.map(p => [p.id, p]));
 
     // Group by user
     const vacationsByUser = requests.reduce((acc: any, req: any) => {
-      if (!req.profiles) return acc;
+      const profile = profilesMap.get(req.user_id);
+      if (!profile) return acc;
+
       const userId = req.user_id;
       if (!acc[userId]) {
         acc[userId] = {
           userId,
-          firstName: req.profiles.first_name,
-          lastName: req.profiles.last_name,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
           vacations: [],
         };
       }
