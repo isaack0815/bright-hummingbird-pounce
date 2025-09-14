@@ -25,6 +25,7 @@ serve(async (req) => {
     )
     
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("User not authenticated");
 
     const checkPermission = async (permission: string) => {
         const { data: permissions, error } = await supabase.rpc('get_my_permissions');
@@ -35,6 +36,7 @@ serve(async (req) => {
     }
 
     switch (action) {
+      // ... existing cases
       case 'login': {
         const { username, password } = payload;
         if (!username || !password) {
@@ -147,6 +149,50 @@ serve(async (req) => {
         const { filePath } = payload;
         if (!filePath) return new Response(JSON.stringify({ error: 'filePath is required' }), { status: 400 });
         const { data, error } = await supabaseAdmin.storage.from('vehicle-files').createSignedUrl(filePath, 60);
+        if (error) throw error;
+        return new Response(JSON.stringify({ signedUrl: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      // New cases for personal file manager
+      case 'get-user-files-and-folders': {
+        const { data: folders, error: foldersError } = await supabase.from('user_folders').select('*').order('name');
+        if (foldersError) throw foldersError;
+        const { data: files, error: filesError } = await supabase.from('user_files').select('*').order('file_name');
+        if (filesError) throw filesError;
+        return new Response(JSON.stringify({ folders, files }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'create-user-folder': {
+        const { name, parent_folder_id } = payload;
+        if (!name) return new Response(JSON.stringify({ error: 'Folder name is required' }), { status: 400 });
+        const { data, error } = await supabase.from('user_folders').insert({ name, parent_folder_id, user_id: user.id }).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ folder: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'delete-user-file': {
+        const { fileId } = payload;
+        if (!fileId) return new Response(JSON.stringify({ error: 'File ID is required' }), { status: 400 });
+        const { data: file, error: fetchError } = await supabase.from('user_files').select('file_path').eq('id', fileId).single();
+        if (fetchError) throw fetchError;
+        await supabase.storage.from('user-files').remove([file.file_path]);
+        await supabase.from('user_files').delete().eq('id', fileId);
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      case 'delete-user-folder': {
+        const { folderId } = payload;
+        if (!folderId) return new Response(JSON.stringify({ error: 'Folder ID is required' }), { status: 400 });
+        // Note: Assumes folder is empty of files and subfolders (enforced on client)
+        const { error } = await supabase.from('user_folders').delete().eq('id', folderId);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      case 'get-user-file-download-url': {
+        const { filePath } = payload;
+        if (!filePath) return new Response(JSON.stringify({ error: 'filePath is required' }), { status: 400 });
+        const { data, error } = await supabase.storage.from('user-files').createSignedUrl(filePath, 60);
         if (error) throw error;
         return new Response(JSON.stringify({ signedUrl: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }

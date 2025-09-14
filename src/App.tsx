@@ -35,6 +35,7 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const EmailClient = lazy(() => import('@/pages/EmailClient'));
 const SimpleEmailClient = lazy(() => import('@/pages/SimpleEmailClient'));
 const FileManager = lazy(() => import('@/pages/FileManager'));
+const MyFiles = lazy(() => import('@/pages/MyFiles'));
 const WorkGroupManagement = lazy(() => import('@/pages/WorkGroupManagement'));
 const DutyRoster = lazy(() => import('@/pages/DutyRoster'));
 const OrderImport = lazy(() => import('@/pages/OrderImport'));
@@ -86,6 +87,7 @@ const AppRoutes = () => {
             <Route path="/email" element={<EmailClient />} />
             <Route path="/simple-email" element={<SimpleEmailClient />} />
             <Route path="/file-manager" element={<ProtectedRoute requiredPermission="files.manage"><FileManager /></ProtectedRoute>} />
+            <Route path="/my-files" element={<MyFiles />} />
             <Route path="/order-import" element={<ProtectedRoute><OrderImport /></ProtectedRoute>} />
             <Route path="/verizon-connect" element={<ProtectedRoute><VerizonConnect /></ProtectedRoute>} />
             <Route path="/work-time" element={<WorkTimeManagement />} />
