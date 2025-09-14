@@ -46,7 +46,10 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
 
     setUploading(true);
     try {
-      const filePath = `${orderId}/${uuidv4()}-${file.name}`;
+      const originalName = file.name;
+      const sanitizedName = originalName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
+      const filePath = `${orderId}/${uuidv4()}-${sanitizedName}`;
+      
       const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file);
       if (uploadError) throw uploadError;
 
@@ -54,7 +57,7 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
         order_id: orderId,
         user_id: user.id,
         file_path: filePath,
-        file_name: file.name,
+        file_name: originalName,
         file_type: file.type,
       }).select().single();
       if (dbError) throw dbError;

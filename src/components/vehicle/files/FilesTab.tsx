@@ -37,7 +37,10 @@ const FilesTab = ({ vehicleId }: { vehicleId: number | null }) => {
     }
     setUploading(true);
     try {
-      const filePath = `${vehicleId}/${uuidv4()}-${selectedFile.name}`;
+      const originalName = selectedFile.name;
+      const sanitizedName = originalName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
+      const filePath = `${vehicleId}/${uuidv4()}-${sanitizedName}`;
+      
       const { error: uploadError } = await supabase.storage.from('vehicle-files').upload(filePath, selectedFile);
       if (uploadError) throw uploadError;
 
@@ -46,7 +49,7 @@ const FilesTab = ({ vehicleId }: { vehicleId: number | null }) => {
         category_id: selectedCategoryId,
         user_id: user.id,
         file_path: filePath,
-        file_name: selectedFile.name,
+        file_name: originalName,
         file_type: selectedFile.type,
       });
 

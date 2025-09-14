@@ -98,7 +98,8 @@ serve(async (_req) => {
             if (parsed.attachments && parsed.attachments.length > 0) {
                 for (const attachment of parsed.attachments) {
                     if (typeof attachment.content === 'string' || !attachment.filename) continue;
-                    const filePath = `${job.user_id}/${insertedEmail.id}/${attachment.filename}`;
+                    const sanitizedFilename = attachment.filename.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
+                    const filePath = `${job.user_id}/${insertedEmail.id}/${sanitizedFilename}`;
                     await supabaseAdmin.storage.from('email-attachments').upload(filePath, attachment.content, { contentType: attachment.contentType, upsert: true });
                     await supabaseAdmin.from('email_attachments').insert({ email_id: insertedEmail.id, file_name: attachment.filename, file_path: filePath, file_type: attachment.contentType });
                 }
