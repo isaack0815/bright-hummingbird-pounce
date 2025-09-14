@@ -13,6 +13,7 @@ import { FileHistoryModal } from '@/components/file-manager/FileHistoryModal';
 import type { OrderFileWithDetails, VehicleFileWithDetails } from '@/types/files';
 import TablePlaceholder from '@/components/TablePlaceholder';
 import type { VehicleFileCategory } from '@/types/vehicle';
+import { PersonalFilesBrowser } from '@/components/file-manager/PersonalFilesBrowser';
 
 const fetchAllFiles = async (): Promise<{ orderFiles: OrderFileWithDetails[], vehicleFiles: VehicleFileWithDetails[] }> => {
   const [orderFilesRes, vehicleFilesRes] = await Promise.all([
@@ -156,7 +157,7 @@ const FileManager = () => {
 
     const vehicleFolders = new Map<number, { name: string, files: VehicleFileWithDetails[] }>();
     allFiles?.vehicleFiles.forEach(file => {
-      if (!vehicleFolders.has(file.vehicle_id)) vehicleFolders.set(file.vehicle_id, { name: file.license_plate, files: [] });
+      if (!vehicleFolders.has(file.vehicle_id)) vehicleFolders.set(file.vehicle_id, { name: file.license_plate || `Fahrzeug #${file.vehicle_id}`, files: [] });
       vehicleFolders.get(file.vehicle_id)!.files.push(file);
     });
 
@@ -186,90 +187,97 @@ const FileManager = () => {
   return (
     <>
       <h1 className="h2 mb-4">Dateimanager</h1>
-      <Card className="mb-4">
-        <Card.Header><Card.Title className="d-flex align-items-center"><Upload className="me-2" />Neue Datei hochladen</Card.Title></Card.Header>
-        <Card.Body>
-          <Row className="g-3 align-items-end">
-            <Col md={4}><Form.Group><Form.Label>Datei</Form.Label><Form.Control type="file" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSelectedFile(e.target.files?.[0] || null)} /></Form.Group></Col>
-            <Col md={2}><Form.Group><Form.Label>Zieltyp</Form.Label><Form.Select value={uploadTarget.type} onChange={e => setUploadTarget({ type: e.target.value as any, id: null })}><option value="order">Auftrag</option><option value="vehicle">Fahrzeug</option></Form.Select></Form.Group></Col>
-            <Col md={4}><Form.Group><Form.Label>Ziel</Form.Label><Select options={uploadTarget.type === 'order' ? orderOptions : vehicleOptions} isLoading={isLoadingParents} onChange={(opt: any) => setUploadTarget(prev => ({ ...prev, id: opt?.value || null }))} placeholder="Ziel auswählen..." isClearable /></Form.Group></Col>
-            <Col md={2}><Button onClick={handleManualUpload} disabled={uploading || !selectedFile || !uploadTarget.id} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></Col>
-          </Row>
-        </Card.Body>
-      </Card>
-
-      <Row>
-        <Col md={4}>
-          <Card>
-            <Card.Header>
-              <Card.Title>Ordner</Card.Title>
-              <Form.Control placeholder="Suchen..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} size="sm" />
-            </Card.Header>
-            <Tabs defaultActiveKey="orders" fill>
-              <Tab eventKey="orders" title="Aufträge">
-                <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                  {isLoading ? <div className="p-3 text-center"><Spinner size="sm" /></div> : filteredOrderFolders.map(([id, data]) => (
-                    <ListGroup.Item key={`order-${id}`} action active={selectedFolder?.id === id && selectedFolder.type === 'order'} onClick={() => setSelectedFolder({ type: 'order', id })} onDragOver={handleDragOver} onDragEnter={(e) => handleDragEnter(e, { type: 'order', id })} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, { type: 'order', id })} style={{ backgroundColor: draggedOverFolder?.id === id && draggedOverFolder.type === 'order' ? '#cfe2ff' : '' }}>
-                      <div className="d-flex justify-content-between align-items-center"><div className="d-flex align-items-center"><Folder size={16} className="me-2" /><span className="fw-medium">{data.name}</span></div><Badge pill bg="secondary">{data.files.length}</Badge></div>
-                    </ListGroup.Item>
-                  ))}
-                </ListGroup>
-              </Tab>
-              <Tab eventKey="vehicles" title="Fahrzeuge">
-                <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                  {isLoading ? <div className="p-3 text-center"><Spinner size="sm" /></div> : filteredVehicleFolders.map(([id, data]) => (
-                    <ListGroup.Item key={`vehicle-${id}`} action active={selectedFolder?.id === id && selectedFolder.type === 'vehicle'} onClick={() => setSelectedFolder({ type: 'vehicle', id })} onDragOver={handleDragOver} onDragEnter={(e) => handleDragEnter(e, { type: 'vehicle', id })} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, { type: 'vehicle', id })} style={{ backgroundColor: draggedOverFolder?.id === id && draggedOverFolder.type === 'vehicle' ? '#cfe2ff' : '' }}>
-                      <div className="d-flex justify-content-between align-items-center"><div className="d-flex align-items-center"><Truck size={16} className="me-2" /><span className="fw-medium">{data.name}</span></div><Badge pill bg="secondary">{data.files.length}</Badge></div>
-                    </ListGroup.Item>
-                  ))}
-                </ListGroup>
-              </Tab>
-            </Tabs>
-          </Card>
-        </Col>
-        <Col md={8}>
-          <Card>
-            <Card.Header>
-                <div className="d-flex justify-content-between align-items-center">
-                    <Card.Title className="mb-0">{selectedFolder ? `Dateien für ${selectedFolder.type === 'order' ? orderFolders.get(selectedFolder.id)?.name : vehicleFolders.get(selectedFolder.id)?.name}` : 'Dateien'}</Card.Title>
-                    {selectedFolder?.type === 'vehicle' && (
-                        <div style={{width: '250px'}}>
-                            <Form.Select size="sm" value={selectedVehicleCategoryId || ''} onChange={e => setSelectedVehicleCategoryId(Number(e.target.value) || null)}>
-                                <option value="">Alle Kategorien</option>
-                                {vehicleFileCategories?.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                            </Form.Select>
-                        </div>
-                    )}
-                </div>
-            </Card.Header>
+      <Tabs defaultActiveKey="orders" className="mb-3 nav-fill">
+        <Tab eventKey="orders" title="Auftrags- & Fahrzeugakten">
+          <Card className="mb-4">
+            <Card.Header><Card.Title className="d-flex align-items-center"><Upload className="me-2" />Neue Datei hochladen</Card.Title></Card.Header>
             <Card.Body>
-              {isLoading ? <TablePlaceholder /> : !selectedFolder ? <div className="text-center text-muted py-5">Bitte wählen Sie links einen Ordner aus.</div> : (
-                <Table responsive hover>
-                  <thead><tr><th>Dateiname</th><th>Hochgeladen von</th><th>Datum</th><th className="text-end">Aktionen</th></tr></thead>
-                  <tbody>
-                    {selectedFiles.map(file => (
-                      <tr key={file.id}>
-                        <td className="fw-medium"><FileIcon size={16} className="me-2" />{file.file_name}</td>
-                        <td>{`${file.first_name || ''} ${file.last_name || ''}`.trim()}</td>
-                        <td>{new Date(file.created_at).toLocaleString('de-DE')}</td>
-                        <td className="text-end">
-                          <Button variant="ghost" size="sm" onClick={() => handleDownload(file)} title="Herunterladen"><Download size={16} /></Button>
-                          {selectedFolder.type === 'order' && <>
-                            <Button variant="ghost" size="sm" onClick={() => setFileToSend(file as OrderFileWithDetails)} title="Senden"><Mail size={16} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file as OrderFileWithDetails)} title="Neu zuordnen"><Edit size={16} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => setFileToShowHistory(file as OrderFileWithDetails)} title="Historie"><History size={16} /></Button>
-                          </>}
-                          <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file)} title="Löschen"><Trash2 size={16} /></Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              )}
+              <Row className="g-3 align-items-end">
+                <Col md={4}><Form.Group><Form.Label>Datei</Form.Label><Form.Control type="file" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSelectedFile(e.target.files?.[0] || null)} /></Form.Group></Col>
+                <Col md={2}><Form.Group><Form.Label>Zieltyp</Form.Label><Form.Select value={uploadTarget.type} onChange={e => setUploadTarget({ type: e.target.value as any, id: null })}><option value="order">Auftrag</option><option value="vehicle">Fahrzeug</option></Form.Select></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Ziel</Form.Label><Select options={uploadTarget.type === 'order' ? orderOptions : vehicleOptions} isLoading={isLoadingParents} onChange={(opt: any) => setUploadTarget(prev => ({ ...prev, id: opt?.value || null }))} placeholder="Ziel auswählen..." isClearable /></Form.Group></Col>
+                <Col md={2}><Button onClick={handleManualUpload} disabled={uploading || !selectedFile || !uploadTarget.id} className="w-100">{uploading ? <Spinner size="sm" /> : 'Hochladen'}</Button></Col>
+              </Row>
             </Card.Body>
           </Card>
-        </Col>
-      </Row>
+
+          <Row>
+            <Col md={4}>
+              <Card>
+                <Card.Header>
+                  <Card.Title>Ordner</Card.Title>
+                  <Form.Control placeholder="Suchen..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} size="sm" />
+                </Card.Header>
+                <Tabs defaultActiveKey="orders" fill>
+                  <Tab eventKey="orders" title="Aufträge">
+                    <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                      {isLoading ? <div className="p-3 text-center"><Spinner size="sm" /></div> : filteredOrderFolders.map(([id, data]) => (
+                        <ListGroup.Item key={`order-${id}`} action active={selectedFolder?.id === id && selectedFolder.type === 'order'} onClick={() => setSelectedFolder({ type: 'order', id })} onDragOver={handleDragOver} onDragEnter={(e) => handleDragEnter(e, { type: 'order', id })} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, { type: 'order', id })} style={{ backgroundColor: draggedOverFolder?.id === id && draggedOverFolder.type === 'order' ? '#cfe2ff' : '' }}>
+                          <div className="d-flex justify-content-between align-items-center"><div className="d-flex align-items-center"><Folder size={16} className="me-2" /><span className="fw-medium">{data.name}</span></div><Badge pill bg="secondary">{data.files.length}</Badge></div>
+                        </ListGroup.Item>
+                      ))}
+                    </ListGroup>
+                  </Tab>
+                  <Tab eventKey="vehicles" title="Fahrzeuge">
+                    <ListGroup variant="flush" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                      {isLoading ? <div className="p-3 text-center"><Spinner size="sm" /></div> : filteredVehicleFolders.map(([id, data]) => (
+                        <ListGroup.Item key={`vehicle-${id}`} action active={selectedFolder?.id === id && selectedFolder.type === 'vehicle'} onClick={() => setSelectedFolder({ type: 'vehicle', id })} onDragOver={handleDragOver} onDragEnter={(e) => handleDragEnter(e, { type: 'vehicle', id })} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, { type: 'vehicle', id })} style={{ backgroundColor: draggedOverFolder?.id === id && draggedOverFolder.type === 'vehicle' ? '#cfe2ff' : '' }}>
+                          <div className="d-flex justify-content-between align-items-center"><div className="d-flex align-items-center"><Truck size={16} className="me-2" /><span className="fw-medium">{data.name}</span></div><Badge pill bg="secondary">{data.files.length}</Badge></div>
+                        </ListGroup.Item>
+                      ))}
+                    </ListGroup>
+                  </Tab>
+                </Tabs>
+              </Card>
+            </Col>
+            <Col md={8}>
+              <Card>
+                <Card.Header>
+                    <div className="d-flex justify-content-between align-items-center">
+                        <Card.Title className="mb-0">{selectedFolder ? `Dateien für ${selectedFolder.type === 'order' ? orderFolders.get(selectedFolder.id)?.name : vehicleFolders.get(selectedFolder.id)?.name}` : 'Dateien'}</Card.Title>
+                        {selectedFolder?.type === 'vehicle' && (
+                            <div style={{width: '250px'}}>
+                                <Form.Select size="sm" value={selectedVehicleCategoryId || ''} onChange={e => setSelectedVehicleCategoryId(Number(e.target.value) || null)}>
+                                    <option value="">Alle Kategorien</option>
+                                    {vehicleFileCategories?.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                                </Form.Select>
+                            </div>
+                        )}
+                    </div>
+                </Card.Header>
+                <Card.Body>
+                  {isLoading ? <TablePlaceholder /> : !selectedFolder ? <div className="text-center text-muted py-5">Bitte wählen Sie links einen Ordner aus.</div> : (
+                    <Table responsive hover>
+                      <thead><tr><th>Dateiname</th><th>Hochgeladen von</th><th>Datum</th><th className="text-end">Aktionen</th></tr></thead>
+                      <tbody>
+                        {selectedFiles.map(file => (
+                          <tr key={file.id}>
+                            <td className="fw-medium"><FileIcon size={16} className="me-2" />{file.file_name}</td>
+                            <td>{`${file.first_name || ''} ${file.last_name || ''}`.trim()}</td>
+                            <td>{new Date(file.created_at).toLocaleString('de-DE')}</td>
+                            <td className="text-end">
+                              <Button variant="ghost" size="sm" onClick={() => handleDownload(file)} title="Herunterladen"><Download size={16} /></Button>
+                              {selectedFolder.type === 'order' && <>
+                                <Button variant="ghost" size="sm" onClick={() => setFileToSend(file as OrderFileWithDetails)} title="Senden"><Mail size={16} /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => setFileToReassign(file as OrderFileWithDetails)} title="Neu zuordnen"><Edit size={16} /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => setFileToShowHistory(file as OrderFileWithDetails)} title="Historie"><History size={16} /></Button>
+                              </>}
+                              <Button variant="ghost" size="sm" className="text-danger" onClick={() => deleteMutation.mutate(file)} title="Löschen"><Trash2 size={16} /></Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Tab>
+        <Tab eventKey="my-files" title="Meine Dateien">
+          <PersonalFilesBrowser />
+        </Tab>
+      </Tabs>
       <ReassignFileDialog show={!!fileToReassign} onHide={() => setFileToReassign(null)} file={fileToReassign} />
       <SendFileDialog show={!!fileToSend} onHide={() => setFileToSend(null)} file={fileToSend} />
       <FileHistoryModal show={!!fileToShowHistory} onHide={() => setFileToShowHistory(null)} file={fileToShowHistory} />

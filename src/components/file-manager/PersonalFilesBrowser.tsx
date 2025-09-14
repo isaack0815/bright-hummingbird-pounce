@@ -16,7 +16,7 @@ const fetchFilesAndFolders = async (): Promise<{ folders: UserFolder[], files: U
   return data;
 };
 
-const MyFiles = () => {
+export const PersonalFilesBrowser = () => {
   const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -117,7 +117,6 @@ const MyFiles = () => {
 
   return (
     <>
-      <h1 className="h2 mb-4">Meine Dateien</h1>
       <Card>
         <Card.Header>
           <Row className="align-items-center">
@@ -177,5 +176,3 @@ const MyFiles = () => {
     </>
   );
 };
-
-export default MyFiles;
