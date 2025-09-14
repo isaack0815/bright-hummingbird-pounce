@@ -10,25 +10,43 @@ const fetchVacations = async (year: number): Promise<UserVacations[]> => {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
 
-  const { data: requests, error } = await supabase
+  // Step 1: Fetch vacation requests without the join
+  const { data: requests, error: requestsError } = await supabase
     .from('vacation_requests')
-    .select('user_id, start_date, end_date, profiles(id, first_name, last_name)')
+    .select('user_id, start_date, end_date')
     .eq('status', 'approved')
     .lte('start_date', endDate)
     .gte('end_date', startDate);
 
-  if (error) throw new Error(error.message);
-  if (!requests) return [];
+  if (requestsError) throw new Error(requestsError.message);
+  if (!requests || requests.length === 0) return [];
 
-  // Group by user
-  const vacationsByUser = requests.reduce((acc: any, req: any) => {
-    if (!req.profiles) return acc;
+  // Step 2: Get unique user IDs
+  const userIds = [...new Set(requests.map(req => req.user_id))];
+  if (userIds.length === 0) return [];
+
+  // Step 3: Fetch profiles for those users
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name')
+    .in('id', userIds);
+  
+  if (profilesError) throw new Error(profilesError.message);
+  if (!profiles) return [];
+
+  const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+  // Step 4: Combine the data
+  const vacationsByUser = requests.reduce((acc: Record<string, UserVacations>, req) => {
+    const profile = profilesMap.get(req.user_id);
+    if (!profile) return acc; // Skip if profile not found
+
     const userId = req.user_id;
     if (!acc[userId]) {
       acc[userId] = {
         userId,
-        firstName: req.profiles.first_name,
-        lastName: req.profiles.last_name,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
         vacations: [],
       };
     }
