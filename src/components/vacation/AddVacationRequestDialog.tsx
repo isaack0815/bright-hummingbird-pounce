@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -6,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { format } from 'date-fns';
 
 const formSchema = z.object({
   start_date: z.string().min(1, "Startdatum ist erforderlich."),
@@ -20,21 +22,37 @@ type AddVacationRequestDialogProps = {
   show: boolean;
   onHide: () => void;
   onSuccess?: () => void;
+  initialUserId?: string;
+  initialDate?: Date;
 };
 
-export function AddVacationRequestDialog({ show, onHide, onSuccess }: AddVacationRequestDialogProps) {
+export function AddVacationRequestDialog({ show, onHide, onSuccess, initialUserId, initialDate }: AddVacationRequestDialogProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
 
+  useEffect(() => {
+    if (show && initialDate) {
+      const dateStr = format(initialDate, 'yyyy-MM-dd');
+      form.reset({
+        start_date: dateStr,
+        end_date: dateStr,
+        notes: '',
+      });
+    } else {
+      form.reset({ start_date: '', end_date: '', notes: '' });
+    }
+  }, [show, initialDate, form]);
+
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      if (!user) throw new Error("User not authenticated");
+      const targetUserId = initialUserId || user?.id;
+      if (!targetUserId) throw new Error("User not authenticated");
       const { error } = await supabase.from('vacation_requests').insert({
         ...values,
-        user_id: user.id,
+        user_id: targetUserId,
       });
       if (error) throw error;
     },

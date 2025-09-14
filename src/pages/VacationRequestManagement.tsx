@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Card, Button, Spinner, Form, Tabs, Tab, ListGroup, Row, Col, Badge } from 'react-bootstrap';
 import { PlusCircle, Check, X } from 'lucide-react';
 import { AddVacationRequestDialog } from '@/components/vacation/AddVacationRequestDialog';
+import { EditVacationRequestDialog } from '@/components/vacation/EditVacationRequestDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO } from 'date-fns';
@@ -46,6 +47,8 @@ const fetchUsers = async (): Promise<ChatUser[]> => {
 
 const VacationRequestManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [dialogData, setDialogData] = useState<{ userId?: string, date?: Date, request?: VacationRequest | null }>({});
   const [year, setYear] = useState(new Date().getFullYear());
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -77,6 +80,16 @@ const VacationRequestManagement = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
   });
 
+  const handleCellClick = (userId: string, date: Date) => {
+    setDialogData({ userId, date });
+    setIsAddDialogOpen(true);
+  };
+
+  const handleRequestClick = (request: VacationRequest) => {
+    setDialogData({ request });
+    setIsEditDialogOpen(true);
+  };
+
   const pendingRequests = useMemo(() => {
     return requests?.filter(r => r.status === 'pending') || [];
   }, [requests]);
@@ -94,7 +107,7 @@ const VacationRequestManagement = () => {
           <Form.Select value={year} onChange={e => setYear(Number(e.target.value))} style={{width: '120px'}}>
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </Form.Select>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
+          <Button onClick={() => { setDialogData({ userId: user?.id }); setIsAddDialogOpen(true); }}>
             <PlusCircle size={16} className="me-2" />
             Urlaub beantragen
           </Button>
@@ -110,7 +123,14 @@ const VacationRequestManagement = () => {
             <Tab eventKey={index} title={format(month, 'MMMM', { locale: de })} key={index}>
               <Card>
                 <Card.Body className="p-0">
-                  <MonthlyVacationTable year={year} month={index} requests={requests} users={users} />
+                  <MonthlyVacationTable 
+                    year={year} 
+                    month={index} 
+                    requests={requests} 
+                    users={users}
+                    onCellClick={handleCellClick}
+                    onRequestClick={handleRequestClick}
+                  />
                 </Card.Body>
               </Card>
             </Tab>
@@ -143,12 +163,15 @@ const VacationRequestManagement = () => {
       <AddVacationRequestDialog 
         show={isAddDialogOpen} 
         onHide={() => setIsAddDialogOpen(false)} 
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
-        }}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] })}
+        initialUserId={dialogData.userId}
+        initialDate={dialogData.date}
+      />
+      <EditVacationRequestDialog
+        show={isEditDialogOpen}
+        onHide={() => setIsEditDialogOpen(false)}
+        request={dialogData.request || null}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] })}
       />
     </>
   );
-};
-
-export default VacationRequestManagement;
