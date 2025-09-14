@@ -59,11 +59,10 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not found")
 
-    const checkAdminPermission = async () => {
+    const getPermissions = async () => {
         const { data, error } = await supabase.rpc('get_my_permissions');
         if (error) throw error;
-        const permissions = data.map((p: any) => p.permission_name);
-        return permissions.includes('work_time.manage');
+        return data.map((p: any) => p.permission_name);
     };
 
     switch (action) {
@@ -267,8 +266,9 @@ serve(async (req) => {
 
       // Work Time Actions
       case 'get-work-time-status': {
+        const permissionNames = await getPermissions();
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+        if (targetUserId !== user.id && !permissionNames.includes('work_time.manage')) {
             throw new Error("Permission denied");
         }
         const { data, error } = await supabase.from('work_sessions').select('*').eq('user_id', targetUserId).is('end_time', null).maybeSingle();
@@ -290,8 +290,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       case 'get-work-time-history': {
+        const permissionNames = await getPermissions();
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+        if (targetUserId !== user.id && !permissionNames.includes('work_time.manage')) {
             throw new Error("Permission denied");
         }
         const { startDate, endDate } = payload;
@@ -303,8 +304,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({ history: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       case 'get-user-work-details': {
+        const permissionNames = await getPermissions();
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+        if (targetUserId !== user.id && !permissionNames.includes('work_time.manage')) {
             throw new Error("Permission denied");
         }
         const { data, error } = await supabaseAdmin.from('work_hours_history').select('hours_per_week').eq('user_id', targetUserId).order('effective_date', { ascending: false }).limit(1).single();
@@ -312,8 +314,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({ details: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       case 'create-work-time': {
+        const permissionNames = await getPermissions();
         const targetUserId = payload?.userId || user.id;
-        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+        if (targetUserId !== user.id && !permissionNames.includes('work_time.manage')) {
             throw new Error("Permission denied");
         }
         const { start_time, end_time, break_duration_minutes, notes } = payload;
@@ -342,7 +345,8 @@ serve(async (req) => {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
       case 'delete-work-hour-history': {
-        if (!(await checkAdminPermission())) {
+        const permissionNames = await getPermissions();
+        if (!permissionNames.includes('personnel_files.manage')) {
             throw new Error("Permission denied. You need 'personnel_files.manage' permission.");
         }
         const { id } = payload;
@@ -352,7 +356,8 @@ serve(async (req) => {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
       case 'get-annual-work-time-summary': {
-        if (!(await checkAdminPermission())) {
+        const permissionNames = await getPermissions();
+        if (!permissionNames.includes('work_time.manage')) {
             throw new Error("Permission denied");
         }
         const { userId, year } = payload;
@@ -377,6 +382,43 @@ serve(async (req) => {
         if (historyError) throw historyError;
 
         return new Response(JSON.stringify({ sessions, workHoursHistory: history }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Vacation Actions
+      case 'create-vacation-request': {
+        const permissionNames = await getPermissions();
+        const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+        const canManage = isSuperAdmin || permissionNames.includes('vacations.manage');
+        if (!canManage) throw new Error("Permission denied.");
+        
+        const { userId, date } = payload;
+        const { data, error } = await supabaseAdmin.from('vacation_requests').insert({
+          user_id: userId,
+          start_date: date,
+          end_date: date,
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+        }).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ request: data }), { status: 201, headers: corsHeaders });
+      }
+      case 'update-vacation-request': {
+        const { requestId, startDate, endDate, notes } = payload;
+        const { data, error } = await supabase.rpc('update_vacation_request', {
+          p_request_id: requestId,
+          p_start_date: startDate,
+          p_end_date: endDate,
+          p_notes: notes,
+        });
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
+      }
+      case 'delete-vacation-request': {
+        const { requestId } = payload;
+        const { error } = await supabase.from('vacation_requests').delete().eq('id', requestId);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
       }
 
       default:

@@ -67,7 +67,7 @@ const VacationRequestManagement = () => {
 
   const manageRequestMutation = useMutation({
     mutationFn: async ({ action, payload }: { action: string, payload: any }) => {
-      const { error } = await supabase.functions.invoke('manage-vacation-request', {
+      const { error } = await supabase.functions.invoke('action', {
         body: { action, payload },
       });
       if (error) throw error;
@@ -101,7 +101,7 @@ const VacationRequestManagement = () => {
       return;
     }
     manageRequestMutation.mutate({
-      action: 'create',
+      action: 'create-vacation-request',
       payload: { userId, date: format(date, 'yyyy-MM-dd') },
     });
   };
@@ -190,8 +190,8 @@ const VacationRequestManagement = () => {
         show={isEditDialogOpen}
         onHide={() => setIsEditDialogOpen(false)}
         request={selectedRequest}
-        onSave={(payload) => manageRequestMutation.mutate({ action: 'update', payload })}
-        onDelete={(payload) => manageRequestMutation.mutate({ action: 'delete', payload })}
+        onSave={(payload) => manageRequestMutation.mutate({ action: 'update-vacation-request', payload })}
+        onDelete={(payload) => manageRequestMutation.mutate({ action: 'delete-vacation-request', payload })}
       />
     </>
   );
