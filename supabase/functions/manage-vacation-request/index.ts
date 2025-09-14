@@ -24,7 +24,8 @@ serve(async (req) => {
     if (permError) throw permError;
     
     const permissionNames = permissions.map((p: { permission_name: string }) => p.permission_name);
-    const canManage = permissionNames.includes('vacations.manage');
+    const isSuperAdmin = permissionNames.includes('roles.manage') && permissionNames.includes('users.manage');
+    const canManage = isSuperAdmin || permissionNames.includes('vacations.manage');
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
