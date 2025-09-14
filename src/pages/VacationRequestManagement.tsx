@@ -70,7 +70,11 @@ const VacationRequestManagement = () => {
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
-      showSuccess(`Aktion "${variables.action}" erfolgreich ausgeführt.`);
+      if (variables.action === 'create-vacation-request') {
+        showSuccess(`Urlaubstag eingetragen.`);
+      } else {
+        showSuccess(`Aktion erfolgreich ausgeführt.`);
+      }
       queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
     },
     onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),

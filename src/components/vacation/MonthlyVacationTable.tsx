@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { Table, Button } from 'react-bootstrap';
-import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays, isBefore, isAfter } from 'date-fns';
+import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays, isBefore } from 'date-fns';
 import type { VacationRequest } from '@/types/vacation';
 import type { ChatUser } from '@/types/chat';
 import { Trash2 } from 'lucide-react';
@@ -36,7 +36,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
       resizeObserver.observe(headerRef.current);
     }
     return () => resizeObserver.disconnect();
-  }, [year, month]);
+  }, [year, month, users]);
 
   const daysInMonth = useMemo(() => {
     const date = new Date(year, month, 1);
@@ -61,8 +61,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
     })).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
   }, [requests, users]);
 
-  const getStatusClass = (status: string, isEditing: boolean) => {
-    if (isEditing) return 'bg-primary';
+  const getStatusClass = (status: string) => {
     switch (status) {
       case 'approved': return 'bg-success';
       case 'pending': return 'bg-warning';
@@ -72,7 +71,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
   };
 
   const handleCellClick = (userId: string, date: Date) => {
-    if (editingRequest) {
+    if (editingRequest && editingRequest.user_id === userId) {
       const startDate = parseISO(editingRequest.start_date);
       const newDate = date;
       
@@ -137,7 +136,7 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                 return (
                   <div
                     key={vacation.id}
-                    className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 vacation-bar ${getStatusClass(vacation.status, isEditing)}`}
+                    className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 vacation-bar ${getStatusClass(vacation.status)} ${isEditing ? 'is-editing' : ''}`}
                     style={{
                       top: '5px',
                       left: `${left + 1}px`,
@@ -146,7 +145,6 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
                       cursor: 'pointer',
-                      border: isEditing ? '2px solid #0d6efd' : 'none',
                     }}
                     onClick={(e) => { e.stopPropagation(); setEditingRequest(isEditing ? null : vacation); }}
                     title={isEditing ? "Wählen Sie ein neues Start- oder Enddatum" : `${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`}
