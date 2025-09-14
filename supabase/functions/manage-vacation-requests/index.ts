@@ -27,13 +27,32 @@ serve(async (req) => {
 
     switch (action) {
       case 'get': {
-        let query = supabase.from('vacation_requests').select('*, profiles!user_id(first_name, last_name)');
+        let requestQuery = supabase.from('vacation_requests').select('*');
         if (!canManage) {
-          query = query.eq('user_id', user.id);
+          requestQuery = requestQuery.eq('user_id', user.id);
         }
-        const { data, error } = await query.order('created_at', { ascending: false });
-        if (error) throw error;
-        return new Response(JSON.stringify({ requests: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const { data: requests, error: requestsError } = await requestQuery.order('created_at', { ascending: false });
+        if (requestsError) throw requestsError;
+        if (!requests || requests.length === 0) {
+            return new Response(JSON.stringify({ requests: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        const userIds = [...new Set(requests.map(req => req.user_id))];
+        
+        const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .in('id', userIds);
+        if (profilesError) throw profilesError;
+
+        const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+        const combinedRequests = requests.map(req => ({
+            ...req,
+            profiles: profilesMap.get(req.user_id) || null
+        }));
+
+        return new Response(JSON.stringify({ requests: combinedRequests }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       case 'create': {
         const { start_date, end_date, notes } = payload;
