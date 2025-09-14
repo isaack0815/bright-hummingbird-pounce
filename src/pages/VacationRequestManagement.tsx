@@ -48,7 +48,7 @@ const fetchUsers = async (): Promise<ChatUser[]> => {
 const VacationRequestManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [dialogData, setDialogData] = useState<{ userId?: string, date?: Date, request?: VacationRequest | null }>({});
+  const [selectedRequest, setSelectedRequest] = useState<VacationRequest | null>(null);
   const [year, setYear] = useState(new Date().getFullYear());
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -63,6 +63,21 @@ const VacationRequestManagement = () => {
   const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
     queryKey: ['chatUsers'],
     queryFn: fetchUsers,
+  });
+
+  const manageRequestMutation = useMutation({
+    mutationFn: async ({ action, payload }: { action: string, payload: any }) => {
+      const { error } = await supabase.functions.invoke('manage-vacation-request', {
+        body: { action, payload },
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      showSuccess(`Aktion "${variables.action}" erfolgreich ausgeführt.`);
+      queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
+      setIsEditDialogOpen(false);
+    },
+    onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
   });
 
   const updateStatusMutation = useMutation({
@@ -81,12 +96,18 @@ const VacationRequestManagement = () => {
   });
 
   const handleCellClick = (userId: string, date: Date) => {
-    setDialogData({ userId, date });
-    setIsAddDialogOpen(true);
+    if (!canManage) {
+      showError("Nur Manager können direkt Urlaub eintragen.");
+      return;
+    }
+    manageRequestMutation.mutate({
+      action: 'create',
+      payload: { userId, date: format(date, 'yyyy-MM-dd') },
+    });
   };
 
   const handleRequestClick = (request: VacationRequest) => {
-    setDialogData({ request });
+    setSelectedRequest(request);
     setIsEditDialogOpen(true);
   };
 
@@ -107,7 +128,7 @@ const VacationRequestManagement = () => {
           <Form.Select value={year} onChange={e => setYear(Number(e.target.value))} style={{width: '120px'}}>
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </Form.Select>
-          <Button onClick={() => { setDialogData({ userId: user?.id }); setIsAddDialogOpen(true); }}>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
             <PlusCircle size={16} className="me-2" />
             Urlaub beantragen
           </Button>
@@ -164,14 +185,13 @@ const VacationRequestManagement = () => {
         show={isAddDialogOpen} 
         onHide={() => setIsAddDialogOpen(false)} 
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] })}
-        initialUserId={dialogData.userId}
-        initialDate={dialogData.date}
       />
       <EditVacationRequestDialog
         show={isEditDialogOpen}
         onHide={() => setIsEditDialogOpen(false)}
-        request={dialogData.request || null}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] })}
+        request={selectedRequest}
+        onSave={(payload) => manageRequestMutation.mutate({ action: 'update', payload })}
+        onDelete={(payload) => manageRequestMutation.mutate({ action: 'delete', payload })}
       />
     </>
   );

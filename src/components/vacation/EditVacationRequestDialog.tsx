@@ -3,9 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button, Modal, Form, Spinner, Alert } from "react-bootstrap";
-import { supabase } from "@/lib/supabase";
-import { showSuccess, showError } from "@/utils/toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { VacationRequest } from "@/types/vacation";
 import { format, parseISO } from 'date-fns';
 
@@ -22,11 +19,11 @@ type EditVacationRequestDialogProps = {
   request: VacationRequest | null;
   show: boolean;
   onHide: () => void;
-  onSuccess: () => void;
+  onSave: (payload: any) => void;
+  onDelete: (payload: any) => void;
 };
 
-export function EditVacationRequestDialog({ request, show, onHide, onSuccess }: EditVacationRequestDialogProps) {
-  const queryClient = useQueryClient();
+export function EditVacationRequestDialog({ request, show, onHide, onSave, onDelete }: EditVacationRequestDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
@@ -41,42 +38,19 @@ export function EditVacationRequestDialog({ request, show, onHide, onSuccess }: 
     }
   }, [request, form, show]);
 
-  const updateMutation = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>) => {
-      if (!request) return;
-      const { error } = await supabase.rpc('update_vacation_request', {
-        p_request_id: request.id,
-        p_start_date: values.start_date,
-        p_end_date: values.end_date,
-        p_notes: values.notes,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess("Antrag erfolgreich aktualisiert!");
-      onSuccess();
-      onHide();
-    },
-    onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!request) return;
-      const { error } = await supabase.from('vacation_requests').delete().eq('id', request.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      showSuccess("Antrag gelöscht!");
-      onSuccess();
-      onHide();
-    },
-    onError: (err: any) => showError(err.message || "Fehler beim Löschen."),
-  });
+  const handleSave = (values: z.infer<typeof formSchema>) => {
+    if (!request) return;
+    onSave({
+      requestId: request.id,
+      startDate: values.start_date,
+      endDate: values.end_date,
+      notes: values.notes,
+    });
+  };
 
   const handleDelete = () => {
-    if (window.confirm("Möchten Sie diesen Urlaubsantrag wirklich löschen?")) {
-      deleteMutation.mutate();
+    if (request && window.confirm("Möchten Sie diesen Urlaubsantrag wirklich löschen?")) {
+      onDelete({ requestId: request.id });
     }
   };
 
@@ -87,7 +61,7 @@ export function EditVacationRequestDialog({ request, show, onHide, onSuccess }: 
       <Modal.Header closeButton>
         <Modal.Title>Urlaubsantrag bearbeiten</Modal.Title>
       </Modal.Header>
-      <Form onSubmit={form.handleSubmit((v) => updateMutation.mutate(v))}>
+      <Form onSubmit={form.handleSubmit(handleSave)}>
         <Modal.Body>
           {request.status !== 'pending' && (
             <Alert variant="warning">
@@ -104,13 +78,13 @@ export function EditVacationRequestDialog({ request, show, onHide, onSuccess }: 
           </Form.Group>
         </Modal.Body>
         <Modal.Footer className="justify-content-between">
-          <Button variant="danger" onClick={handleDelete} disabled={deleteMutation.isPending}>
+          <Button variant="danger" onClick={handleDelete}>
             Löschen
           </Button>
           <div>
             <Button variant="secondary" onClick={onHide} className="me-2">Abbrechen</Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? <Spinner as="span" size="sm" /> : "Speichern"}
+            <Button type="submit">
+              Speichern
             </Button>
           </div>
         </Modal.Footer>
