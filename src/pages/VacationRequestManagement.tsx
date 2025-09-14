@@ -9,6 +9,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { VacationRequest } from '@/types/vacation';
+import type { ChatUser } from '@/types/chat';
 import { MonthlyVacationTable } from '@/components/vacation/MonthlyVacationTable';
 
 const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> => {
@@ -23,7 +24,6 @@ const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> =>
   
   if (error) throw error;
 
-  // Reshape the data to match the expected type structure
   const formattedRequests = requests?.map(req => {
     const { first_name, last_name, ...rest } = req;
     return {
@@ -38,6 +38,12 @@ const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> =>
   return formattedRequests as VacationRequest[];
 };
 
+const fetchUsers = async (): Promise<ChatUser[]> => {
+  const { data, error } = await supabase.functions.invoke('get-chat-users');
+  if (error) throw new Error(error.message);
+  return data.users;
+};
+
 const VacationRequestManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [year, setYear] = useState(new Date().getFullYear());
@@ -46,9 +52,14 @@ const VacationRequestManagement = () => {
   const canManage = hasPermission('vacations.manage');
   const currentMonthIndex = new Date().getMonth();
 
-  const { data: requests, isLoading, error } = useQuery<VacationRequest[]>({
+  const { data: requests, isLoading: isLoadingRequests, error } = useQuery<VacationRequest[]>({
     queryKey: ['vacationRequestsForYear', year],
     queryFn: () => fetchRequestsForYear(year),
+  });
+
+  const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
+    queryKey: ['chatUsers'],
+    queryFn: fetchUsers,
   });
 
   const updateStatusMutation = useMutation({
@@ -73,6 +84,8 @@ const VacationRequestManagement = () => {
   const yearOptions = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(year, i, 1)), [year]);
 
+  const isLoading = isLoadingRequests || isLoadingUsers;
+
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -91,13 +104,13 @@ const VacationRequestManagement = () => {
       {isLoading && <div className="text-center p-5"><Spinner /></div>}
       {error && <p className="text-danger">Fehler: {error.message}</p>}
       
-      {requests && (
+      {requests && users && (
         <Tabs defaultActiveKey={currentMonthIndex} id="month-tabs" className="mb-3">
           {months.map((month, index) => (
             <Tab eventKey={index} title={format(month, 'MMMM', { locale: de })} key={index}>
               <Card>
                 <Card.Body className="p-0">
-                  <MonthlyVacationTable year={year} month={index} requests={requests} />
+                  <MonthlyVacationTable year={year} month={index} requests={requests} users={users} />
                 </Card.Body>
               </Card>
             </Tab>

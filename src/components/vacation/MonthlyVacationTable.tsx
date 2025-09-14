@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Table, Badge } from 'react-bootstrap';
 import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, startOfDay } from 'date-fns';
 import type { VacationRequest } from '@/types/vacation';
+import type { ChatUser } from '@/types/chat';
 
 type ProcessedUserVacation = {
   userId: string;
@@ -18,9 +19,10 @@ type MonthlyVacationTableProps = {
   year: number;
   month: number; // 0-11
   requests: VacationRequest[];
+  users: ChatUser[];
 };
 
-export const MonthlyVacationTable = ({ year, month, requests }: MonthlyVacationTableProps) => {
+export const MonthlyVacationTable = ({ year, month, requests, users }: MonthlyVacationTableProps) => {
   const daysInMonth = useMemo(() => {
     const date = new Date(year, month, 1);
     const days = getDaysInMonth(date);
@@ -28,26 +30,25 @@ export const MonthlyVacationTable = ({ year, month, requests }: MonthlyVacationT
   }, [year, month]);
 
   const processedData = useMemo(() => {
-    const usersMap = new Map<string, ProcessedUserVacation>();
+    const requestsMap = new Map<string, { start: string; end: string; status: 'pending' | 'approved' | 'rejected'; }[]>();
     requests.forEach(req => {
-      if (!req.profiles) return;
-      const userId = req.user_id;
-      if (!usersMap.has(userId)) {
-        usersMap.set(userId, {
-          userId,
-          firstName: req.profiles.first_name,
-          lastName: req.profiles.last_name,
-          vacations: [],
-        });
+      if (!requestsMap.has(req.user_id)) {
+        requestsMap.set(req.user_id, []);
       }
-      usersMap.get(userId)!.vacations.push({
+      requestsMap.get(req.user_id)!.push({
         start: req.start_date,
         end: req.end_date,
         status: req.status,
       });
     });
-    return Array.from(usersMap.values()).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
-  }, [requests]);
+
+    return users.map(user => ({
+      userId: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      vacations: requestsMap.get(user.id) || [],
+    })).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
+  }, [requests, users]);
 
   return (
     <div className="table-responsive">
