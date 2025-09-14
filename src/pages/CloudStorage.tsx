@@ -133,3 +133,6 @@ const CloudStorage = () => {
       <CreateFolderModal show={isCreateFolderModalOpen} onHide={() => setIsCreateFolderModalOpen(false)} parentFolderId={currentFolderId} />
     </>
   );
+};
+
+export default CloudStorage;
