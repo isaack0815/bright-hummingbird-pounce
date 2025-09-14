@@ -30,4 +30,5 @@ export type UserWithVacationDetails = {
   last_name: string | null;
   vacation_days_per_year: number | null;
   works_weekends: boolean | null;
+  entry_date: string | null;
 };

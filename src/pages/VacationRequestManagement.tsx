@@ -12,15 +12,10 @@ import type { VacationRequest, UserWithVacationDetails } from '@/types/vacation'
 import { MonthlyVacationTable } from '@/components/vacation/MonthlyVacationTable';
 import { VacationSummaryTable } from '@/components/vacation/VacationSummaryTable';
 
-const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> => {
-  const startDate = `${year}-01-01`;
-  const endDate = `${year}-12-31`;
-
+const fetchAllRequests = async (): Promise<VacationRequest[]> => {
   const { data: requests, error } = await supabase
     .from('vacation_requests_with_profiles')
-    .select('*')
-    .lte('start_date', endDate)
-    .gte('end_date', startDate);
+    .select('*');
   
   if (error) throw error;
 
@@ -53,8 +48,8 @@ const VacationRequestManagement = () => {
   const currentMonthIndex = new Date().getMonth();
 
   const { data: requests, isLoading: isLoadingRequests, error } = useQuery<VacationRequest[]>({
-    queryKey: ['vacationRequestsForYear', year],
-    queryFn: () => fetchRequestsForYear(year),
+    queryKey: ['allVacationRequests'],
+    queryFn: fetchAllRequests,
   });
 
   const { data: users, isLoading: isLoadingUsers } = useQuery<UserWithVacationDetails[]>({
@@ -77,7 +72,7 @@ const VacationRequestManagement = () => {
       } else {
         showSuccess(`Aktion erfolgreich ausgeführt.`);
       }
-      queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
+      queryClient.invalidateQueries({ queryKey: ['allVacationRequests'] });
     },
     onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
   });
@@ -92,7 +87,7 @@ const VacationRequestManagement = () => {
     },
     onSuccess: () => {
       showSuccess("Status aktualisiert!");
-      queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
+      queryClient.invalidateQueries({ queryKey: ['allVacationRequests'] });
     },
     onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
   });
@@ -208,7 +203,7 @@ const VacationRequestManagement = () => {
       <AddVacationRequestDialog 
         show={isAddDialogOpen} 
         onHide={() => setIsAddDialogOpen(false)} 
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] })}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['allVacationRequests'] })}
       />
     </>
   );
