@@ -161,13 +161,27 @@ serve(async (req) => {
         const { data: ownedFiles, error: ownedFilesError } = await supabase.from('user_files').select('*').eq('user_id', user.id).order('file_name');
         if (ownedFilesError) throw ownedFilesError;
 
-        const { data: sharedFiles, error: sharedFilesError } = await supabase
-          .from('file_shares')
-          .select('user_files(*, profiles!user_id(first_name, last_name))')
-          .eq('shared_with_user_id', user.id);
-        if (sharedFilesError) throw sharedFilesError;
+        // Manual join to bypass schema cache issues
+        const { data: shares, error: sharesError } = await supabase.from('file_shares').select('file_id').eq('shared_with_user_id', user.id);
+        if (sharesError) throw sharesError;
 
-        return new Response(JSON.stringify({ folders, ownedFiles, sharedFiles: sharedFiles.map(s => s.user_files) }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        let finalSharedFiles = [];
+        if (shares && shares.length > 0) {
+            const sharedFileIds = shares.map(s => s.file_id);
+            const { data: sharedFileDetails, error: sharedFileDetailsError } = await supabase.from('user_files').select('*').in('id', sharedFileIds);
+            if (sharedFileDetailsError) throw sharedFileDetailsError;
+
+            if (sharedFileDetails && sharedFileDetails.length > 0) {
+                const ownerIds = [...new Set(sharedFileDetails.map(f => f.user_id))];
+                const { data: profiles, error: profilesError } = await supabase.from('profiles').select('id, first_name, last_name').in('id', ownerIds);
+                if (profilesError) throw profilesError;
+
+                const profilesMap = new Map(profiles.map(p => [p.id, p]));
+                finalSharedFiles = sharedFileDetails.map(file => ({ ...file, profiles: profilesMap.get(file.user_id) || null }));
+            }
+        }
+
+        return new Response(JSON.stringify({ folders, ownedFiles, sharedFiles: finalSharedFiles }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
       case 'create-user-folder': {
