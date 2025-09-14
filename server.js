@@ -5,7 +5,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const app = express();
-const port = process.env.PORT || 16068;
+const port = process.env.PORT;
+
+if (!port) {
+  console.error("FATAL ERROR: The PORT environment variable is not set. The server cannot start.");
+  process.exit(1);
+}
 
 // ES-Modul-Äquivalent für __dirname
 const __filename = fileURLToPath(import.meta.url);
