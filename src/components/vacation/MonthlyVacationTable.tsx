@@ -1,8 +1,9 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { Table, Badge } from 'react-bootstrap';
-import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { Table, Button } from 'react-bootstrap';
+import { format, getDaysInMonth, isWithinInterval, parseISO, isWeekend, differenceInCalendarDays } from 'date-fns';
 import type { VacationRequest } from '@/types/vacation';
 import type { ChatUser } from '@/types/chat';
+import { Trash2 } from 'lucide-react';
 
 type MonthlyVacationTableProps = {
   year: number;
@@ -10,22 +11,26 @@ type MonthlyVacationTableProps = {
   requests: VacationRequest[];
   users: ChatUser[];
   onCellClick: (userId: string, date: Date) => void;
-  onRequestClick: (request: VacationRequest) => void;
+  onDeleteRequest: (requestId: number) => void;
 };
 
-export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick, onRequestClick }: MonthlyVacationTableProps) => {
+export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick, onDeleteRequest }: MonthlyVacationTableProps) => {
   const headerRef = useRef<HTMLTableSectionElement>(null);
   const [cellWidth, setCellWidth] = useState(35);
+  const [firstColWidth, setFirstColWidth] = useState(150);
+  const [hoveredVacationId, setHoveredVacationId] = useState<number | null>(null);
 
   useEffect(() => {
-    const calculateCellWidth = () => {
-      if (headerRef.current?.querySelector('th:nth-child(2)')) {
-        const firstDayCell = headerRef.current.querySelector('th:nth-child(2)') as HTMLElement;
-        setCellWidth(firstDayCell.offsetWidth);
+    const calculateWidths = () => {
+      if (headerRef.current) {
+        const firstTh = headerRef.current.querySelector('th:first-child') as HTMLElement;
+        const secondTh = headerRef.current.querySelector('th:nth-child(2)') as HTMLElement;
+        if (firstTh) setFirstColWidth(firstTh.offsetWidth);
+        if (secondTh) setCellWidth(secondTh.offsetWidth);
       }
     };
-    calculateCellWidth();
-    const resizeObserver = new ResizeObserver(calculateCellWidth);
+    calculateWidths();
+    const resizeObserver = new ResizeObserver(calculateWidths);
     if (headerRef.current) {
       resizeObserver.observe(headerRef.current);
     }
@@ -102,27 +107,40 @@ export const MonthlyVacationTable = ({ year, month, requests, users, onCellClick
                 const effectiveStart = start < monthStart ? monthStart : start;
                 const effectiveEnd = end > monthEnd ? monthEnd : end;
                 
-                const left = (effectiveStart.getDate() - 1) * cellWidth;
+                const left = firstColWidth + (effectiveStart.getDate() - 1) * cellWidth;
                 const duration = differenceInCalendarDays(effectiveEnd, effectiveStart) + 1;
-                const width = duration * cellWidth - 2; // -2 for padding/border
+                const width = duration * cellWidth - 2;
 
                 return (
                   <div
                     key={vacation.id}
-                    className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 ${getStatusClass(vacation.status)}`}
+                    className={`position-absolute rounded-pill text-white small d-flex align-items-center justify-content-center px-2 vacation-bar ${getStatusClass(vacation.status)}`}
                     style={{
                       top: '5px',
                       left: `${left + 1}px`,
                       width: `${width}px`,
                       height: '30px',
-                      cursor: 'pointer',
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
                     }}
-                    onClick={() => onRequestClick(vacation)}
+                    onMouseEnter={() => setHoveredVacationId(vacation.id)}
+                    onMouseLeave={() => setHoveredVacationId(null)}
                     title={`${format(start, 'dd.MM')} - ${format(end, 'dd.MM')}`}
                   >
-                    {vacation.status === 'pending' ? 'Beantragt' : 'Urlaub'}
+                    <span>{vacation.status === 'pending' ? 'Beantragt' : 'Urlaub'}</span>
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="p-0 text-white position-absolute end-0 me-2 vacation-bar-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm("Möchten Sie diesen Eintrag wirklich löschen?")) {
+                          onDeleteRequest(vacation.id);
+                        }
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
                   </div>
                 );
               })}

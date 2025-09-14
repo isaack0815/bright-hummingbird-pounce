@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 import { Card, Button, Spinner, Form, Tabs, Tab, ListGroup, Row, Col, Badge } from 'react-bootstrap';
 import { PlusCircle, Check, X } from 'lucide-react';
 import { AddVacationRequestDialog } from '@/components/vacation/AddVacationRequestDialog';
-import { EditVacationRequestDialog } from '@/components/vacation/EditVacationRequestDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO } from 'date-fns';
@@ -47,8 +46,6 @@ const fetchUsers = async (): Promise<ChatUser[]> => {
 
 const VacationRequestManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<VacationRequest | null>(null);
   const [year, setYear] = useState(new Date().getFullYear());
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -73,9 +70,12 @@ const VacationRequestManagement = () => {
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
-      showSuccess(`Aktion "${variables.action}" erfolgreich ausgeführt.`);
+      if (variables.action === 'create-vacation-request') {
+        showSuccess(`Urlaubstag eingetragen.`);
+      } else {
+        showSuccess(`Aktion erfolgreich ausgeführt.`);
+      }
       queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
-      setIsEditDialogOpen(false);
     },
     onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
   });
@@ -106,9 +106,11 @@ const VacationRequestManagement = () => {
     });
   };
 
-  const handleRequestClick = (request: VacationRequest) => {
-    setSelectedRequest(request);
-    setIsEditDialogOpen(true);
+  const handleDeleteRequest = (requestId: number) => {
+    manageRequestMutation.mutate({
+      action: 'delete-vacation-request',
+      payload: { requestId },
+    });
   };
 
   const pendingRequests = useMemo(() => {
@@ -150,7 +152,8 @@ const VacationRequestManagement = () => {
                     requests={requests} 
                     users={users}
                     onCellClick={handleCellClick}
-                    onRequestClick={handleRequestClick}
+                    onDeleteRequest={handleDeleteRequest}
+                    onRequestClick={() => {}} // No longer opens a modal
                   />
                 </Card.Body>
               </Card>
@@ -185,13 +188,6 @@ const VacationRequestManagement = () => {
         show={isAddDialogOpen} 
         onHide={() => setIsAddDialogOpen(false)} 
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] })}
-      />
-      <EditVacationRequestDialog
-        show={isEditDialogOpen}
-        onHide={() => setIsEditDialogOpen(false)}
-        request={selectedRequest}
-        onSave={(payload) => manageRequestMutation.mutate({ action: 'update-vacation-request', payload })}
-        onDelete={(payload) => manageRequestMutation.mutate({ action: 'delete-vacation-request', payload })}
       />
     </>
   );

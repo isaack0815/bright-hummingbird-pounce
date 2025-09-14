@@ -52,3 +52,12 @@ body {
 .vacation-table tbody td:first-child {
   background-color: white;
 }
+
+.vacation-bar-delete {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.vacation-bar:hover .vacation-bar-delete {
+  opacity: 1;
+}
