@@ -16,6 +16,7 @@ type WorkTimeHistoryProps = {
   sessions: WorkSession[];
   onEdit: (session: WorkSession) => void;
   onDelete: (id: number) => void;
+  onCreate: (date: Date) => void;
   month: Date;
   targetHoursPerWeek: number | null;
   onSave: (id: number, data: Partial<WorkSession>) => void;
@@ -31,7 +32,7 @@ const formatDuration = (minutes: number) => {
 
 const editableColumns = ['start_time', 'end_time', 'break_duration_minutes', 'notes'];
 
-export const WorkTimeHistory = ({ sessions, onEdit, onDelete, month, targetHoursPerWeek, onSave }: WorkTimeHistoryProps) => {
+export const WorkTimeHistory = ({ sessions, onEdit, onDelete, onCreate, month, targetHoursPerWeek, onSave }: WorkTimeHistoryProps) => {
   const [editingCell, setEditingCell] = useState<{ rowId: number; column: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
@@ -160,9 +161,14 @@ export const WorkTimeHistory = ({ sessions, onEdit, onDelete, month, targetHours
             return (
               <tr key={dateKey} className={isWeekendDay ? 'table-info' : ''}>
                 <td>{format(day, 'dd.MM.yyyy (E)', { locale: de })}</td>
-                <td colSpan={5} className="text-muted"></td>
+                <td onDoubleClick={() => onCreate(day)}></td>
+                <td onDoubleClick={() => onCreate(day)}></td>
+                <td onDoubleClick={() => onCreate(day)}></td>
+                <td>{formatDuration(targetMinutes)}</td>
+                <td>{formatDuration(0)}</td>
                 <td>{formatDuration(0 - targetMinutes)}</td>
-                <td colSpan={2}></td>
+                <td onDoubleClick={() => onCreate(day)}></td>
+                <td></td>
               </tr>
             );
           }

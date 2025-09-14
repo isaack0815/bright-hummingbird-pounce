@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Spinner, Button, Form } from 'react-bootstrap';
+import { Card, Spinner, Button, Form } from 'react-bootstrap';
 import { WorkTimeHistory } from '@/components/work-time/WorkTimeHistory';
 import { EditWorkTimeDialog } from '@/components/work-time/EditWorkTimeDialog';
 import { WorkTimeSummary } from '@/components/work-time/WorkTimeSummary';
 import { showError, showSuccess } from '@/utils/toast';
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfYear } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Select from 'react-select';
@@ -57,6 +57,18 @@ const WorkTimeAdministration = () => {
     enabled: !!selectedUserId,
   });
 
+  const yearRange = useMemo(() => ({
+    startDate: startOfYear(currentMonth).toISOString(),
+    endDate: new Date().toISOString(),
+    userId: selectedUserId,
+  }), [currentMonth, selectedUserId]);
+
+  const { data: yearHistoryData, isLoading: isLoadingYearHistory } = useQuery({
+    queryKey: ['workTimeHistoryYear', yearRange],
+    queryFn: () => manageWorkTime('get-work-time-history', yearRange),
+    enabled: !!selectedUserId,
+  });
+
   const { data: workDetails, isLoading: isLoadingDetails } = useQuery({
     queryKey: ['userWorkDetails', selectedUserId],
     queryFn: () => manageWorkTime('get-user-work-details', { userId: selectedUserId }),
@@ -67,13 +79,14 @@ const WorkTimeAdministration = () => {
     mutationFn: ({ action, payload }: { action: string, payload?: any }) => manageWorkTime(action, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workTimeHistory', monthRange] });
+      queryClient.invalidateQueries({ queryKey: ['workTimeHistoryYear', yearRange] });
       setEditSession(null);
     },
     onError: (err: any) => showError(err.message || "Ein Fehler ist aufgetreten."),
   });
 
   const handleSave = (id: number, data: any) => {
-    mutation.mutate({ action: 'update-work-time', payload: { id, ...data } });
+    mutation.mutate({ action: 'update-work-time', payload: { id, ...data, userId: selectedUserId } });
     showSuccess("Eintrag gespeichert!");
   };
 
@@ -82,6 +95,21 @@ const WorkTimeAdministration = () => {
       mutation.mutate({ action: 'delete-work-time', payload: { id } });
       showSuccess("Eintrag gelöscht!");
     }
+  };
+
+  const handleCreate = (date: Date) => {
+    if (!selectedUserId) return;
+    const startTime = new Date(date);
+    startTime.setHours(8, 0, 0, 0);
+    mutation.mutate({
+      action: 'create-work-time',
+      payload: {
+        userId: selectedUserId,
+        start_time: startTime.toISOString(),
+        break_duration_minutes: 0,
+      }
+    });
+    showSuccess(`Neuer Eintrag für ${format(date, 'dd.MM.yyyy')} erstellt.`);
   };
 
   const userOptions = users?.map(u => ({ value: u.id, label: `${u.first_name || ''} ${u.last_name || ''}`.trim() }));
@@ -105,6 +133,7 @@ const WorkTimeAdministration = () => {
         <>
           <WorkTimeSummary 
             sessions={historyData?.history || []}
+            yearSessions={yearHistoryData?.history || []}
             targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
             month={currentMonth}
           />
@@ -117,13 +146,15 @@ const WorkTimeAdministration = () => {
               </div>
             </Card.Header>
             <Card.Body>
-              {isLoadingHistory || isLoadingDetails ? <div className="text-center"><Spinner /></div> : (
+              {isLoadingHistory || isLoadingDetails || isLoadingYearHistory ? <div className="text-center"><Spinner /></div> : (
                 <WorkTimeHistory
                   sessions={historyData?.history || []}
                   onEdit={setEditSession}
                   onDelete={handleDelete}
+                  onCreate={handleCreate}
                   month={currentMonth}
                   targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
+                  onSave={handleSave}
                 />
               )}
             </Card.Body>

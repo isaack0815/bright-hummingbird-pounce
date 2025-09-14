@@ -311,6 +311,24 @@ serve(async (req) => {
         if (error && error.code !== 'PGRST116') throw error;
         return new Response(JSON.stringify({ details: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+      case 'create-work-time': {
+        const targetUserId = payload?.userId || user.id;
+        if (targetUserId !== user.id && !(await checkAdminPermission())) {
+            throw new Error("Permission denied");
+        }
+        const { start_time, end_time, break_duration_minutes, notes } = payload;
+        if (!start_time) throw new Error("Start time is required.");
+        
+        const { data, error } = await supabase.from('work_sessions').insert({ 
+            user_id: targetUserId, 
+            start_time,
+            end_time,
+            break_duration_minutes,
+            notes
+        }).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
       case 'update-work-time': {
         const { id, ...updateData } = payload;
         const { data, error } = await supabase.from('work_sessions').update(updateData).eq('id', id).select().single();

@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Spinner, Button } from 'react-bootstrap';
+import { Card, Spinner, Button } from 'react-bootstrap';
 import { TimeClock } from '@/components/work-time/TimeClock';
 import { WorkTimeHistory } from '@/components/work-time/WorkTimeHistory';
 import { EditWorkTimeDialog } from '@/components/work-time/EditWorkTimeDialog';
 import { WorkTimeSummary } from '@/components/work-time/WorkTimeSummary';
 import { showError, showSuccess } from '@/utils/toast';
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfYear } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -47,6 +47,16 @@ const WorkTimeManagement = () => {
     queryFn: () => manageWorkTime('get-work-time-history', monthRange),
   });
 
+  const yearRange = useMemo(() => ({
+    startDate: startOfYear(currentMonth).toISOString(),
+    endDate: new Date().toISOString(),
+  }), [currentMonth]);
+
+  const { data: yearHistoryData, isLoading: isLoadingYearHistory } = useQuery({
+    queryKey: ['workTimeHistoryYear', yearRange],
+    queryFn: () => manageWorkTime('get-work-time-history', yearRange),
+  });
+
   const { data: workDetails } = useQuery({
     queryKey: ['userWorkDetails'],
     queryFn: () => manageWorkTime('get-user-work-details'),
@@ -57,6 +67,7 @@ const WorkTimeManagement = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workTimeStatus'] });
       queryClient.invalidateQueries({ queryKey: ['workTimeHistory', monthRange] });
+      queryClient.invalidateQueries({ queryKey: ['workTimeHistoryYear', yearRange] });
       setEditSession(null);
     },
     onError: (err: any) => showError(err.message || "Ein Fehler ist aufgetreten."),
@@ -74,11 +85,25 @@ const WorkTimeManagement = () => {
     }
   };
 
+  const handleCreate = (date: Date) => {
+    const startTime = new Date(date);
+    startTime.setHours(8, 0, 0, 0);
+    mutation.mutate({
+      action: 'create-work-time',
+      payload: {
+        start_time: startTime.toISOString(),
+        break_duration_minutes: 0,
+      }
+    });
+    showSuccess(`Neuer Eintrag für ${format(date, 'dd.MM.yyyy')} erstellt.`);
+  };
+
   return (
     <>
       <h1 className="h2 mb-4">Meine Zeiterfassung</h1>
       <WorkTimeSummary 
         sessions={historyData?.history || []}
+        yearSessions={yearHistoryData?.history || []}
         targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
         month={currentMonth}
       />
@@ -100,11 +125,12 @@ const WorkTimeManagement = () => {
           />
         </Card.Header>
         <Card.Body>
-          {isLoadingHistory ? <div className="text-center"><Spinner /></div> : (
+          {isLoadingHistory || isLoadingYearHistory ? <div className="text-center"><Spinner /></div> : (
             <WorkTimeHistory
               sessions={historyData?.history || []}
               onEdit={setEditSession}
               onDelete={handleDelete}
+              onCreate={handleCreate}
               month={currentMonth}
               targetHoursPerWeek={workDetails?.details?.hours_per_week || null}
               onSave={handleSave}
