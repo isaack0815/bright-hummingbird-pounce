@@ -175,3 +175,6 @@ const VacationRequestManagement = () => {
       />
     </>
   );
+};
+
+export default VacationRequestManagement;
