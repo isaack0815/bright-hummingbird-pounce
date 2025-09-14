@@ -403,17 +403,6 @@ serve(async (req) => {
         if (error) throw error;
         return new Response(JSON.stringify({ request: data }), { status: 201, headers: corsHeaders });
       }
-      case 'update-vacation-request': {
-        const { requestId, startDate, endDate, notes } = payload;
-        const { data, error } = await supabase.rpc('update_vacation_request', {
-          p_request_id: requestId,
-          p_start_date: startDate,
-          p_end_date: endDate,
-          p_notes: notes,
-        });
-        if (error) throw error;
-        return new Response(JSON.stringify({ success: true }), { status: 200, headers: corsHeaders });
-      }
       case 'delete-vacation-request': {
         const { requestId } = payload;
         const { error } = await supabase.from('vacation_requests').delete().eq('id', requestId);

@@ -80,6 +80,20 @@ const VacationRequestManagement = () => {
     onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
   });
 
+  const updateRequestMutation = useMutation({
+    mutationFn: async ({ requestId, startDate, endDate }: { requestId: number, startDate: string, endDate: string }) => {
+      const { error } = await supabase.functions.invoke('update-vacation-request', {
+        body: { requestId, startDate, endDate, notes: '' },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Urlaub erfolgreich aktualisiert!");
+      queryClient.invalidateQueries({ queryKey: ['vacationRequestsForYear', year] });
+    },
+    onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number, status: 'approved' | 'rejected' }) => {
       if (!user) throw new Error("User not authenticated");
@@ -114,10 +128,7 @@ const VacationRequestManagement = () => {
   };
 
   const handleUpdateRequest = (requestId: number, startDate: string, endDate: string) => {
-    manageRequestMutation.mutate({
-      action: 'update-vacation-request',
-      payload: { requestId, startDate, endDate, notes: '' },
-    });
+    updateRequestMutation.mutate({ requestId, startDate, endDate });
   };
 
   const pendingRequests = useMemo(() => {
