@@ -155,11 +155,19 @@ serve(async (req) => {
 
       // New cases for personal file manager
       case 'get-user-files-and-folders': {
-        const { data: folders, error: foldersError } = await supabase.from('user_folders').select('*').order('name');
+        const { data: folders, error: foldersError } = await supabase.from('user_folders').select('*').eq('user_id', user.id).order('name');
         if (foldersError) throw foldersError;
-        const { data: files, error: filesError } = await supabase.from('user_files').select('*').order('file_name');
-        if (filesError) throw filesError;
-        return new Response(JSON.stringify({ folders, files }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        
+        const { data: ownedFiles, error: ownedFilesError } = await supabase.from('user_files').select('*').eq('user_id', user.id).order('file_name');
+        if (ownedFilesError) throw ownedFilesError;
+
+        const { data: sharedFiles, error: sharedFilesError } = await supabase
+          .from('file_shares')
+          .select('user_files(*, profiles!user_id(first_name, last_name))')
+          .eq('shared_with_user_id', user.id);
+        if (sharedFilesError) throw sharedFilesError;
+
+        return new Response(JSON.stringify({ folders, ownedFiles, sharedFiles: sharedFiles.map(s => s.user_files) }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
       case 'create-user-folder': {
@@ -195,6 +203,30 @@ serve(async (req) => {
         const { data, error } = await supabase.storage.from('user-files').createSignedUrl(filePath, 60);
         if (error) throw error;
         return new Response(JSON.stringify({ signedUrl: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-file-shares': {
+        const { fileId } = payload;
+        if (!fileId) return new Response(JSON.stringify({ error: 'File ID is required' }), { status: 400 });
+        const { data, error } = await supabase.from('file_shares').select('shared_with_user_id, profiles:shared_with_user_id(first_name, last_name)').eq('file_id', fileId);
+        if (error) throw error;
+        return new Response(JSON.stringify({ shares: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'share-file': {
+        const { fileId, userIdToShareWith } = payload;
+        if (!fileId || !userIdToShareWith) return new Response(JSON.stringify({ error: 'File ID and User ID are required' }), { status: 400 });
+        const { error } = await supabase.from('file_shares').insert({ file_id: fileId, shared_by_user_id: user.id, shared_with_user_id: userIdToShareWith });
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'unshare-file': {
+        const { fileId, userIdToUnshare } = payload;
+        if (!fileId || !userIdToUnshare) return new Response(JSON.stringify({ error: 'File ID and User ID are required' }), { status: 400 });
+        const { error } = await supabase.from('file_shares').delete().match({ file_id: fileId, shared_with_user_id: userIdToUnshare });
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
       }
 
       default:
