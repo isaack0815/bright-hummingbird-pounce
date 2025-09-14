@@ -12,32 +12,53 @@ import { de } from 'date-fns/locale';
 import { format, eachDayOfInterval, parseISO, startOfDay } from 'date-fns';
 import type { VacationRequest } from '@/types/vacation';
 
-const fetchRequests = async (): Promise<VacationRequest[]> => {
-  const { data, error } = await supabase.functions.invoke('manage-vacation-requests', {
-    body: { action: 'get' },
-  });
-  if (error) throw error;
-  return data.requests;
+const fetchRequests = async (canManage: boolean, userId: string | null): Promise<VacationRequest[]> => {
+  let query = supabase.from('vacation_requests').select('*');
+  
+  if (!canManage && userId) {
+    query = query.eq('user_id', userId);
+  }
+  
+  const { data: requests, error: requestsError } = await query.order('created_at', { ascending: false });
+  if (requestsError) throw requestsError;
+  if (!requests || requests.length === 0) return [];
+
+  const userIds = [...new Set(requests.map(req => req.user_id))];
+  if (userIds.length === 0) return requests.map(r => ({...r, profiles: null}));
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name')
+    .in('id', userIds);
+  if (profilesError) throw profilesError;
+
+  const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+  return requests.map(req => ({
+    ...req,
+    profiles: profilesMap.get(req.user_id) || null
+  }));
 };
 
 const VacationRequestManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission('vacations.manage');
 
   const { data: requests, isLoading } = useQuery<VacationRequest[]>({
     queryKey: ['vacationRequests'],
-    queryFn: fetchRequests,
+    queryFn: () => fetchRequests(canManage, user?.id || null),
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number, status: 'approved' | 'rejected' }) => {
-      const { error } = await supabase.functions.invoke('manage-vacation-requests', {
-        body: { action: 'update-status', payload: { id, status } },
-      });
+      if (!user) throw new Error("User not authenticated");
+      const { error } = await supabase.from('vacation_requests')
+        .update({ status, approved_by: user.id, approved_at: new Date().toISOString() })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {

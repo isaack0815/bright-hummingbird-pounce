@@ -5,6 +5,7 @@ import { Button, Modal, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   start_date: z.string().min(1, "Startdatum ist erforderlich."),
@@ -22,14 +23,17 @@ type AddVacationRequestDialogProps = {
 
 export function AddVacationRequestDialog({ show, onHide }: AddVacationRequestDialogProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
   });
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const { error } = await supabase.functions.invoke('manage-vacation-requests', {
-        body: { action: 'create', payload: values },
+      if (!user) throw new Error("User not authenticated");
+      const { error } = await supabase.from('vacation_requests').insert({
+        ...values,
+        user_id: user.id,
       });
       if (error) throw error;
     },
