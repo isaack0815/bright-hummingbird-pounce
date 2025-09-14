@@ -42,6 +42,7 @@ const VerizonConnect = lazy(() => import('@/pages/VerizonConnect'));
 const WorkTimeManagement = lazy(() => import('@/pages/WorkTimeManagement'));
 const WorkTimeAdministration = lazy(() => import('@/pages/WorkTimeAdministration'));
 const WorkTimeAnnualSummary = lazy(() => import('@/pages/WorkTimeAnnualSummary'));
+const VacationCalendar = lazy(() => import('@/pages/VacationCalendar'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -90,6 +91,7 @@ const AppRoutes = () => {
             <Route path="/work-time" element={<WorkTimeManagement />} />
             <Route path="/work-time-admin" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAdministration /></ProtectedRoute>} />
             <Route path="/work-time-admin/annual-summary" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAnnualSummary /></ProtectedRoute>} />
+            <Route path="/vacation-calendar" element={<VacationCalendar />} />
             <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<NotFound />} />

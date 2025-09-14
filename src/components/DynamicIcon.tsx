@@ -13,6 +13,7 @@ import {
   Settings,
   Map,
   Clock,
+  CalendarDays,
   type LucideProps,
 } from 'lucide-react';
 
@@ -30,6 +31,7 @@ const iconMap = {
   Settings,
   Map,
   Clock,
+  CalendarDays,
 };
 
 type IconName = keyof typeof iconMap;
