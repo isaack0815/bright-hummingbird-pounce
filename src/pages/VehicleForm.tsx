@@ -12,6 +12,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { Vehicle, VehicleGroup } from '@/types/vehicle';
 import type { ChatUser } from '@/types/chat';
 import VehicleNotesTab from '@/components/vehicle/VehicleNotesTab';
+import FilesTab from '@/components/vehicle/files/FilesTab';
 
 const formSchema = z.object({
   license_plate: z.string().min(1, "Kennzeichen ist erforderlich."),
@@ -221,8 +222,8 @@ const VehicleForm = () => {
         <Tab eventKey="notes" title="Notizen" disabled={!isEditMode}>
           <VehicleNotesTab vehicleId={id ? Number(id) : null} />
         </Tab>
-        <Tab eventKey="files" title="Dateien (bald)" disabled>
-          {/* Placeholder for future files component */}
+        <Tab eventKey="files" title="Dateien" disabled={!isEditMode}>
+          <FilesTab vehicleId={id ? Number(id) : null} />
         </Tab>
       </Tabs>
     </Form>

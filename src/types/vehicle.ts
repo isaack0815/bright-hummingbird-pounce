@@ -9,6 +9,23 @@ export type VehicleNoteCategory = {
   name: string;
 };
 
+export type VehicleFileCategory = {
+  id: number;
+  name: string;
+};
+
+export type VehicleFile = {
+  id: number;
+  vehicle_id: number;
+  file_path: string;
+  file_name: string;
+  file_type: string | null;
+  created_at: string;
+  category_name: string;
+  first_name: string | null;
+  last_name: string | null;
+};
+
 export type VehicleNote = {
   id: number;
   vehicle_id: number;
