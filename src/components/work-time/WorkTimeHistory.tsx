@@ -71,7 +71,7 @@ export const WorkTimeHistory = ({ sessions, onEdit, onDelete, month, targetHours
               <tr key={dateKey} className={isWeekendDay ? 'table-info' : ''}>
                 <td>{format(day, 'dd.MM.yyyy (E)', { locale: de })}</td>
                 <td colSpan={5} className="text-muted"></td>
-                <td>{formatHours(0 - targetMinutes)}</td>
+                <td>{formatDuration(0 - targetMinutes)}</td>
                 <td colSpan={2}></td>
               </tr>
             );
