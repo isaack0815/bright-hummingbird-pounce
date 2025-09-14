@@ -307,7 +307,7 @@ serve(async (req) => {
         if (targetUserId !== user.id && !(await checkAdminPermission())) {
             throw new Error("Permission denied");
         }
-        const { data, error } = await supabase.from('work_hours_history').select('hours_per_week').eq('user_id', targetUserId).order('effective_date', { ascending: false }).limit(1).single();
+        const { data, error } = await supabaseAdmin.from('work_hours_history').select('hours_per_week').eq('user_id', targetUserId).order('effective_date', { ascending: false }).limit(1).single();
         if (error && error.code !== 'PGRST116') throw error;
         return new Response(JSON.stringify({ details: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
