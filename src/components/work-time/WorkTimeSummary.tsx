@@ -1,6 +1,6 @@
 import { Card, Row, Col } from 'react-bootstrap';
 import { Clock, Calendar, Briefcase, TrendingUp } from 'lucide-react';
-import { getDaysInMonth, isWeekday } from 'date-fns';
+import { getDaysInMonth, isWeekend } from 'date-fns';
 
 type WorkSession = {
   start_time: string;
@@ -23,7 +23,7 @@ const formatHours = (minutes: number) => {
 export const WorkTimeSummary = ({ sessions, targetHoursPerWeek, month }: WorkTimeSummaryProps) => {
   const daysInMonth = getDaysInMonth(month);
   const netWorkingDays = Array.from({ length: daysInMonth }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1))
-    .filter(isWeekday).length;
+    .filter(date => !isWeekend(date)).length;
 
   const actualWorkDays = new Set(sessions.map(s => new Date(s.start_time).toDateString())).size;
 
