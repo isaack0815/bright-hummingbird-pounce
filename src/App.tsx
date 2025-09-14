@@ -43,6 +43,7 @@ const WorkTimeManagement = lazy(() => import('@/pages/WorkTimeManagement'));
 const WorkTimeAdministration = lazy(() => import('@/pages/WorkTimeAdministration'));
 const WorkTimeAnnualSummary = lazy(() => import('@/pages/WorkTimeAnnualSummary'));
 const VacationRequestManagement = lazy(() => import('@/pages/VacationRequestManagement'));
+const CloudStorage = lazy(() => import('@/pages/CloudStorage'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ const AppRoutes = () => {
             <Route path="/work-time-admin" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAdministration /></ProtectedRoute>} />
             <Route path="/work-time-admin/annual-summary" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAnnualSummary /></ProtectedRoute>} />
             <Route path="/vacation-requests" element={<VacationRequestManagement />} />
+            <Route path="/cloud-storage" element={<CloudStorage />} />
             <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<NotFound />} />
