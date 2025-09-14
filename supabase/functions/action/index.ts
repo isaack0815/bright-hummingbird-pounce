@@ -129,6 +129,28 @@ serve(async (req) => {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
 
+      case 'get-all-vehicle-files': {
+        if (!await checkPermission('files.manage')) throw new Error('Forbidden');
+        const { data, error } = await supabaseAdmin.from('vehicle_files_with_details').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        return new Response(JSON.stringify({ files: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-all-vehicles-for-select': {
+        const { data, error } = await supabaseAdmin.from('vehicles').select('id, license_plate').order('license_plate', { ascending: true });
+        if (error) throw error;
+        return new Response(JSON.stringify({ vehicles: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-vehicle-file-download-url': {
+        if (!user) throw new Error("User not authenticated");
+        const { filePath } = payload;
+        if (!filePath) return new Response(JSON.stringify({ error: 'filePath is required' }), { status: 400 });
+        const { data, error } = await supabaseAdmin.storage.from('vehicle-files').createSignedUrl(filePath, 60);
+        if (error) throw error;
+        return new Response(JSON.stringify({ signedUrl: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

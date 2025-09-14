@@ -16,7 +16,7 @@ import TablePlaceholder from '@/components/TablePlaceholder';
 const fetchAllFiles = async (): Promise<{ orderFiles: OrderFileWithDetails[], vehicleFiles: VehicleFileWithDetails[] }> => {
   const [orderFilesRes, vehicleFilesRes] = await Promise.all([
     supabase.functions.invoke('get-all-order-files'),
-    supabase.functions.invoke('get-all-vehicle-files')
+    supabase.functions.invoke('action', { body: { action: 'get-all-vehicle-files' } })
   ]);
   if (orderFilesRes.error) throw orderFilesRes.error;
   if (vehicleFilesRes.error) throw vehicleFilesRes.error;
@@ -26,7 +26,7 @@ const fetchAllFiles = async (): Promise<{ orderFiles: OrderFileWithDetails[], ve
 const fetchParentEntities = async () => {
   const [ordersRes, vehiclesRes] = await Promise.all([
     supabase.functions.invoke('get-all-order-numbers'),
-    supabase.functions.invoke('get-all-vehicles-for-select')
+    supabase.functions.invoke('action', { body: { action: 'get-all-vehicles-for-select' } })
   ]);
   if (ordersRes.error) throw ordersRes.error;
   if (vehiclesRes.error) throw vehiclesRes.error;
@@ -110,9 +110,10 @@ const FileManager = () => {
 
   const handleDownload = async (file: OrderFileWithDetails | VehicleFileWithDetails) => {
     const isOrderFile = 'order_id' in file;
-    const storageBucket = isOrderFile ? 'order-files' : 'vehicle-files';
     const functionName = isOrderFile ? 'get-download-url' : 'action';
-    const payload = isOrderFile ? { fileId: file.id, filePath: file.file_path } : { action: 'get-vehicle-file-download-url', payload: { filePath: file.file_path } };
+    const payload = isOrderFile 
+        ? { fileId: file.id, filePath: file.file_path } 
+        : { action: 'get-vehicle-file-download-url', payload: { filePath: file.file_path } };
     
     try {
       const { data, error } = await supabase.functions.invoke(functionName, { body: payload });
