@@ -19,9 +19,10 @@ const formSchema = z.object({
 type AddVacationRequestDialogProps = {
   show: boolean;
   onHide: () => void;
+  onSuccess?: () => void;
 };
 
-export function AddVacationRequestDialog({ show, onHide }: AddVacationRequestDialogProps) {
+export function AddVacationRequestDialog({ show, onHide, onSuccess }: AddVacationRequestDialogProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -39,7 +40,11 @@ export function AddVacationRequestDialog({ show, onHide }: AddVacationRequestDia
     },
     onSuccess: () => {
       showSuccess("Antrag erfolgreich eingereicht!");
-      queryClient.invalidateQueries({ queryKey: ['vacationRequests'] });
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['vacationRequests'] });
+      }
       onHide();
       form.reset();
     },

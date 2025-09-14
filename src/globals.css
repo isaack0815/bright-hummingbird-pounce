@@ -36,3 +36,19 @@ body {
   color: var(--bs-danger-text-emphasis) !important;
   border-radius: 50%;
 }
+
+.vacation-table th:first-child,
+.vacation-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.vacation-table thead th:first-child {
+  z-index: 2;
+  background-color: #f8f9fa; /* Match table header bg */
+}
+
+.vacation-table tbody td:first-child {
+  background-color: white;
+}
