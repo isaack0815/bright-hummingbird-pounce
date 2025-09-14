@@ -12,6 +12,7 @@ import {
   Truck,
   Settings,
   Map,
+  Clock,
   type LucideProps,
 } from 'lucide-react';
 
@@ -28,6 +29,7 @@ const iconMap = {
   Truck,
   Settings,
   Map,
+  Clock,
 };
 
 type IconName = keyof typeof iconMap;
