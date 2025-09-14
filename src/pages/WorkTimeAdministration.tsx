@@ -84,7 +84,7 @@ const WorkTimeAdministration = () => {
     }
   };
 
-  const userOptions = users?.map(u => ({ value: u.id, label: `${u.first_name} ${u.last_name}` }));
+  const userOptions = users?.map(u => ({ value: u.id, label: `${u.first_name || ''} ${u.last_name || ''}`.trim() }));
 
   return (
     <>
