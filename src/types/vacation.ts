@@ -23,3 +23,11 @@ export type VacationRequest = {
     last_name: string | null;
   } | null;
 };
+
+export type UserWithVacationDetails = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  vacation_days_per_year: number | null;
+  works_weekends: boolean | null;
+};

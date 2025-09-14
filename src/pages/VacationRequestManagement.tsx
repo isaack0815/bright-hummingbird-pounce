@@ -8,9 +8,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { VacationRequest } from '@/types/vacation';
-import type { ChatUser } from '@/types/chat';
+import type { VacationRequest, UserWithVacationDetails } from '@/types/vacation';
 import { MonthlyVacationTable } from '@/components/vacation/MonthlyVacationTable';
+import { VacationSummaryTable } from '@/components/vacation/VacationSummaryTable';
 
 const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> => {
   const startDate = `${year}-01-01`;
@@ -38,8 +38,8 @@ const fetchRequestsForYear = async (year: number): Promise<VacationRequest[]> =>
   return formattedRequests as VacationRequest[];
 };
 
-const fetchUsers = async (): Promise<ChatUser[]> => {
-  const { data, error } = await supabase.functions.invoke('get-chat-users');
+const fetchUsers = async (): Promise<UserWithVacationDetails[]> => {
+  const { data, error } = await supabase.functions.invoke('get-users');
   if (error) throw new Error(error.message);
   return data.users;
 };
@@ -57,8 +57,8 @@ const VacationRequestManagement = () => {
     queryFn: () => fetchRequestsForYear(year),
   });
 
-  const { data: users, isLoading: isLoadingUsers } = useQuery<ChatUser[]>({
-    queryKey: ['chatUsers'],
+  const { data: users, isLoading: isLoadingUsers } = useQuery<UserWithVacationDetails[]>({
+    queryKey: ['usersWithVacationDetails'],
     queryFn: fetchUsers,
   });
 
@@ -192,6 +192,18 @@ const VacationRequestManagement = () => {
           </ListGroup>
         </Card>
       )}
+
+      <Card className="mt-4">
+        <Card.Header><Card.Title>Jahresübersicht {year}</Card.Title></Card.Header>
+        <Card.Body>
+          <VacationSummaryTable 
+            users={users || []}
+            requests={requests || []}
+            year={year}
+            isLoading={isLoading}
+          />
+        </Card.Body>
+      </Card>
 
       <AddVacationRequestDialog 
         show={isAddDialogOpen} 
