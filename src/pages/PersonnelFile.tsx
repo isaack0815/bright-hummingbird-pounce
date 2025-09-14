@@ -33,6 +33,7 @@ const formSchema = z.object({
   hoursPerWeek: numberPreprocess,
   entryDate: z.string().nullable().optional(),
   exitDate: z.string().nullable().optional(),
+  works_weekends: z.boolean().optional(),
 });
 
 const fetchUserDetails = async (userId: string) => {
@@ -70,6 +71,7 @@ const PersonnelFile = () => {
         hoursPerWeek: user.work_hours_history?.[0]?.hours_per_week ?? undefined,
         entryDate: user.entry_date ? format(parseISO(user.entry_date), 'yyyy-MM-dd') : "",
         exitDate: user.exit_date ? format(parseISO(user.exit_date), 'yyyy-MM-dd') : "",
+        works_weekends: user.works_weekends ?? false,
       });
     }
   }, [user, form]);
@@ -149,6 +151,16 @@ const PersonnelFile = () => {
                 <Col md={4}><Form.Group><Form.Label>Aktuelle Stunden / Woche</Form.Label><Form.Control type="number" step="0.01" {...form.register("hoursPerWeek")} isInvalid={!!form.formState.errors.hoursPerWeek} /><Form.Control.Feedback type="invalid">{form.formState.errors.hoursPerWeek?.message}</Form.Control.Feedback></Form.Group></Col>
                 <Col md={6}><Form.Group><Form.Label>Eintrittsdatum</Form.Label><Form.Control type="date" {...form.register("entryDate")} isInvalid={!!form.formState.errors.entryDate} /><Form.Control.Feedback type="invalid">{form.formState.errors.entryDate?.message}</Form.Control.Feedback></Form.Group></Col>
                 <Col md={6}><Form.Group><Form.Label>Austrittsdatum</Form.Label><Form.Control type="date" {...form.register("exitDate")} isInvalid={!!form.formState.errors.exitDate} /><Form.Control.Feedback type="invalid">{form.formState.errors.exitDate?.message}</Form.Control.Feedback></Form.Group></Col>
+              </Row>
+              <Row className="g-3 mt-3">
+                <Col>
+                    <Form.Check 
+                        type="switch"
+                        id="works-weekends-switch"
+                        label="Arbeitet regulär am Wochenende"
+                        {...form.register("works_weekends")}
+                    />
+                </Col>
               </Row>
             </Tab>
             <Tab eventKey="garnishments" title="Pfändungen">
