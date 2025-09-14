@@ -330,7 +330,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
       }
       case 'update-work-time': {
-        const { id, ...updateData } = payload;
+        const { id, userId, ...updateData } = payload;
         const { data, error } = await supabase.from('work_sessions').update(updateData).eq('id', id).select().single();
         if (error) throw error;
         return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
