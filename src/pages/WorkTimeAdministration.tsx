@@ -77,23 +77,29 @@ const WorkTimeAdministration = () => {
 
   const mutation = useMutation({
     mutationFn: ({ action, payload }: { action: string, payload?: any }) => manageWorkTime(action, payload),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['workTimeHistory', monthRange] });
       queryClient.invalidateQueries({ queryKey: ['workTimeHistoryYear', yearRange] });
       setEditSession(null);
+
+      if (variables.action === 'delete-work-time') {
+        showSuccess("Eintrag gelöscht!");
+      } else if (variables.action === 'update-work-time') {
+        showSuccess("Eintrag gespeichert!");
+      } else if (variables.action === 'create-work-time') {
+        showSuccess("Neuer Eintrag erstellt.");
+      }
     },
     onError: (err: any) => showError(err.message || "Ein Fehler ist aufgetreten."),
   });
 
   const handleSave = (id: number, data: any) => {
     mutation.mutate({ action: 'update-work-time', payload: { id, ...data, userId: selectedUserId } });
-    showSuccess("Eintrag gespeichert!");
   };
 
   const handleDelete = (id: number) => {
     if (window.confirm("Möchten Sie diesen Zeiteintrag wirklich löschen?")) {
       mutation.mutate({ action: 'delete-work-time', payload: { id } });
-      showSuccess("Eintrag gelöscht!");
     }
   };
 
@@ -109,7 +115,6 @@ const WorkTimeAdministration = () => {
         break_duration_minutes: 0,
       }
     });
-    showSuccess(`Neuer Eintrag für ${format(date, 'dd.MM.yyyy')} erstellt.`);
   };
 
   const userOptions = users?.map(u => ({ value: u.id, label: `${u.first_name || ''} ${u.last_name || ''}`.trim() }));
