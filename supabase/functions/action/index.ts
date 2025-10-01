@@ -52,7 +52,7 @@ serve(async (req) => {
         const fileBuffer = Buffer.from(fileData, 'base64');
     
         const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
-            contentType: fileType || 'application/octet-stream'
+            contentType: 'application/octet-stream'
         });
         if (uploadError) throw uploadError;
     
@@ -70,6 +70,52 @@ serve(async (req) => {
             user_id: user.id,
             action: 'created',
             details: { original_filename: fileName }
+        });
+    
+        return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
+      }
+
+      case 'upload-import-file': {
+        if (!user) throw new Error("User not authenticated");
+        const { fileName, fileType, fileData } = payload;
+        if (!fileName || !fileData) {
+            return new Response(JSON.stringify({ error: 'Missing required fields for file upload.' }), { status: 400, headers: corsHeaders });
+        }
+    
+        const filePath = `imports/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
+        const fileBuffer = Buffer.from(fileData, 'base64');
+    
+        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
+            contentType: 'application/octet-stream'
+        });
+        if (uploadError) throw uploadError;
+    
+        return new Response(JSON.stringify({ success: true, filePath }), { status: 201, headers: corsHeaders });
+      }
+
+      case 'upload-vehicle-file': {
+        if (!user) throw new Error("User not authenticated");
+        const { vehicleId, categoryId, fileName, fileType, fileData } = payload;
+        if (!vehicleId || !categoryId || !fileName || !fileData) {
+            return new Response(JSON.stringify({ error: 'Missing required fields for vehicle file upload.' }), { status: 400, headers: corsHeaders });
+        }
+    
+        const sanitizedName = fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
+        const filePath = `${vehicleId}/${crypto.randomUUID()}-${sanitizedName}`;
+        const fileBuffer = Buffer.from(fileData, 'base64');
+    
+        const { error: uploadError } = await supabaseAdmin.storage.from('vehicle-files').upload(filePath, fileBuffer, {
+            contentType: 'application/octet-stream'
+        });
+        if (uploadError) throw uploadError;
+
+        await supabaseAdmin.from('vehicle_files').insert({
+            vehicle_id: vehicleId,
+            category_id: categoryId,
+            user_id: user.id,
+            file_path: filePath,
+            file_name: fileName,
+            file_type: fileType,
         });
     
         return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
