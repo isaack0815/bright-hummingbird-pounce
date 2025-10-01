@@ -9,23 +9,6 @@ export type VehicleNoteCategory = {
   name: string;
 };
 
-export type VehicleFileCategory = {
-  id: number;
-  name: string;
-};
-
-export type VehicleFile = {
-  id: number;
-  vehicle_id: number;
-  file_path: string;
-  file_name: string;
-  file_type: string | null;
-  created_at: string;
-  category_name: string;
-  first_name: string | null;
-  last_name: string | null;
-};
-
 export type VehicleNote = {
   id: number;
   vehicle_id: number;
@@ -51,7 +34,6 @@ export type Vehicle = {
   notes: string | null;
   created_at: string;
   loading_area: number | null;
-  max_payload_kg: number | null;
   next_service_date: string | null;
   gas_inspection_due_date: string | null;
   driver_id: string | null;

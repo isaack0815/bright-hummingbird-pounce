@@ -46,29 +46,18 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
 
     setUploading(true);
     try {
-      const originalName = file.name;
-      const sanitizedName = originalName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
-      const filePath = `${orderId}/${uuidv4()}-${sanitizedName}`;
-      
+      const filePath = `${orderId}/${uuidv4()}-${file.name}`;
       const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { data: newFile, error: dbError } = await supabase.from('order_files').insert({
+      const { error: dbError } = await supabase.from('order_files').insert({
         order_id: orderId,
         user_id: user.id,
         file_path: filePath,
-        file_name: originalName,
+        file_name: file.name,
         file_type: file.type,
-      }).select().single();
-      if (dbError) throw dbError;
-
-      // Log creation activity
-      await supabase.from('file_activity_logs').insert({
-        file_id: newFile.id,
-        user_id: user.id,
-        action: 'created',
-        details: { original_filename: file.name }
       });
+      if (dbError) throw dbError;
 
       queryClient.invalidateQueries({ queryKey: ['orderFiles', orderId] });
       showSuccess("Datei erfolgreich hochgeladen!");

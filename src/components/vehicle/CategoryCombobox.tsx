@@ -1,3 +1,4 @@
+import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
 import { showError, showSuccess } from "@/utils/toast"
@@ -49,7 +50,7 @@ export function CategoryCombobox({ value, onChange }: CategoryComboboxProps) {
       isClearable
       isDisabled={isLoading || createMutation.isPending}
       isLoading={isLoading}
-      onChange={(newValue: any) => newValue && onChange(newValue.value)}
+      onChange={(newValue) => newValue && onChange(newValue.value)}
       onCreateOption={handleCreate}
       options={options}
       value={selectedOption}

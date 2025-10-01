@@ -16,36 +16,30 @@ serve(async (req) => {
 
     const { invoiceId } = await req.json();
     if (!invoiceId) {
-      return new Response(JSON.stringify({ error: 'Invoice ID is required' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+      return new Response(JSON.stringify({ error: 'invoiceId is required' }), { status: 400 });
     }
 
-    const lexResponse = await fetch(`https://api.lexoffice.io/v1/invoices/${invoiceId}/document`, {
-      method: 'GET',
+    const fileResponse = await fetch(`https://api.lexoffice.io/v1/vouchers/${invoiceId}?download=true`, {
       headers: {
         'Authorization': `Bearer ${lexApiKey}`,
         'Accept': 'application/pdf',
       },
     });
 
-    if (!lexResponse.ok) {
-      const errorBody = await lexResponse.text();
-      throw new Error(`Lexoffice API Error: ${lexResponse.status} - ${errorBody}`);
+    if (!fileResponse.ok) {
+      throw new Error(`Lexoffice API error (fetching file): ${fileResponse.status} - ${await fileResponse.text()}`);
     }
 
-    const pdfBlob = await lexResponse.blob();
+    const pdfBlob = await fileResponse.blob();
 
-    return new Response(pdfBlob, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/pdf',
-      },
-      status: 200,
-    });
+    const headers = new Headers(corsHeaders);
+    headers.set('Content-Type', 'application/pdf');
+    headers.set('Content-Disposition', `attachment; filename="rechnung-${invoiceId}.pdf"`);
+
+    return new Response(pdfBlob, { headers, status: 200 });
 
   } catch (e) {
+    console.error("Error in get-lexoffice-invoice-pdf:", e);
     return new Response(JSON.stringify({ error: e.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

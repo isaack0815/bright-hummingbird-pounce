@@ -8,14 +8,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
   lastName: z.string().min(1, "Nachname ist erforderlich."),
-  username: z.string().min(3, "Benutzername muss mind. 3 Zeichen haben.").regex(/^[a-zA-Z0-9_]+$/, "Nur Buchstaben, Zahlen und Unterstriche."),
   email: z.string().email(),
-  email_signature: z.string().optional(),
 });
 
 const fetchUserProfile = async () => {
@@ -25,7 +22,7 @@ const fetchUserProfile = async () => {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('first_name, last_name, username, email_signature')
+    .select('first_name, last_name')
     .eq('id', user.id)
     .maybeSingle();
   
@@ -35,15 +32,11 @@ const fetchUserProfile = async () => {
     email: user.email,
     firstName: profile?.first_name,
     lastName: profile?.last_name,
-    username: profile?.username,
-    email_signature: profile?.email_signature,
   };
 };
 
 const Profile = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-
   const { data: userProfile, isLoading } = useQuery({
     queryKey: ['userProfile'],
     queryFn: fetchUserProfile,
@@ -54,9 +47,7 @@ const Profile = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      username: "",
       email: "",
-      email_signature: "",
     },
   });
 
@@ -65,29 +56,20 @@ const Profile = () => {
       form.reset({
         firstName: userProfile.firstName || "",
         lastName: userProfile.lastName || "",
-        username: userProfile.username || "",
         email: userProfile.email || "",
-        email_signature: userProfile.email_signature || "",
       });
     }
   }, [userProfile, form]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (values: z.infer<typeof profileSchema>) => {
-      if (!user) throw new Error("Nicht authentifiziert. Bitte neu anmelden.");
-
-      const { error } = await supabase.rpc('update_my_profile_details', {
-        p_user_id: user.id,
-        p_first_name: values.firstName,
-        p_last_name: values.lastName,
-        p_username: values.username,
-        p_email_signature: values.email_signature || ''
+      const { error } = await supabase.functions.invoke('update-my-profile', {
+        body: {
+          firstName: values.firstName,
+          lastName: values.lastName,
+        },
       });
-
-      if (error) {
-        console.error("RPC Error:", error);
-        throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       showSuccess("Profil erfolgreich aktualisiert!");
@@ -135,15 +117,6 @@ const Profile = () => {
                     <Form.Label>Nachname</Form.Label>
                     <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
                     <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
-                  </Form.Group>
-                  <Form.Group className="mb-3" controlId="profileUsername">
-                    <Form.Label>Benutzername</Form.Label>
-                    <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
-                    <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
-                  </Form.Group>
-                  <Form.Group className="mb-3" controlId="profileSignature">
-                    <Form.Label>E-Mail Signatur (HTML)</Form.Label>
-                    <Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen,<br/>Max Mustermann</p>" {...form.register("email_signature")} />
                   </Form.Group>
                   <Button type="submit" disabled={updateProfileMutation.isPending}>
                     {updateProfileMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}

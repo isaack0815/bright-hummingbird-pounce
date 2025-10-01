@@ -4,21 +4,17 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Card, Row, Col, Button, ListGroup, Alert, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
-import { ArrowLeft, Save, PlusCircle, Trash2, FileUp, FileCheck2, Download } from 'lucide-react';
+import { Card, Row, Col, Button, ListGroup, Placeholder, Alert, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
+import { ArrowLeft, Save, PlusCircle, Trash2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import type { FreightOrder } from '@/types/freight';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { BillingLineItem } from '@/types/billing';
-import { useEffect, useState, useMemo } from 'react';
-import { addDays, format, parseISO } from 'date-fns';
-import { useAuth } from '@/contexts/AuthContext';
-import { v4 as uuidv4 } from 'uuid';
+import { useEffect } from 'react';
 
 type BillingOrder = Omit<FreightOrder, 'customers'> & {
   customers: Customer | null;
   line_items: BillingLineItem[];
-  external_invoice_receipt_date?: string | null;
 };
 
 const lineItemSchema = z.object({
@@ -46,36 +42,14 @@ const fetchBillingDetails = async (id: string): Promise<BillingOrder> => {
   return data.order;
 };
 
-const fetchExternalFiles = async (orderId: string) => {
-    const { data, error } = await supabase.functions.invoke('get-external-billing-files', {
-        body: { orderId: parseInt(orderId, 10) }
-    });
-    if (error) throw error;
-    return data.files;
-}
-
 const BillingDetail = () => {
-  const { orderId } = useParams<{ orderId: string }>();
+  const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  const [receiptDate, setReceiptDate] = useState('');
-  const [cmrFile, setCmrFile] = useState<File | null>(null);
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [uploadingCMR, setUploadingCMR] = useState(false);
-  const [uploadingInvoice, setUploadingInvoice] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
 
   const { data: order, isLoading, error } = useQuery({
-    queryKey: ['billingDetail', orderId],
-    queryFn: () => fetchBillingDetails(orderId!),
-    enabled: !!orderId,
-  });
-
-  const { data: externalFiles } = useQuery({
-    queryKey: ['externalBillingFiles', orderId],
-    queryFn: () => fetchExternalFiles(orderId!),
-    enabled: !!orderId && order?.is_billed && order?.is_external,
+    queryKey: ['billingDetail', id],
+    queryFn: () => fetchBillingDetails(id!),
+    enabled: !!id,
   });
 
   const form = useForm<z.infer<typeof billingSchema>>({
@@ -109,79 +83,8 @@ const BillingDetail = () => {
         total_discount_type: (order.total_discount_type as 'fixed' | 'percentage') || 'fixed',
         line_items: order.line_items && order.line_items.length > 0 ? order.line_items : [defaultLineItem],
       });
-      setReceiptDate(order.external_invoice_receipt_date || format(new Date(), 'yyyy-MM-dd'));
     }
   }, [order, form]);
-
-  const updateReceiptDateMutation = useMutation({
-    mutationFn: async (date: string) => {
-        const { error } = await supabase.functions.invoke('update-invoice-receipt-date', {
-            body: { orderId: order!.id, receiptDate: date }
-        });
-        if (error) throw error;
-    },
-    onSuccess: () => {
-        showSuccess("Rechnungseingang gespeichert!");
-        queryClient.invalidateQueries({ queryKey: ['billingDetail', orderId] });
-    },
-    onError: (err: any) => showError(err.message || "Fehler beim Speichern des Datums.")
-  });
-
-  const handleFileUpload = async (file: File, type: 'CMR' | 'Eingangsrechnung') => {
-    if (!file || !orderId || !user) return;
-    const setLoading = type === 'CMR' ? setUploadingCMR : setUploadingInvoice;
-    setLoading(true);
-    try {
-        const fileName = `${type}_${orderId}.pdf`;
-        const filePath = `${orderId}/${uuidv4()}-${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file, { upsert: true });
-        if (uploadError) throw uploadError;
-
-        await supabase.from('order_files').upsert({
-            order_id: orderId,
-            user_id: user.id,
-            file_path: filePath,
-            file_name: fileName,
-            file_type: file.type,
-        }, { onConflict: 'order_id,file_name' });
-
-        showSuccess(`${type} erfolgreich hochgeladen!`);
-        queryClient.invalidateQueries({ queryKey: ['externalBillingFiles', orderId] });
-    } catch (err: any) {
-        showError(err.message || "Fehler beim Upload.");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  const deleteFileMutation = useMutation({
-    mutationFn: async (fileId: number) => {
-        const { error } = await supabase.functions.invoke('delete-order-file', {
-            body: { fileId }
-        });
-        if (error) throw error;
-    },
-    onSuccess: () => {
-        showSuccess("Datei erfolgreich gelöscht.");
-        queryClient.invalidateQueries({ queryKey: ['externalBillingFiles', orderId] });
-    },
-    onError: (err: any) => {
-        showError(err.message || "Fehler beim Löschen der Datei.");
-    }
-  });
-
-  const handleDownload = async (filePath: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('get-download-url', {
-        body: { filePath },
-      });
-      if (error) throw error;
-      window.open(data.signedUrl, '_blank');
-    } catch (err: any) {
-      showError(err.data?.error || "Fehler beim Herunterladen.");
-    }
-  };
 
   const createLexofficeInvoiceMutation = useMutation({
     mutationFn: async () => {
@@ -196,7 +99,7 @@ const BillingDetail = () => {
     },
     onSuccess: (data) => {
       showSuccess(data.message || "Rechnungsentwurf erfolgreich in Lexoffice erstellt!");
-      queryClient.invalidateQueries({ queryKey: ['billingDetail', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['billingDetail', id] });
       queryClient.invalidateQueries({ queryKey: ['freightOrders'] });
     },
     onError: (err: any) => {
@@ -228,242 +131,139 @@ const BillingDetail = () => {
     }
   });
 
-  const handleDownloadInvoice = async () => {
-    if (!order?.lex_invoice_id) return;
-    setIsDownloading(true);
-    try {
-        const { data, error } = await supabase.functions.invoke('get-lexoffice-invoice-pdf', {
-            body: { invoiceId: order.lex_invoice_id },
-        });
-        if (error) throw error;
-
-        const url = window.URL.createObjectURL(data);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `rechnung-${order.order_number}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-
-    } catch (err: any) {
-        showError(err.data?.error || err.message || "Fehler beim Herunterladen der Rechnung.");
-    } finally {
-        setIsDownloading(false);
-    }
-  };
-
   const watchedLineItems = form.watch('line_items');
   const watchedTotalDiscount = form.watch('total_discount');
   const watchedTotalDiscountType = form.watch('total_discount_type');
   const watchedIsIntraCommunity = form.watch('is_intra_community');
 
-  const totals = useMemo(() => watchedLineItems.reduce((acc, item) => {
-    const lineTotal = (item.quantity || 0) * (item.unit_price || 0);
+  const totals = watchedLineItems.reduce((acc, item) => {
+    const lineTotal = item.quantity * item.unit_price;
     let lineDiscount = 0;
     if (item.discount_type === 'fixed') {
-      lineDiscount = item.discount || 0;
+      lineDiscount = item.discount;
     } else {
-      lineDiscount = lineTotal * ((item.discount || 0) / 100);
+      lineDiscount = lineTotal * (item.discount / 100);
     }
     const netLineTotal = lineTotal - lineDiscount;
-    const vatAmount = netLineTotal * ((item.vat_rate || 0) / 100);
+    const vatAmount = netLineTotal * (item.vat_rate / 100);
     
     acc.subtotal += lineTotal;
     acc.totalNet += netLineTotal;
     
-    if (!acc.vatTotals[item.vat_rate || 0]) {
-      acc.vatTotals[item.vat_rate || 0] = 0;
+    if (!acc.vatTotals[item.vat_rate]) {
+      acc.vatTotals[item.vat_rate] = 0;
     }
-    acc.vatTotals[item.vat_rate || 0] += vatAmount;
+    acc.vatTotals[item.vat_rate] += vatAmount;
     
     return acc;
-  }, { subtotal: 0, totalNet: 0, vatTotals: {} as Record<number, number> }), [watchedLineItems]);
+  }, { subtotal: 0, totalNet: 0, vatTotals: {} as Record<number, number> });
 
-  const { finalNet, finalGross } = useMemo(() => {
-    let overallDiscountAmount = 0;
-    if (watchedTotalDiscountType === 'fixed') {
-      overallDiscountAmount = watchedTotalDiscount || 0;
-    } else {
-      overallDiscountAmount = totals.totalNet * ((watchedTotalDiscount || 0) / 100);
-    }
-    const finalNet = totals.totalNet - overallDiscountAmount;
-    const totalVat = Object.values(totals.vatTotals).reduce((sum, v) => sum + v, 0);
-    const finalGross = finalNet + totalVat;
-    return { finalNet, finalGross };
-  }, [totals, watchedTotalDiscount, watchedTotalDiscountType]);
-
-  const paymentDueDate = useMemo(() => {
-    if (receiptDate && order?.payment_term_days) {
-        try {
-            return format(addDays(parseISO(receiptDate), order.payment_term_days), 'dd.MM.yyyy');
-        } catch {
-            return 'Ungültiges Datum';
-        }
-    }
-    return '-';
-  }, [receiptDate, order?.payment_term_days]);
-
-  const existingCmr = externalFiles?.find(f => f.file_name.startsWith('CMR_'));
-  const existingInvoice = externalFiles?.find(f => f.file_name.startsWith('Eingangsrechnung_') || f.file_name.startsWith('Invoice_'));
+  let overallDiscountAmount = 0;
+  if (watchedTotalDiscountType === 'fixed') {
+    overallDiscountAmount = watchedTotalDiscount;
+  } else {
+    overallDiscountAmount = totals.totalNet * (watchedTotalDiscount / 100);
+  }
+  const finalNet = totals.totalNet - overallDiscountAmount;
+  const totalVat = Object.values(totals.vatTotals).reduce((sum, v) => sum + v, 0);
+  const finalGross = finalNet + totalVat;
 
   if (isLoading) return <p>Lade Abrechnungsdetails...</p>;
   if (error) return <Alert variant="danger">Fehler: {error.message}</Alert>;
   if (!order) return <Alert variant="warning">Auftrag nicht gefunden.</Alert>;
 
   return (
-    <>
+    <Form onSubmit={form.handleSubmit((v) => updateBillingMutation.mutate(v))}>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <div className='d-flex align-items-center gap-3'>
           <NavLink to="/fernverkehr" className="btn btn-outline-secondary btn-sm p-2 lh-1"><ArrowLeft size={16} /></NavLink>
           <h1 className="h2 mb-0">Abrechnung für Auftrag {order.order_number}</h1>
         </div>
-        {!order.is_billed && (
-            <Button form="billing-form" type="submit" disabled={updateBillingMutation.isPending || createLexofficeInvoiceMutation.isPending}>
-                {updateBillingMutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
-                {createLexofficeInvoiceMutation.isPending ? 'Erstelle Entwurf...' : 'Speichern & Lexoffice-Entwurf erstellen'}
-            </Button>
-        )}
+        <Button type="submit" disabled={updateBillingMutation.isPending || createLexofficeInvoiceMutation.isPending || !!order.lex_invoice_id}>
+          {updateBillingMutation.isPending ? <Spinner size="sm" className="me-2" /> : <Save size={16} className="me-2" />}
+          {createLexofficeInvoiceMutation.isPending ? 'Erstelle Entwurf...' : (order.lex_invoice_id ? 'Bereits abgerechnet' : 'Speichern & Lexoffice-Entwurf erstellen')}
+        </Button>
       </div>
 
-      {order && order.is_billed && order.is_external && (
-        <Card className="mb-4">
-            <Card.Header className="bg-info text-white d-flex justify-content-between align-items-center">
-                <Card.Title className="mb-0">Externe Abrechnungsdetails</Card.Title>
-                {order.lex_invoice_id && (
-                    <Button variant="light" size="sm" onClick={handleDownloadInvoice} disabled={isDownloading}>
-                        {isDownloading ? <Spinner size="sm" /> : <Download size={16} />}
-                        <span className="ms-2">Rechnung herunterladen</span>
-                    </Button>
-                )}
-            </Card.Header>
+      <Row className="g-4">
+        <Col lg={8}>
+          <Card>
+            <Card.Header><Card.Title>Rechnungspositionen</Card.Title></Card.Header>
             <Card.Body>
-                <Row className="g-4">
-                    <Col md={6}>
-                        <h6>Zahlungsfristen</h6>
-                        <InputGroup className="mb-3">
-                            <InputGroup.Text>Rechnungseingang</InputGroup.Text>
-                            <Form.Control type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
-                            <Button onClick={() => updateReceiptDateMutation.mutate(receiptDate)} disabled={!receiptDate || updateReceiptDateMutation.isPending}>
-                                {updateReceiptDateMutation.isPending ? <Spinner size="sm" /> : 'Speichern'}
-                            </Button>
+              <Table responsive>
+                <thead><tr><th>Beschreibung</th><th>Menge</th><th>Einzelpreis</th><th>Rabatt</th><th>MwSt.</th><th></th></tr></thead>
+                <tbody>
+                  {fields.map((field, index) => (
+                    <tr key={field.id}>
+                      <td><Form.Control {...form.register(`line_items.${index}.description`)} /></td>
+                      <td><Form.Control type="number" {...form.register(`line_items.${index}.quantity`)} /></td>
+                      <td><InputGroup><Form.Control type="number" step="0.01" {...form.register(`line_items.${index}.unit_price`)} /><InputGroup.Text>€</InputGroup.Text></InputGroup></td>
+                      <td>
+                        <InputGroup>
+                          <Form.Control type="number" step="0.01" {...form.register(`line_items.${index}.discount`)} />
+                          <Form.Select {...form.register(`line_items.${index}.discount_type`)} style={{width: '60px'}}><option value="fixed">€</option><option value="percentage">%</option></Form.Select>
                         </InputGroup>
-                        <p className="small"><strong>Zahlungsfrist:</strong> {order.payment_term_days || '-'} Tage</p>
-                        <p className="small"><strong>Zahlungsziel:</strong> {paymentDueDate}</p>
-                    </Col>
-                    <Col md={6}>
-                        <h6>Dokumente</h6>
-                        <div className="d-flex flex-column gap-3">
-                            <div>
-                                <Form.Label>CMR-Dokument</Form.Label>
-                                {existingCmr ? (
-                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted flex-grow-1 text-truncate">{existingCmr.file_name}</span><Button variant="link" size="sm" onClick={() => handleDownload(existingCmr.file_path)}><Download size={16} /></Button><Button variant="link" size="sm" className="text-danger" onClick={() => deleteFileMutation.mutate(existingCmr.id)}><Trash2 size={16} /></Button></div>
-                                ) : (
-                                    <InputGroup>
-                                        <Form.Control type="file" onChange={e => setCmrFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
-                                        <Button onClick={() => cmrFile && handleFileUpload(cmrFile, 'CMR')} disabled={!cmrFile || uploadingCMR}>{uploadingCMR ? <Spinner size="sm" /> : <FileUp />}</Button>
-                                    </InputGroup>
-                                )}
-                            </div>
-                            <div>
-                                <Form.Label>Eingangsrechnung</Form.Label>
-                                {existingInvoice ? (
-                                    <div className="d-flex align-items-center gap-2"><FileCheck2 className="text-success" /><span className="text-muted flex-grow-1 text-truncate">{existingInvoice.file_name}</span><Button variant="link" size="sm" onClick={() => handleDownload(existingInvoice.file_path)}><Download size={16} /></Button><Button variant="link" size="sm" className="text-danger" onClick={() => deleteFileMutation.mutate(existingInvoice.id)}><Trash2 size={16} /></Button></div>
-                                ) : (
-                                    <InputGroup>
-                                        <Form.Control type="file" onChange={e => setInvoiceFile((e.target as HTMLInputElement).files?.[0] || null)} accept=".pdf" />
-                                        <Button onClick={() => invoiceFile && handleFileUpload(invoiceFile, 'Eingangsrechnung')} disabled={!invoiceFile || uploadingInvoice}>{uploadingInvoice ? <Spinner size="sm" /> : <FileUp />}</Button>
-                                    </InputGroup>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                </Row>
+                      </td>
+                      <td>
+                        <Controller
+                          control={form.control}
+                          name={`line_items.${index}.vat_rate`}
+                          render={({ field }) => (
+                            <Form.Select {...field} disabled={watchedIsIntraCommunity}>
+                              <option value="19">19%</option><option value="7">7%</option><option value="0">0%</option>
+                            </Form.Select>
+                          )}
+                        />
+                      </td>
+                      <td><Button variant="ghost" size="sm" onClick={() => remove(index)}><Trash2 className="text-danger" size={16} /></Button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+              <Button variant="outline-secondary" onClick={() => append({ description: '', quantity: 1, unit_price: 0, discount: 0, discount_type: 'fixed', vat_rate: 19 })}>
+                <PlusCircle size={16} className="me-2" />Position hinzufügen
+              </Button>
             </Card.Body>
-        </Card>
-      )}
-
-      <Form id="billing-form" onSubmit={form.handleSubmit((v) => updateBillingMutation.mutate(v))}>
-        <Row className="g-4">
-            <Col lg={8}>
-                <Card>
-                    <Card.Header><Card.Title>Rechnungspositionen</Card.Title></Card.Header>
-                    <Card.Body>
-                        <Table responsive>
-                            <thead><tr><th>Beschreibung</th><th>Menge</th><th>Einzelpreis</th><th>Rabatt</th><th>MwSt.</th><th></th></tr></thead>
-                            <tbody>
-                            {fields.map((field, index) => (
-                                <tr key={field.id}>
-                                <td><Form.Control {...form.register(`line_items.${index}.description`)} disabled={order.is_billed} /></td>
-                                <td><Form.Control type="number" {...form.register(`line_items.${index}.quantity`)} disabled={order.is_billed} /></td>
-                                <td><InputGroup><Form.Control type="number" step="0.01" {...form.register(`line_items.${index}.unit_price`)} disabled={order.is_billed} /><InputGroup.Text>€</InputGroup.Text></InputGroup></td>
-                                <td>
-                                    <InputGroup>
-                                    <Form.Control type="number" step="0.01" {...form.register(`line_items.${index}.discount`)} disabled={order.is_billed} />
-                                    <Form.Select {...form.register(`line_items.${index}.discount_type`)} style={{width: '60px'}} disabled={order.is_billed}><option value="fixed">€</option><option value="percentage">%</option></Form.Select>
-                                    </InputGroup>
-                                </td>
-                                <td>
-                                    <Controller
-                                    control={form.control}
-                                    name={`line_items.${index}.vat_rate`}
-                                    render={({ field }) => (
-                                        <Form.Select {...field} disabled={watchedIsIntraCommunity || order.is_billed}>
-                                        <option value="19">19%</option><option value="7">7%</option><option value="0">0%</option>
-                                        </Form.Select>
-                                    )}
-                                    />
-                                </td>
-                                <td>{!order.is_billed && <Button variant="ghost" size="sm" onClick={() => remove(index)}><Trash2 className="text-danger" size={16} /></Button>}</td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </Table>
-                        {!order.is_billed && <Button variant="outline-secondary" onClick={() => append({ description: '', quantity: 1, unit_price: 0, discount: 0, discount_type: 'fixed', vat_rate: 19 })}>
-                            <PlusCircle size={16} className="me-2" />Position hinzufügen
-                        </Button>}
-                    </Card.Body>
-                </Card>
-            </Col>
-            <Col lg={4}>
-                <Card className="mb-4">
-                    <Card.Header><Card.Title>Rechnungsanschrift</Card.Title></Card.Header>
-                    <Card.Body>
-                    <p className="mb-1"><strong>{order.customers?.company_name}</strong></p>
-                    <p className="text-muted small">{order.customers?.street} {order.customers?.house_number}<br/>{order.customers?.postal_code} {order.customers?.city}</p>
-                    </Card.Body>
-                </Card>
-                <Card>
-                    <Card.Header><Card.Title>Zusammenfassung</Card.Title></Card.Header>
-                    <Card.Body>
-                    <ListGroup variant="flush">
-                        <ListGroup.Item className="d-flex justify-content-between"><span>Zwischensumme</span> <span>{totals.subtotal.toFixed(2)} €</span></ListGroup.Item>
-                        <ListGroup.Item className="d-flex justify-content-between"><span>Gesamtrabatt</span>
-                        <InputGroup size="sm" style={{maxWidth: '150px'}}>
-                            <Form.Control type="number" step="0.01" {...form.register('total_discount')} disabled={order.is_billed} />
-                            <Form.Select {...form.register('total_discount_type')} style={{width: '60px'}} disabled={order.is_billed}><option value="fixed">€</option><option value="percentage">%</option></Form.Select>
-                        </InputGroup>
-                        </ListGroup.Item>
-                        <ListGroup.Item className="d-flex justify-content-between"><strong>Summe Netto</strong> <strong>{finalNet.toFixed(2)} €</strong></ListGroup.Item>
-                        {Object.entries(totals.vatTotals).map(([rate, amount]) => (
-                        <ListGroup.Item key={rate} className="d-flex justify-content-between"><span>+ MwSt. ({rate}%)</span> <span>{amount.toFixed(2)} €</span></ListGroup.Item>
-                        ))}
-                        <ListGroup.Item className="d-flex justify-content-between fw-bold h5 mb-0"><span>Gesamt Brutto</span> <span>{finalGross.toFixed(2)} €</span></ListGroup.Item>
-                    </ListGroup>
-                    <hr/>
-                    <Form.Check type="switch" id="intra-community-switch" label="Innergemeinschaftliche Leistung" {...form.register('is_intra_community')} disabled={order.is_billed} onChange={(e) => {
-                        form.setValue('is_intra_community', e.target.checked);
-                        const newVatRate = e.target.checked ? 0 : 19;
-                        watchedLineItems.forEach((_, index) => {
-                            form.setValue(`line_items.${index}.vat_rate`, newVatRate);
-                        });
-                    }}/>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
-      </Form>
-    </>
+          </Card>
+        </Col>
+        <Col lg={4}>
+          <Card className="mb-4">
+            <Card.Header><Card.Title>Rechnungsanschrift</Card.Title></Card.Header>
+            <Card.Body>
+              <p className="mb-1"><strong>{order.customers?.company_name}</strong></p>
+              <p className="text-muted small">{order.customers?.street} {order.customers?.house_number}<br/>{order.customers?.postal_code} {order.customers?.city}</p>
+            </Card.Body>
+          </Card>
+          <Card>
+            <Card.Header><Card.Title>Zusammenfassung</Card.Title></Card.Header>
+            <Card.Body>
+              <ListGroup variant="flush">
+                <ListGroup.Item className="d-flex justify-content-between"><span>Zwischensumme</span> <span>{totals.subtotal.toFixed(2)} €</span></ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between"><span>Gesamtrabatt</span>
+                  <InputGroup size="sm" style={{maxWidth: '150px'}}>
+                    <Form.Control type="number" step="0.01" {...form.register('total_discount')} />
+                    <Form.Select {...form.register('total_discount_type')} style={{width: '60px'}}><option value="fixed">€</option><option value="percentage">%</option></Form.Select>
+                  </InputGroup>
+                </ListGroup.Item>
+                <ListGroup.Item className="d-flex justify-content-between"><strong>Summe Netto</strong> <strong>{finalNet.toFixed(2)} €</strong></ListGroup.Item>
+                {Object.entries(totals.vatTotals).map(([rate, amount]) => (
+                  <ListGroup.Item key={rate} className="d-flex justify-content-between"><span>+ MwSt. ({rate}%)</span> <span>{amount.toFixed(2)} €</span></ListGroup.Item>
+                ))}
+                <ListGroup.Item className="d-flex justify-content-between fw-bold h5 mb-0"><span>Gesamt Brutto</span> <span>{finalGross.toFixed(2)} €</span></ListGroup.Item>
+              </ListGroup>
+              <hr/>
+              <Form.Check type="switch" id="intra-community-switch" label="Innergemeinschaftliche Leistung" {...form.register('is_intra_community')} onChange={(e) => {
+                  form.setValue('is_intra_community', e.target.checked);
+                  const newVatRate = e.target.checked ? 0 : 19;
+                  watchedLineItems.forEach((_, index) => {
+                      form.setValue(`line_items.${index}.vat_rate`, newVatRate);
+                  });
+              }}/>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Form>
   );
 };
 

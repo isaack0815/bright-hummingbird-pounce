@@ -53,7 +53,7 @@ export const FileListItem = ({ file, orderId }: FileListItemProps) => {
 
     try {
       const { data, error } = await supabase.functions.invoke('get-download-url', {
-        body: { fileId: file.id, filePath: file.file_path },
+        body: { filePath: file.file_path },
       });
 
       if (error) throw error;

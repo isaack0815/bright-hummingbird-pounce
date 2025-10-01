@@ -5,7 +5,19 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showError } from '@/utils/toast';
 import TablePlaceholder from '@/components/TablePlaceholder';
-import type { LexInvoice } from '@/types/invoice';
+
+type LexInvoice = {
+  id: string;
+  voucherNumber: string;
+  voucherDate: string;
+  voucherStatus: 'open' | 'paid' | 'overdue' | 'voided';
+  contactName: string;
+  totalPrice?: {
+    totalNetAmount: number;
+    totalGrossAmount: number;
+    currency: string;
+  };
+};
 
 const fetchInvoices = async (): Promise<LexInvoice[]> => {
   const { data, error } = await supabase.functions.invoke('get-lexoffice-invoices');

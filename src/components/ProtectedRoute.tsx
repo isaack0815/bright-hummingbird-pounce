@@ -3,31 +3,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { showError } from '@/utils/toast';
 
 type ProtectedRouteProps = {
-  requiredPermission?: string;
-  children?: React.ReactElement;
+  requiredPermission: string;
 };
 
-const ProtectedRoute = ({ requiredPermission, children }: ProtectedRouteProps) => {
-  const { isLoading, hasPermission, session } = useAuth();
+const ProtectedRoute = ({ requiredPermission }: ProtectedRouteProps) => {
+  const { isLoading, hasPermission } = useAuth();
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p>Lade Sitzung...</p>
+        <p>Lade Berechtigungen...</p>
       </div>
     );
   }
 
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (requiredPermission && !hasPermission(requiredPermission)) {
+  if (!hasPermission(requiredPermission)) {
     showError("Zugriff verweigert. Sie haben nicht die erforderliche Berechtigung.");
     return <Navigate to="/" replace />;
   }
 
-  return children ? children : <Outlet />;
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

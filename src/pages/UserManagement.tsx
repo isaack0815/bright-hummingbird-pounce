@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { Card, Button, Table, Badge } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit, FileText, Users } from 'lucide-react';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import TablePlaceholder from '@/components/TablePlaceholder';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 
 type User = {
   id: string;
@@ -16,10 +14,7 @@ type User = {
   created_at: string;
   first_name?: string | null;
   last_name?: string | null;
-  username?: string | null;
   roles: { id: number; name: string }[];
-  work_groups: { id: number; name: string }[];
-  entry_date?: string | null;
 };
 
 const fetchUsers = async (): Promise<User[]> => {
@@ -34,8 +29,6 @@ const UserManagement = () => {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { hasPermission } = useAuth();
 
   const { data: users, isLoading, error } = useQuery<User[]>({
     queryKey: ['users'],
@@ -79,16 +72,10 @@ const UserManagement = () => {
     <div>
       <div className="d-flex align-items-center justify-content-between mb-4">
         <h1 className="h2">Nutzerverwaltung</h1>
-        <div className="d-flex gap-2">
-            <Button variant="outline-secondary" onClick={() => navigate('/work-groups')}>
-                <Users className="me-2" size={16} />
-                Arbeitsgruppen verwalten
-            </Button>
-            <Button onClick={() => setIsAddUserDialogOpen(true)}>
-                <PlusCircle className="me-2" size={16} />
-                Nutzer hinzufügen
-            </Button>
-        </div>
+        <Button onClick={() => setIsAddUserDialogOpen(true)}>
+          <PlusCircle className="me-2" size={16} />
+          Nutzer hinzufügen
+        </Button>
       </div>
       <Card>
         <Card.Header>
@@ -97,17 +84,15 @@ const UserManagement = () => {
         </Card.Header>
         <Card.Body>
           {isLoading ? (
-            <TablePlaceholder cols={7} />
+            <TablePlaceholder cols={5} />
           ) : users && users.length > 0 ? (
             <Table responsive hover>
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Benutzername</th>
                   <th>Email</th>
-                  <th>Berechtigung</th>
-                  <th>Arbeitsgruppen</th>
-                  <th>Eintritt</th>
+                  <th>Gruppen</th>
+                  <th>Erstellt am</th>
                   <th className="text-end">Aktionen</th>
                 </tr>
               </thead>
@@ -117,7 +102,6 @@ const UserManagement = () => {
                     <td className="fw-medium">
                       {user.first_name || user.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'N/A'}
                     </td>
-                    <td>{user.username}</td>
                     <td>{user.email}</td>
                     <td>
                       <div className="d-flex gap-1 flex-wrap">
@@ -128,23 +112,9 @@ const UserManagement = () => {
                         )}
                       </div>
                     </td>
-                    <td>
-                      <div className="d-flex gap-1 flex-wrap">
-                        {user.work_groups.length > 0 ? (
-                          user.work_groups.map(group => <Badge key={group.id} bg="info">{group.name}</Badge>)
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </div>
-                    </td>
-                    <td>{user.entry_date ? new Date(user.entry_date).toLocaleDateString() : '-'}</td>
+                    <td>{new Date(user.created_at).toLocaleDateString()}</td>
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
-                        {hasPermission('personnel_files.manage') && (
-                          <Button variant="ghost" size="sm" onClick={() => navigate(`/users/${user.id}/personnel-file`)}>
-                            <FileText size={16} />
-                          </Button>
-                        )}
                         <Button variant="ghost" size="sm" onClick={() => handleEditClick(user)}>
                           <Edit size={16} />
                         </Button>

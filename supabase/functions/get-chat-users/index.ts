@@ -25,7 +25,7 @@ serve(async (req) => {
     const userIds = authUsers.map(user => user.id);
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, first_name, last_name, username')
+      .select('id, first_name, last_name')
       .in('id', userIds);
     if (profilesError) throw profilesError;
 
@@ -44,7 +44,6 @@ serve(async (req) => {
         id: user.id,
         first_name: firstName || user.email?.split('@')[0] || 'Benutzer',
         last_name: lastName || '',
-        username: profile?.username || null,
       };
     });
 

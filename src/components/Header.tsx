@@ -44,7 +44,7 @@ const buildTree = (items: MenuItem[]): TreeMenuItem[] => {
 
 const Header = () => {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const { data: menuItems, isLoading: isLoadingMenu } = useQuery<MenuItem[]>({
     queryKey: ['menuItems'],
@@ -56,20 +56,15 @@ const Header = () => {
     navigate('/login');
   };
 
-  // Temporarily removed permission filtering to show all items
-  const menuTree = buildTree(menuItems || []);
+  const visibleItems = menuItems?.filter(item => 
+    !item.required_permission || hasPermission(item.required_permission)
+  ) || [];
+
+  const menuTree = buildTree(visibleItems);
 
   const renderMenuItems = (items: TreeMenuItem[]) => {
     return items.map(item => {
-      // Hide menu items that require a permission the user doesn't have
-      if (item.required_permission && !hasPermission(item.required_permission)) {
-        return null;
-      }
-
       if (item.children && item.children.length > 0) {
-        const visibleChildren = item.children.filter(child => !child.required_permission || hasPermission(child.required_permission));
-        if (visibleChildren.length === 0) return null;
-
         return (
           <NavDropdown 
             title={
@@ -81,7 +76,7 @@ const Header = () => {
             id={`dropdown-${item.id}`} 
             key={item.id}
           >
-            {visibleChildren.map(child => (
+            {item.children.map(child => (
               <NavDropdown.Item as={NavLink} to={child.link || '#'} key={child.id}>
                 {child.icon && <DynamicIcon name={child.icon} className="me-2 h-4 w-4" />}
                 {child.name}
@@ -112,7 +107,7 @@ const Header = () => {
             {isLoadingMenu ? <Spinner animation="border" size="sm" /> : renderMenuItems(menuTree)}
           </Nav>
           <Nav>
-            <NavDropdown title={<User />} id="user-dropdown" align="end" renderMenuOnMount>
+            <NavDropdown title={<User />} id="user-dropdown" align="end" renderOnMount popperConfig={{ strategy: 'fixed' }}>
               <NavDropdown.Item as={NavLink} to="/profile">
                 <User className="me-2 h-4 w-4" /> Mein Profil
               </NavDropdown.Item>

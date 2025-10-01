@@ -26,8 +26,7 @@ serve(async (req) => {
         *,
         customers (id, company_name),
         freight_order_stops (*),
-        cargo_items (*),
-        vehicles (id, license_plate)
+        cargo_items (*)
       `)
       .order('created_at', { ascending: false });
 

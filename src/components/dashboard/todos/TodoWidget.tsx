@@ -54,7 +54,7 @@ export function TodoWidget() {
   const getDueDateBadge = (dueDate: string | null) => {
     if (!dueDate) return null;
     const date = parseISO(dueDate);
-    if (isPast(date) && date.toDateString() !== new Date().toDateString()) return <Badge bg="danger">Überfällig</Badge>;
+    if (isPast(date) && !date.toDateString() === new Date().toDateString()) return <Badge bg="danger">Überfällig</Badge>;
     return <Badge bg="secondary">{format(date, 'dd.MM.yyyy', { locale: de })}</Badge>;
   };
 

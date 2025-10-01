@@ -9,7 +9,6 @@ import { useState } from "react";
 const formSchema = z.object({
   firstName: z.string().min(1, { message: "Vorname ist erforderlich." }),
   lastName: z.string().min(1, { message: "Nachname ist erforderlich." }),
-  username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
   email: z.string().email({ message: "Ungültige E-Mail-Adresse." }),
   password: z.string().min(6, { message: "Passwort muss mindestens 6 Zeichen lang sein." }),
 });
@@ -27,7 +26,6 @@ export function AddUserDialog({ show, onHide, onUserAdded }: AddUserDialogProps)
     defaultValues: {
       firstName: "",
       lastName: "",
-      username: "",
       email: "",
       password: "",
     },
@@ -40,7 +38,6 @@ export function AddUserDialog({ show, onHide, onUserAdded }: AddUserDialogProps)
         body: {
           first_name: values.firstName,
           last_name: values.lastName,
-          username: values.username,
           email: values.email,
           password: values.password,
         },
@@ -79,11 +76,6 @@ export function AddUserDialog({ show, onHide, onUserAdded }: AddUserDialogProps)
             <Form.Label>Nachname</Form.Label>
             <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
             <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
-          </Form.Group>
-          <Form.Group className="mb-3" controlId="username">
-            <Form.Label>Benutzername</Form.Label>
-            <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
-            <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
           </Form.Group>
           <Form.Group className="mb-3" controlId="email">
             <Form.Label>Email</Form.Label>

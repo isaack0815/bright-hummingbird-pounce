@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button, Card, Form, Tabs, Tab, Row, Col } from 'react-bootstrap';
@@ -17,10 +17,8 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
-import StatusHistoryTab from '@/components/freight/StatusHistoryTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
-import type { Vehicle } from '@/types/vehicle';
 
 const stopSchema = z.object({
   stop_type: z.enum(['Abholung', 'Teillieferung', 'Teilladung', 'Lieferung']),
@@ -47,23 +45,12 @@ const formSchema = z.object({
   description: z.string().optional(),
   stops: z.array(stopSchema).min(1, "Es muss mindestens ein Stopp vorhanden sein."),
   cargoItems: z.array(cargoItemSchema).optional(),
-  vehicle_id: z.coerce.number().nullable().optional(),
 });
 
-type FormSchemaType = z.infer<typeof formSchema>;
-
 const fetchCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase.functions.invoke('manage-customers', {
-    body: { action: 'get' }
-  });
+  const { data, error } = await supabase.functions.invoke('get-customers');
   if (error) throw new Error(error.message);
   return data.customers;
-};
-
-const fetchVehicles = async (): Promise<Vehicle[]> => {
-  const { data, error } = await supabase.functions.invoke('get-vehicles');
-  if (error) throw new Error(error.message);
-  return data.vehicles;
 };
 
 const fetchOrder = async (id: string): Promise<FreightOrder> => {
@@ -93,11 +80,6 @@ const FreightOrderForm = () => {
     queryFn: fetchCustomers,
   });
 
-  const { data: vehicles, isLoading: isLoadingVehicles } = useQuery<Vehicle[]>({
-    queryKey: ['vehicles'],
-    queryFn: fetchVehicles,
-  });
-
   const { data: settingsArray, isLoading: isLoadingSettings } = useQuery<Setting[]>({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -115,7 +97,7 @@ const FreightOrderForm = () => {
     enabled: isEditMode,
   });
 
-  const form = useForm<FormSchemaType>({
+  const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: 'Angelegt',
@@ -144,47 +126,41 @@ const FreightOrderForm = () => {
         description: existingOrder.description || '',
         stops: (existingOrder.freight_order_stops || []).map(s => ({...s, stop_date: s.stop_date || null, time_start: s.time_start || null, time_end: s.time_end || null })),
         cargoItems: existingOrder.cargo_items || [],
-        vehicle_id: existingOrder.vehicle_id || undefined,
       });
     }
   }, [existingOrder, isEditMode, form]);
 
   const mutation = useMutation({
-    mutationFn: async (values: FormSchemaType): Promise<FreightOrder> => {
-      const { stops, cargoItems, ...orderData } = values;
+    mutationFn: async (values: z.infer<typeof formSchema>): Promise<FreightOrder> => {
+      const cleanedOrderData = Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
+      );
+      
+      const { stops, cargoItems, ...orderData } = cleanedOrderData;
 
-      const cleanedStops = Array.isArray(stops) ? stops.map((stop: z.infer<typeof stopSchema>) => ({
+      const cleanedStops = Array.isArray(stops) ? stops.map(stop => ({
         ...stop,
         stop_date: stop.stop_date || null,
         time_start: stop.time_start || null,
         time_end: stop.time_end || null,
       })) : [];
 
-      const firstStop = cleanedStops.length > 0 ? cleanedStops[0] : null;
-      const lastStop = cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1] : null;
-
-      const finalOrderData = {
-        ...orderData,
-        vehicle_id: orderData.vehicle_id ? Number(orderData.vehicle_id) : null,
-        origin_address: firstStop ? firstStop.address : null,
-        destination_address: lastStop ? lastStop.address : null,
-        pickup_date: firstStop ? firstStop.stop_date : null,
-        pickup_time_start: firstStop ? firstStop.time_start : null,
-        pickup_time_end: firstStop ? firstStop.time_end : null,
-        delivery_date: lastStop ? lastStop.stop_date : null,
-        delivery_time_start: lastStop ? lastStop.time_start : null,
-        delivery_time_end: lastStop ? lastStop.time_end : null,
-        created_by: isEditMode ? existingOrder?.created_by : user?.id,
-      };
-
-      Object.keys(finalOrderData).forEach(key => {
-        if ((finalOrderData as any)[key] === '') {
-          (finalOrderData as any)[key] = null;
-        }
-      });
+      const firstStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[0] : null;
+      const lastStop = cleanedStops && cleanedStops.length > 0 ? cleanedStops[cleanedStops.length - 1] : null;
 
       const payload = {
-        orderData: finalOrderData,
+        orderData: {
+            ...orderData,
+            origin_address: firstStop ? firstStop.address : null,
+            destination_address: lastStop ? lastStop.address : null,
+            pickup_date: firstStop ? firstStop.stop_date : null,
+            pickup_time_start: firstStop ? firstStop.time_start : null,
+            pickup_time_end: firstStop ? firstStop.time_end : null,
+            delivery_date: lastStop ? lastStop.stop_date : null,
+            delivery_time_start: lastStop ? lastStop.time_start : null,
+            delivery_time_end: lastStop ? lastStop.time_end : null,
+            created_by: isEditMode ? existingOrder?.created_by : user?.id,
+        },
         stops: cleanedStops,
         cargoItems,
       };
@@ -210,7 +186,6 @@ const FreightOrderForm = () => {
         queryClient.invalidateQueries({ queryKey: ['orderNotes', Number(id)] });
         queryClient.invalidateQueries({ queryKey: ['orderFiles', Number(id)] });
         queryClient.invalidateQueries({ queryKey: ['orderTeam', Number(id)] });
-        queryClient.invalidateQueries({ queryKey: ['orderStatusHistory', Number(id)] });
       }
     },
     onError: (err: any) => {
@@ -219,7 +194,7 @@ const FreightOrderForm = () => {
     },
   });
 
-  if (isLoadingCustomers || isLoadingOrder || isLoadingSettings || isLoadingVehicles) {
+  if (isLoadingCustomers || isLoadingOrder || isLoadingSettings) {
       return <p>Lade Formulardaten...</p>
   }
 
@@ -276,7 +251,7 @@ const FreightOrderForm = () => {
                                               <Button type="button" variant="ghost" size="sm" className="p-1" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
                                           </div>
                                           <Row className="g-3">
-                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control as="textarea" rows={2} {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
+                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Stopp-Art</Form.Label><Form.Select {...form.register(`stops.${index}.stop_type`)}><option value="Abholung">Abholung</option><option value="Teilladung">Teilladung</option><option value="Teillieferung">Teillieferung</option><option value="Lieferung">Lieferung</option></Form.Select></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Datum</Form.Label><Form.Control type="date" {...form.register(`stops.${index}.stop_date`)} /></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Zeitfenster (von)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_start`)} /></Form.Group></Col>
@@ -334,27 +309,15 @@ const FreightOrderForm = () => {
                       <Card.Body className="d-flex flex-column gap-3">
                           <Form.Group>
                               <Form.Label>Kunde</Form.Label>
-                              <Controller
-                                name="customer_id"
-                                control={form.control}
-                                render={({ field }) => (
-                                  <CustomerCombobox
-                                      customers={customers || []}
-                                      value={field.value}
-                                      onChange={field.onChange}
-                                      onAddNew={() => setIsAddCustomerDialogOpen(true)}
-                                  />
-                                )}
+                              <CustomerCombobox
+                                  customers={customers || []}
+                                  value={form.watch('customer_id')}
+                                  onChange={(value) => form.setValue('customer_id', value)}
+                                  onAddNew={() => setIsAddCustomerDialogOpen(true)}
                               />
                           </Form.Group>
                           <Form.Group><Form.Label>Externe Auftragsnummer</Form.Label><Form.Control {...form.register("external_order_number")} /></Form.Group>
                           <Form.Group><Form.Label>Status</Form.Label><Form.Select {...form.register("status")}><option value="Angelegt">Angelegt</option><option value="Geplant">Geplant</option><option value="Unterwegs">Unterwegs</option><option value="Zugestellt">Zugestellt</option><option value="Storniert">Storniert</option></Form.Select></Form.Group>
-                          <Form.Group><Form.Label>Fahrzeug</Form.Label>
-                            <Form.Select {...form.register("vehicle_id")} value={form.watch("vehicle_id") ?? ""}>
-                                <option value="">- Kein Fahrzeug -</option>
-                                {vehicles?.map(v => <option key={v.id} value={v.id}>{v.license_plate} ({v.brand} {v.model})</option>)}
-                            </Form.Select>
-                          </Form.Group>
                           <Form.Group><Form.Label>Preis (€)</Form.Label><Form.Control type="number" step="0.01" {...form.register("price")} /></Form.Group>
                           <Form.Group><Form.Label>Beschreibung / Notizen</Form.Label><Form.Control as="textarea" {...form.register("description")} /></Form.Group>
                       </Card.Body>
@@ -365,7 +328,6 @@ const FreightOrderForm = () => {
         <Tab eventKey="notes" title="Notizen"><NotesTab orderId={id ? Number(id) : null} /></Tab>
         <Tab eventKey="files" title="Dateien"><FilesTab orderId={id ? Number(id) : null} /></Tab>
         <Tab eventKey="team" title="Team"><TeamTab orderId={id ? Number(id) : null} /></Tab>
-        <Tab eventKey="history" title="Verlauf" disabled={!isEditMode}><StatusHistoryTab orderId={id ? Number(id) : null} /></Tab>
       </Tabs>
     </Form>
     <AddCustomerDialog

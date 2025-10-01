@@ -5,7 +5,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
-  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,57 +15,17 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginIdentifier);
-
-    if (isEmail) {
-      // Standard email login
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginIdentifier,
-        password,
-      });
-
-      if (error) {
-        setError(error.message);
-        showError(error.message);
-      } else {
-        showSuccess('Anmeldung erfolgreich!');
-        navigate('/');
-      }
+    if (error) {
+      setError(error.message);
+      showError(error.message);
     } else {
-      // Username login via Edge Function
-      const { data, error: invokeError } = await supabase.functions.invoke('action', {
-        method: 'POST',
-        body: { 
-          action: 'login', 
-          payload: { username: loginIdentifier, password: password } 
-        },
-      });
-
-      if (invokeError) {
-        setError(invokeError.message);
-        showError(invokeError.message);
-      } else if (data.error) {
-        setError(data.error);
-        showError(data.error);
-      } else if (data.session) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-        });
-
-        if (sessionError) {
-          setError(sessionError.message);
-          showError(sessionError.message);
-        } else {
-          showSuccess('Anmeldung erfolgreich!');
-          navigate('/');
-        }
-      } else {
-        const msg = 'Ein unerwarteter Fehler ist aufgetreten.';
-        setError(msg);
-        showError(msg);
-      }
+      showSuccess('Login successful!');
+      navigate('/');
     }
     setLoading(false);
   };
@@ -79,14 +39,14 @@ const Login = () => {
         <Card.Body className="p-4">
           {error && <Alert variant="danger">{error}</Alert>}
           <Form onSubmit={handleLogin}>
-            <Form.Group className="mb-3" controlId="loginIdentifier">
-              <Form.Label>Benutzername oder E-Mail</Form.Label>
+            <Form.Group className="mb-3" controlId="email">
+              <Form.Label>E-Mail-Adresse</Form.Label>
               <Form.Control
-                type="text"
-                placeholder="max_mustermann oder m@example.com"
+                type="email"
+                placeholder="m@example.com"
                 required
-                value={loginIdentifier}
-                onChange={(e) => setLoginIdentifier(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </Form.Group>
 
