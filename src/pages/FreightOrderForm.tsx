@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button, Card, Form, Tabs, Tab, Row, Col } from 'react-bootstrap';
+import { Button, Card, Form, Tabs, Tab, Row, Col, Spinner } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { useNavigate, useParams, NavLink } from 'react-router-dom';
 import type { Customer } from '@/pages/CustomerManagement';
 import type { FreightOrder } from '@/types/freight';
 import type { Setting } from '@/types/settings';
-import { ArrowLeft, PlusCircle, Trash2, Share2, MapPin, Package, Info } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Trash2, Share2, MapPin, Package, Info, Loader2 } from 'lucide-react';
 import { CustomerCombobox } from '@/components/CustomerCombobox';
 import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
@@ -87,6 +87,9 @@ const FreightOrderForm = () => {
   const { user } = useAuth();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [routeDetails, setRouteDetails] = useState<{ distance: number | null, cost: number | null }>({ distance: null, cost: null });
+  const [isCalculating, setIsCalculating] = useState(false);
+  const lastCalculatedAddresses = useRef({ origin: '', destination: '' });
 
   const { data: customers, isLoading: isLoadingCustomers } = useQuery<Customer[]>({
     queryKey: ['customers'],
@@ -106,7 +109,14 @@ const FreightOrderForm = () => {
   const settings = useMemo(() => {
     if (!settingsArray) return {};
     const settingsMap = new Map(settingsArray.map((s) => [s.key, s.value]));
-    return Object.fromEntries(settingsMap);
+    return {
+        price_per_km_small: Number(settingsMap.get('price_per_km_small')) || 0.9,
+        price_per_km_large: Number(settingsMap.get('price_per_km_large')) || 1.8,
+        weight_limit_small_kg: Number(settingsMap.get('weight_limit_small_kg')) || 1000,
+        loading_meters_limit_small: Number(settingsMap.get('loading_meters_limit_small')) || 4.5,
+        payment_term_default: settingsMap.get('payment_term_default'),
+        agb_text: settingsMap.get('agb_text'),
+    };
   }, [settingsArray]);
 
   const { data: existingOrder, isLoading: isLoadingOrder, isFetching: isFetchingOrder } = useQuery<FreightOrder>({
@@ -133,6 +143,56 @@ const FreightOrderForm = () => {
     control: form.control,
     name: "cargoItems",
   });
+
+  const watchedStops = form.watch('stops');
+  const watchedCargo = form.watch('cargoItems');
+
+  useEffect(() => {
+    const calculateRoute = async () => {
+        if (watchedStops.length < 2) {
+            setRouteDetails({ distance: null, cost: null });
+            return;
+        }
+        const origin = watchedStops[0].address;
+        const destination = watchedStops[watchedStops.length - 1].address;
+
+        if (!origin || !destination || (origin === lastCalculatedAddresses.current.origin && destination === lastCalculatedAddresses.current.destination)) {
+            return;
+        }
+        
+        lastCalculatedAddresses.current = { origin, destination };
+        setIsCalculating(true);
+
+        try {
+            const { data, error } = await supabase.functions.invoke('calculate-route-details', {
+                body: { origin, destination }
+            });
+            if (error) throw error;
+
+            if (data.distance) {
+                const distanceInKm = data.distance / 1000;
+                const totalWeight = watchedCargo?.reduce((sum, item) => sum + (item.weight || 0), 0) || 0;
+                const totalLoadingMeters = watchedCargo?.reduce((sum, item) => sum + (item.loading_meters || 0), 0) || 0;
+
+                const isLargeTransport = totalWeight > settings.weight_limit_small_kg || totalLoadingMeters > settings.loading_meters_limit_small;
+                const pricePerKm = isLargeTransport ? settings.price_per_km_large : settings.price_per_km_small;
+                const cost = distanceInKm * pricePerKm;
+
+                setRouteDetails({ distance: distanceInKm, cost });
+            } else {
+                setRouteDetails({ distance: null, cost: null });
+            }
+        } catch (err: any) {
+            console.error("Error calculating route:", err);
+            setRouteDetails({ distance: null, cost: null });
+        } finally {
+            setIsCalculating(false);
+        }
+    };
+
+    const timeoutId = setTimeout(calculateRoute, 1000); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [watchedStops, watchedCargo, settings, supabase]);
 
   useEffect(() => {
     if (isEditMode && existingOrder) {
@@ -357,6 +417,20 @@ const FreightOrderForm = () => {
                           </Form.Group>
                           <Form.Group><Form.Label>Preis (€)</Form.Label><Form.Control type="number" step="0.01" {...form.register("price")} /></Form.Group>
                           <Form.Group><Form.Label>Beschreibung / Notizen</Form.Label><Form.Control as="textarea" {...form.register("description")} /></Form.Group>
+                          <hr/>
+                          <div className="d-flex flex-column gap-2">
+                            <h6 className="text-muted">Routenkalkulation</h6>
+                            {isCalculating ? (
+                                <div className="d-flex align-items-center gap-2 small text-muted"><Loader2 className="animate-spin" size={16} /> Berechne...</div>
+                            ) : routeDetails.distance ? (
+                                <>
+                                    <div className="d-flex justify-content-between small"><span>Distanz:</span> <strong>~ {routeDetails.distance.toFixed(0)} km</strong></div>
+                                    <div className="d-flex justify-content-between small"><span>Geschätzte Kosten:</span> <strong>~ {routeDetails.cost.toFixed(2)} €</strong></div>
+                                </>
+                            ) : (
+                                <p className="small text-muted">Geben Sie Start- und Zieladresse ein, um die Route zu berechnen.</p>
+                            )}
+                          </div>
                       </Card.Body>
                   </Card>
               </Col>

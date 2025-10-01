@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button, Card, Form, Spinner, Placeholder, Alert, Modal, Tabs, Tab, Row, Col } from "react-bootstrap";
+import { Button, Card, Form, Spinner, Placeholder, Alert, Modal, Tabs, Tab, Row, Col, InputGroup } from "react-bootstrap";
 import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,6 +21,10 @@ const settingsSchema = z.object({
   payment_term_default: z.coerce.number().optional(),
   agb_text: z.string().optional(),
   tour_planning_vehicle_group_id: z.coerce.number().optional(),
+  price_per_km_small: z.coerce.number().optional(),
+  price_per_km_large: z.coerce.number().optional(),
+  weight_limit_small_kg: z.coerce.number().optional(),
+  loading_meters_limit_small: z.coerce.number().optional(),
 });
 
 const Settings = () => {
@@ -68,6 +72,10 @@ const Settings = () => {
       payment_term_default: 45,
       agb_text: "",
       tour_planning_vehicle_group_id: undefined,
+      price_per_km_small: 0.9,
+      price_per_km_large: 1.8,
+      weight_limit_small_kg: 1000,
+      loading_meters_limit_small: 4.5,
     },
   });
 
@@ -85,6 +93,10 @@ const Settings = () => {
         payment_term_default: Number(settingsMap.get('payment_term_default')) || 45,
         agb_text: settingsMap.get('agb_text') || "",
         tour_planning_vehicle_group_id: Number(settingsMap.get('tour_planning_vehicle_group_id')) || undefined,
+        price_per_km_small: Number(settingsMap.get('price_per_km_small')) || 0.9,
+        price_per_km_large: Number(settingsMap.get('price_per_km_large')) || 1.8,
+        weight_limit_small_kg: Number(settingsMap.get('weight_limit_small_kg')) || 1000,
+        loading_meters_limit_small: Number(settingsMap.get('loading_meters_limit_small')) || 4.5,
       });
     }
   }, [settings, form]);
@@ -210,6 +222,22 @@ const Settings = () => {
                     <Col md={6}>
                       <Form.Group><Form.Label>Standard-Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_default")} /></Form.Group>
                     </Col>
+                  </Row>
+                )}
+              </Card.Body>
+            </Card>
+            <Card className="mb-4">
+              <Card.Header>
+                <Card.Title>Kostenkalkulation</Card.Title>
+                <Card.Text className="text-muted">Parameter für die automatische Kostenabschätzung.</Card.Text>
+              </Card.Header>
+              <Card.Body>
+                {isLoading ? <Placeholder as="div" animation="glow"><Placeholder xs={12} style={{height: '150px'}} /></Placeholder> : (
+                  <Row className="g-3">
+                    <Col md={6}><Form.Group><Form.Label>Preis Kleintransport</Form.Label><InputGroup><Form.Control type="number" step="0.01" {...form.register("price_per_km_small")} /><InputGroup.Text>€/km</InputGroup.Text></InputGroup></Form.Group></Col>
+                    <Col md={6}><Form.Group><Form.Label>Preis LKW</Form.Label><InputGroup><Form.Control type="number" step="0.01" {...form.register("price_per_km_large")} /><InputGroup.Text>€/km</InputGroup.Text></InputGroup></Form.Group></Col>
+                    <Col md={6}><Form.Group><Form.Label>Gewichtsgrenze Kleintransport</Form.Label><InputGroup><Form.Control type="number" {...form.register("weight_limit_small_kg")} /><InputGroup.Text>kg</InputGroup.Text></InputGroup></Form.Group></Col>
+                    <Col md={6}><Form.Group><Form.Label>Lademetergrenze Kleintransport</Form.Label><InputGroup><Form.Control type="number" step="0.1" {...form.register("loading_meters_limit_small")} /><InputGroup.Text>m</InputGroup.Text></InputGroup></Form.Group></Col>
                   </Row>
                 )}
               </Card.Body>
