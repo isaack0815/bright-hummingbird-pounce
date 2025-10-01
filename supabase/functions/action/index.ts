@@ -7,6 +7,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const getMimeType = (fileName: string): string => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+        case 'pdf': return 'application/pdf';
+        case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        case 'xls': return 'application/vnd.ms-excel';
+        case 'jpg': case 'jpeg': return 'image/jpeg';
+        case 'png': return 'image/png';
+        case 'gif': return 'image/gif';
+        case 'txt': return 'text/plain';
+        case 'csv': return 'text/csv';
+        default: return 'application/octet-stream';
+    }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -50,9 +65,10 @@ serve(async (req) => {
     
         const filePath = `${orderId}/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
+        const contentType = getMimeType(fileName);
     
         const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
-            contentType: fileType || 'application/octet-stream'
+            contentType: contentType
         });
         if (uploadError) throw uploadError;
     
@@ -84,8 +100,11 @@ serve(async (req) => {
     
         const filePath = `imports/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
+        const contentType = getMimeType(fileName);
     
-        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer);
+        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
+            contentType: contentType
+        });
         if (uploadError) throw uploadError;
     
         return new Response(JSON.stringify({ success: true, filePath }), { status: 201, headers: corsHeaders });
@@ -101,9 +120,10 @@ serve(async (req) => {
         const sanitizedName = fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
         const filePath = `${vehicleId}/${crypto.randomUUID()}-${sanitizedName}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
+        const contentType = getMimeType(fileName);
     
         const { error: uploadError } = await supabaseAdmin.storage.from('vehicle-files').upload(filePath, fileBuffer, {
-            contentType: fileType || 'application/octet-stream'
+            contentType: contentType
         });
         if (uploadError) throw uploadError;
 
