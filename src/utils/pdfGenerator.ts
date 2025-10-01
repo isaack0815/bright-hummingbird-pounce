@@ -53,12 +53,21 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any, ver
 
   let lastY = (doc as any).lastAutoTable.finalY + 5;
 
+  // Dynamically create stop details
+  const stopDetails: string[][] = [];
+  if (order.freight_order_stops && order.freight_order_stops.length > 0) {
+    const sortedStops = [...order.freight_order_stops].sort((a, b) => a.position - b.position);
+    sortedStops.forEach(stop => {
+      const dateStr = stop.stop_date ? new Date(stop.stop_date).toLocaleDateString('de-DE') : '-';
+      const timeStr = stop.time_start || '';
+      stopDetails.push([`${stop.stop_type} Datum/Zeit:`, `${dateStr} ${timeStr}`.trim()]);
+      stopDetails.push([`${stop.stop_type} Adresse:`, stop.address || '']);
+    });
+  }
+
   // Details
   const details = [
-    ['Abholdatum/Abholzeit:', `${order.pickup_date ? new Date(order.pickup_date).toLocaleDateString() : '-'} ${order.pickup_time_start || ''}`],
-    ['Absenderadresse:', order.origin_address || ''],
-    ['Lieferdatum/Lieferzeit:', `${order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : '-'} ${order.delivery_time_start || ''}`],
-    ['Lieferadresse:', order.destination_address || ''],
+    ...stopDetails,
     ['Ladung:', order.cargo_items.map(i => i.description).join(', ')],
     ['Gewicht:', `${order.cargo_items.reduce((sum, i) => sum + (i.weight || 0), 0)} kg`],
     ['Lademeter:', `${order.cargo_items.reduce((sum, i) => sum + (i.loading_meters || 0), 0)} m`],
