@@ -67,9 +67,12 @@ const fetchVehicles = async (): Promise<Vehicle[]> => {
 };
 
 const fetchOrder = async (id: string): Promise<FreightOrder> => {
-    const { data, error } = await supabase.from('freight_orders').select('*, customers(id, company_name), freight_order_stops(*), cargo_items(*)').eq('id', id).single();
+    const { data, error } = await supabase.functions.invoke('get-freight-order-details', {
+        body: { orderId: parseInt(id, 10) }
+    });
     if (error) throw new Error(error.message);
-    return data as FreightOrder;
+    if (!data || !data.order) throw new Error("Auftrag nicht gefunden oder Sie haben keine Berechtigung.");
+    return data.order;
 }
 
 const fetchSettings = async (): Promise<Setting[]> => {
