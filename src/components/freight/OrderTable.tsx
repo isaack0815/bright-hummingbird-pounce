@@ -59,7 +59,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
   };
 
   const handleEditClick = (orderId: number) => {
-    const path = isBillingContext ? `/billing/${orderId}` : `/freight-orders/edit/${orderId}`;
+    const path = isBillingContext ? `/fernverkehr/${orderId}` : `/freight-orders/edit/${orderId}`;
     navigate(path);
   };
 
@@ -100,6 +100,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
           <th>Entladeort</th>
           <th>Auftragsnr.</th>
           <th>Auftraggeber</th>
+          <th>Fahrzeug</th>
           <th>Status</th>
           <th>Abholdatum</th>
           <th>Lieferdatum</th>
@@ -110,7 +111,12 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
       </thead>
       <tbody>
         {orders.map((order) => (
-          <tr key={order.id} className={getRowClass(order)}>
+          <tr 
+            key={order.id} 
+            className={getRowClass(order)}
+            onDoubleClick={() => handleEditClick(order.id)}
+            style={{ cursor: 'pointer' }}
+          >
             {isBillingContext && (
               <td className="text-center align-middle">
                 <Form.Check 
@@ -125,6 +131,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
             <td>{order.destination_address}</td>
             <td className="fw-medium">{order.order_number}</td>
             <td>{order.customers?.company_name || 'N/A'}</td>
+            <td>{order.vehicles?.license_plate || '-'}</td>
             <td><Badge bg="secondary">{order.status}</Badge></td>
             <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
             <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
@@ -133,7 +140,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
                 <Button
                   variant="link"
                   size="sm"
-                  onClick={() => toggleBilledMutation.mutate(order.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleBilledMutation.mutate(order.id); }}
                   disabled={toggleBilledMutation.isPending && toggleBilledMutation.variables === order.id}
                   className="p-0 text-decoration-none"
                 >
@@ -150,10 +157,10 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
             <td>{order.creator ? `${order.creator.first_name || ''} ${order.creator.last_name || ''}`.trim() : 'N/A'}</td>
             <td className="text-end">
               <div className="d-flex justify-content-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => handleEditClick(order.id)}>
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditClick(order.id); }}>
                   <Edit size={16} />
                 </Button>
-                <Button variant="ghost" size="sm" className="text-danger" onClick={() => onDelete(order.id)}>
+                <Button variant="ghost" size="sm" className="text-danger" onClick={(e) => { e.stopPropagation(); onDelete(order.id); }}>
                   <Trash2 size={16} />
                 </Button>
               </div>

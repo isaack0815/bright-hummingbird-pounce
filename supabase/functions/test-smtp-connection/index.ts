@@ -15,22 +15,38 @@ serve(async (req) => {
   try {
     steps.push("Function started using nodemailer.");
 
-    const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
-    const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
-    if (missingEnv.length > 0) {
-      throw new Error(`Missing required SMTP secrets: ${missingEnv.join(', ')}`);
+    const smtpHost = Deno.env.get('SMTP_HOST');
+    const smtpPort = Deno.env.get('SMTP_PORT');
+    const smtpUser = Deno.env.get('SMTP_USER');
+    const smtpPass = Deno.env.get('SMTP_PASS');
+    const smtpSecure = Deno.env.get('SMTP_SECURE');
+    const fromEmail = Deno.env.get('SMTP_FROM_EMAIL');
+
+    steps.push(`[DEBUG] Reading SMTP_HOST: ${smtpHost}`);
+    steps.push(`[DEBUG] Reading SMTP_PORT: ${smtpPort}`);
+    steps.push(`[DEBUG] Reading SMTP_USER: ${smtpUser ? 'Present' : 'MISSING'}`);
+    steps.push(`[DEBUG] Reading SMTP_PASS: ${smtpPass ? 'Present' : 'MISSING'}`);
+    steps.push(`[DEBUG] Reading SMTP_SECURE: ${smtpSecure}`);
+    steps.push(`[DEBUG] Reading SMTP_FROM_EMAIL: ${fromEmail}`);
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
+        throw new Error(`Server configuration error: Missing one or more required SMTP secrets. Please check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL in your Supabase project settings.`);
     }
     steps.push("All required secrets are present.");
 
-    const transporter = nodemailer.createTransport({
-      host: Deno.env.get('SMTP_HOST')!,
-      port: Number(Deno.env.get('SMTP_PORT')!),
-      secure: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
+    const transportOptions = {
+      host: smtpHost,
+      port: Number(smtpPort),
+      secure: smtpSecure?.toLowerCase() === 'ssl' || smtpSecure?.toLowerCase() === 'tls',
       auth: {
-        user: Deno.env.get('SMTP_USER')!,
-        pass: Deno.env.get('SMTP_PASS')!,
+        user: smtpUser,
+        pass: smtpPass,
       },
-    });
+    };
+
+    steps.push(`[DEBUG] Nodemailer config: ${JSON.stringify({ ...transportOptions, auth: { user: transportOptions.auth.user, pass: 'REDACTED' } })}`);
+
+    const transporter = nodemailer.createTransport(transportOptions);
     steps.push("Nodemailer transporter created.");
 
     steps.push("Verifying SMTP connection...");

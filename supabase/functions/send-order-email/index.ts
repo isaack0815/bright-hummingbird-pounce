@@ -13,12 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    const requiredEnv = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
-    const missingEnv = requiredEnv.filter(v => !Deno.env.get(v));
-    if (missingEnv.length > 0) {
-      throw new Error(`Server configuration error: Missing required SMTP secrets: ${missingEnv.join(', ')}`);
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -61,17 +55,34 @@ serve(async (req) => {
     if (downloadError) throw downloadError
     const pdfContent = await fileData.arrayBuffer()
 
-    const transporter = nodemailer.createTransport({
-      host: Deno.env.get('SMTP_HOST')!,
-      port: Number(Deno.env.get('SMTP_PORT')!),
-      secure: Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'ssl' || Deno.env.get('SMTP_SECURE')?.toLowerCase() === 'tls',
-      auth: {
-        user: Deno.env.get('SMTP_USER')!,
-        pass: Deno.env.get('SMTP_PASS')!,
-      },
-    });
+    const smtpHost = Deno.env.get('SMTP_HOST');
+    const smtpPort = Deno.env.get('SMTP_PORT');
+    const smtpUser = Deno.env.get('SMTP_USER');
+    const smtpPass = Deno.env.get('SMTP_PASS');
+    const smtpSecure = Deno.env.get('SMTP_SECURE');
+    const fromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
-    const fromEmail = Deno.env.get('SMTP_FROM_EMAIL') ?? 'noreply@example.com'
+    console.log(`[send-order-email] DEBUG: Reading SMTP_HOST: ${smtpHost}`);
+    console.log(`[send-order-email] DEBUG: Reading SMTP_PORT: ${smtpPort}`);
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
+        throw new Error(`Server configuration error: Missing one or more required SMTP secrets. Please check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL in your Supabase project settings.`);
+    }
+
+    const transportOptions = {
+      host: smtpHost,
+      port: Number(smtpPort),
+      secure: smtpSecure?.toLowerCase() === 'ssl' || smtpSecure?.toLowerCase() === 'tls',
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    };
+
+    console.log(`[send-order-email] DEBUG: Nodemailer config: ${JSON.stringify({ ...transportOptions, auth: { user: transportOptions.auth.user, pass: 'REDACTED' } })}`);
+
+    const transporter = nodemailer.createTransport(transportOptions);
+
     const companyName = settingsMap.get('company_name') ?? 'Your Company'
     const signature = settingsMap.get('email_signature') ?? `<p>Mit freundlichen Grüßen,<br/>${companyName}</p>`
     const bccEmail = settingsMap.get('email_bcc')

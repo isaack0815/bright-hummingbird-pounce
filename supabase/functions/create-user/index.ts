@@ -17,9 +17,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { email, password, first_name, last_name } = await req.json()
+    const { email, password, first_name, last_name, username } = await req.json()
 
-    if (!email || !password || !first_name || !last_name) {
+    if (!email || !password || !first_name || !last_name || !username) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -30,7 +30,7 @@ serve(async (req) => {
       email,
       password,
       email_confirm: true, // auto-confirm user
-      user_metadata: { first_name, last_name },
+      user_metadata: { first_name, last_name, username },
     })
 
     if (error) {

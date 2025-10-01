@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const app = express();
+// Verwenden Sie den Port aus der Umgebung oder greifen Sie auf 16068 zurück
 const port = process.env.PORT || 16068;
 
 // ES-Modul-Äquivalent für __dirname

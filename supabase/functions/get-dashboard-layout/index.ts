@@ -10,6 +10,7 @@ const defaultLayout = [
   { i: 'stats', x: 0, y: 0, w: 12, h: 1, enabled: true },
   { i: 'todos', x: 0, y: 1, w: 6, h: 4, enabled: true },
   { i: 'freightOrders', x: 6, y: 1, w: 6, h: 4, enabled: true },
+  { i: 'calendar', x: 0, y: 5, w: 6, h: 4, enabled: true },
 ];
 
 serve(async (req) => {

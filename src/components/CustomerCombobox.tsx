@@ -1,4 +1,3 @@
-import * as React from "react"
 import { PlusCircle } from "lucide-react"
 import { Button } from "react-bootstrap"
 import Select, { components, NoticeProps } from 'react-select';
@@ -39,7 +38,7 @@ export function CustomerCombobox({ customers, value, onChange, onAddNew }: Custo
     <Select<OptionType>
       options={options}
       value={selectedOption}
-      onChange={(option) => option && onChange(option.value)}
+      onChange={(option: OptionType | null) => option && onChange(option.value)}
       placeholder="Kunde auswählen..."
       components={{ NoOptionsMessage }}
       isClearable

@@ -1,7 +1,7 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
-import { useSession, useUser } from '@supabase/auth-helpers-react';
+import { useSessionContext, useUser } from '@supabase/auth-helpers-react';
 
 type AuthContextType = {
   session: Session | null;
@@ -14,17 +14,17 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const session = useSession();
+  const { session, isLoading: isSessionLoading } = useSessionContext();
   const user = useUser();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isPermissionsLoading, setIsPermissionsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    setIsPermissionsLoading(true);
-
-    async function fetchPermissions() {
-      if (user) {
+    
+    if (!isSessionLoading && user) {
+      setIsPermissionsLoading(true);
+      async function fetchPermissions() {
         try {
           const { data, error } = await supabase.rpc('get_my_permissions');
           if (error) throw error;
@@ -37,23 +37,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
           if (isMounted) setIsPermissionsLoading(false);
         }
-      } else {
-        if (isMounted) {
-          setPermissions([]);
-          setIsPermissionsLoading(false);
-        }
       }
+      fetchPermissions();
+    } else if (!isSessionLoading) {
+      setPermissions([]);
+      setIsPermissionsLoading(false);
     }
-
-    fetchPermissions();
 
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, isSessionLoading]);
 
   const hasPermission = (permission: string) => {
-    // This is a special rule for "super admins" who can manage both users and roles.
     if (permissions.includes('roles.manage') && permissions.includes('users.manage')) {
       return true;
     }
@@ -64,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session, 
     user, 
     permissions, 
-    isLoading: isPermissionsLoading, // The main loading state now only depends on permissions
+    isLoading: isSessionLoading || isPermissionsLoading, 
     hasPermission 
   };
 

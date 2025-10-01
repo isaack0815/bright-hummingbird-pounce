@@ -2,6 +2,7 @@ export type Profile = {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  username: string | null;
 };
 
 export type ChatMessage = {
@@ -29,4 +30,5 @@ export type ChatUser = {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  username: string | null;
 };
