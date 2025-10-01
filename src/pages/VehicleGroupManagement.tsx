@@ -11,7 +11,7 @@ import { AddVehicleGroupDialog } from '@/components/vehicle/AddVehicleGroupDialo
 import { EditVehicleGroupDialog } from '@/components/vehicle/EditVehicleGroupDialog';
 
 const fetchVehicleGroups = async (): Promise<VehicleGroup[]> => {
-  const { data, error } = await supabase.functions.invoke('get-vehicle-groups');
+  const { data, error } = await supabase.functions.invoke('vehicle-groups', { method: 'GET' });
   if (error) throw new Error(error.message);
   return data.groups;
 };
@@ -29,7 +29,10 @@ const VehicleGroupManagement = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const { error } = await supabase.functions.invoke('delete-vehicle-group', { body: { id } });
+      const { error } = await supabase.functions.invoke('vehicle-groups', { 
+        method: 'DELETE',
+        body: { id } 
+      });
       if (error) throw error;
     },
     onSuccess: () => {

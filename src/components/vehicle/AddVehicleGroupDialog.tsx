@@ -25,7 +25,8 @@ export function AddVehicleGroupDialog({ show, onHide }: AddVehicleGroupDialogPro
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const { error } = await supabase.functions.invoke('create-vehicle-group', {
+      const { error } = await supabase.functions.invoke('vehicle-groups', {
+        method: 'POST',
         body: values,
       });
       if (error) throw error;

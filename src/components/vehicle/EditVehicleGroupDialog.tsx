@@ -37,7 +37,8 @@ export function EditVehicleGroupDialog({ group, show, onHide }: EditVehicleGroup
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!group) return;
-      const { error } = await supabase.functions.invoke('update-vehicle-group', {
+      const { error } = await supabase.functions.invoke('vehicle-groups', {
+        method: 'PUT',
         body: { id: group.id, ...values },
       });
       if (error) throw error;

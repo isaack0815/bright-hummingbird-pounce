@@ -14,7 +14,9 @@ type ImportTemplate = {
 };
 
 const fetchCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase.functions.invoke('get-customers');
+  const { data, error } = await supabase.functions.invoke('customers', {
+    method: 'GET',
+  });
   if (error) throw new Error(error.message);
   return data.customers;
 };
