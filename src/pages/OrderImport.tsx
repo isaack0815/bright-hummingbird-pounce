@@ -106,9 +106,14 @@ const parseDateTime = (value: string | Date): { date: string | null, time: strin
   }
 
   if (timePartStr) {
-    const timeMatch = timePartStr.match(/(\d{1,2})[:.](\d{2})/);
+    let timeMatch = timePartStr.match(/(\d{1,2})[:.](\d{2})/);
     if (timeMatch) {
       time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+    } else {
+      timeMatch = timePartStr.match(/(\d{1,2})\s*Uhr/i);
+      if (timeMatch) {
+        time = `${timeMatch[1].padStart(2, '0')}:00`;
+      }
     }
   }
 
