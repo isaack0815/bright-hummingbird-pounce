@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, Form, Placeholder } from "react-bootstrap";
 import { useAuth } from "@/contexts/AuthContext";
 import { showError, showSuccess } from "@/utils/toast";
+import { v4 as uuidv4 } from 'uuid';
 import { FileListItem } from "./FileListItem";
 
 type OrderFile = {
@@ -28,15 +29,6 @@ const fetchFiles = async (orderId: number): Promise<OrderFile[]> => {
   return data;
 };
 
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = error => reject(error);
-  });
-};
-
 const FilesTab = ({ orderId }: { orderId: number | null }) => {
   const [uploading, setUploading] = useState(false);
   const { user } = useAuth();
@@ -54,25 +46,34 @@ const FilesTab = ({ orderId }: { orderId: number | null }) => {
 
     setUploading(true);
     try {
-      const fileData = await fileToBase64(file);
+      const originalName = file.name;
+      const sanitizedName = originalName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
+      const filePath = `${orderId}/${uuidv4()}-${sanitizedName}`;
       
-      const { error } = await supabase.functions.invoke('action', {
-        body: {
-          action: 'upload-order-file',
-          payload: {
-            orderId,
-            fileName: file.name,
-            fileType: file.type,
-            fileData,
-          }
-        }
+      const { error: uploadError } = await supabase.storage.from('order-files').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: newFile, error: dbError } = await supabase.from('order_files').insert({
+        order_id: orderId,
+        user_id: user.id,
+        file_path: filePath,
+        file_name: originalName,
+        file_type: file.type,
+      }).select().single();
+      if (dbError) throw dbError;
+
+      // Log creation activity
+      await supabase.from('file_activity_logs').insert({
+        file_id: newFile.id,
+        user_id: user.id,
+        action: 'created',
+        details: { original_filename: file.name }
       });
-      if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ['orderFiles', orderId] });
       showSuccess("Datei erfolgreich hochgeladen!");
     } catch (err: any) {
-      showError(err.data?.error || err.message || "Fehler beim Hochladen der Datei.");
+      showError(err.message || "Fehler beim Hochladen der Datei.");
     } finally {
       setUploading(false);
       event.target.value = ''; // Reset file input

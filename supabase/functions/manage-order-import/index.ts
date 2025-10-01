@@ -30,7 +30,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'import-orders': {
-        const { customerId, orders, importFilePath, importFileName } = payload;
+        const { customerId, orders } = payload;
         if (!customerId || !Array.isArray(orders) || orders.length === 0) {
           return new Response(JSON.stringify({ error: 'Customer ID and a non-empty orders array are required.' }), { status: 400, headers: corsHeaders });
         }
@@ -91,18 +91,6 @@ serve(async (req) => {
               if (cargoError) console.warn(`Order ${newOrder.id} created, but cargo item insert failed: ${cargoError.message}`);
             }
             
-            if (importFilePath && importFileName) {
-                const { error: fileError } = await supabaseAdmin.from('order_files').insert({
-                    order_id: newOrder.id,
-                    user_id: user.id,
-                    file_path: importFilePath,
-                    file_name: `[Import] ${importFileName}`,
-                    file_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    is_archived: true,
-                });
-                if (fileError) console.warn(`Order ${newOrder.id} created, but attaching import file failed: ${fileError.message}`);
-            }
-
             successCount++;
           } catch (e) {
             errorCount++;

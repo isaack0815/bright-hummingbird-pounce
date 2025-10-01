@@ -25,8 +25,8 @@ export function AddWorkGroupDialog({ show, onHide }: AddWorkGroupDialogProps) {
 
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const { error } = await supabase.functions.invoke('action', {
-        body: { action: 'create-work-group', payload: values },
+      const { error } = await supabase.functions.invoke('create-work-group', {
+        body: values,
       });
       if (error) throw error;
     },

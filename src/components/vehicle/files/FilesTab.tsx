@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, Form, Button, Placeholder, Accordion, Spinner } from "react-bootstrap";
 import { showError, showSuccess } from "@/utils/toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { v4 as uuidv4 } from 'uuid';
 import type { VehicleFile } from "@/types/vehicle";
 import { FileCategoryCombobox } from "./FileCategoryCombobox";
 import { FileListItem } from "./FileListItem";
@@ -14,15 +15,6 @@ const fetchFiles = async (vehicleId: number): Promise<VehicleFile[]> => {
   });
   if (error) throw error;
   return data.files;
-};
-
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = error => reject(error);
-  });
 };
 
 const FilesTab = ({ vehicleId }: { vehicleId: number | null }) => {
@@ -45,20 +37,21 @@ const FilesTab = ({ vehicleId }: { vehicleId: number | null }) => {
     }
     setUploading(true);
     try {
-      const fileData = await fileToBase64(selectedFile);
-      const { error } = await supabase.functions.invoke('action', {
-        body: {
-          action: 'upload-vehicle-file',
-          payload: {
-            vehicleId,
-            categoryId: selectedCategoryId,
-            fileName: selectedFile.name,
-            fileType: selectedFile.type,
-            fileData,
-          }
-        }
+      const originalName = selectedFile.name;
+      const sanitizedName = originalName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_');
+      const filePath = `${vehicleId}/${uuidv4()}-${sanitizedName}`;
+      
+      const { error: uploadError } = await supabase.storage.from('vehicle-files').upload(filePath, selectedFile);
+      if (uploadError) throw uploadError;
+
+      await supabase.from('vehicle_files').insert({
+        vehicle_id: vehicleId,
+        category_id: selectedCategoryId,
+        user_id: user.id,
+        file_path: filePath,
+        file_name: originalName,
+        file_type: selectedFile.type,
       });
-      if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ['vehicleFiles', vehicleId] });
       showSuccess("Datei erfolgreich hochgeladen!");
