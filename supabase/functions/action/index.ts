@@ -36,6 +36,10 @@ serve(async (req) => {
     }
 
     switch (action) {
+      case 'ping': {
+        return new Response(JSON.stringify({ message: 'pong', user_id: user.id, timestamp: new Date().toISOString() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+        
       case 'get-planned-tour-for-vehicle': {
         const { vehicleId } = payload;
         if (!vehicleId) return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
