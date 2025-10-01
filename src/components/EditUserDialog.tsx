@@ -44,8 +44,10 @@ const fetchRoles = async (): Promise<Role[]> => {
 };
 
 const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
-  const { data, error } = await supabase.functions.invoke('get-work-groups');
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-work-groups' }
+  });
+  if (error) throw error;
   return data.groups;
 };
 

@@ -53,8 +53,8 @@ export function EditWorkGroupDialog({ group, show, onHide }: EditWorkGroupDialog
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!group) return;
-      const { error } = await supabase.functions.invoke('update-work-group', {
-        body: { id: group.id, ...values },
+      const { error } = await supabase.functions.invoke('action', {
+        body: { action: 'update-work-group', payload: { id: group.id, ...values } },
       });
       if (error) throw error;
     },

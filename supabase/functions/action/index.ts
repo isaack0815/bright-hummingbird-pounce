@@ -25,7 +25,7 @@ serve(async (req) => {
     )
     
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error("User not authenticated");
+    if (!user && action !== 'login') throw new Error("User not authenticated");
 
     const checkPermission = async (permission: string) => {
         const { data: permissions, error } = await supabase.rpc('get_my_permissions');
@@ -38,6 +38,56 @@ serve(async (req) => {
     switch (action) {
       case 'ping': {
         return new Response(JSON.stringify({ message: 'pong', user_id: user.id, timestamp: new Date().toISOString() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-work-groups': {
+        const { data: groups, error: groupsError } = await supabase
+          .from('work_groups')
+          .select(`*, user_work_groups(user_id)`)
+          .order('name');
+        if (groupsError) throw groupsError;
+        if (!groups) return new Response(JSON.stringify({ groups: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+
+        const userIds = [...new Set(groups.flatMap(g => g.user_work_groups.map((m: any) => m.user_id)))];
+        if (userIds.length === 0) {
+            const groupsWithEmptyMembers = groups.map(({ user_work_groups, ...rest }) => ({ ...rest, members: [] }));
+            return new Response(JSON.stringify({ groups: groupsWithEmptyMembers }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+
+        const { data: profiles, error: profilesError } = await supabase.from('profiles').select('id, first_name, last_name').in('id', userIds);
+        if (profilesError) throw profilesError;
+
+        const profilesMap = new Map(profiles.map(p => [p.id, p]));
+        const groupsWithMembers = groups.map(group => {
+          const members = group.user_work_groups.map((m: any) => profilesMap.get(m.user_id)).filter(Boolean);
+          const { user_work_groups, ...restOfGroup } = group;
+          return { ...restOfGroup, members };
+        });
+        return new Response(JSON.stringify({ groups: groupsWithMembers }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'create-work-group': {
+        const { name, description } = payload;
+        if (!name) return new Response(JSON.stringify({ error: 'Group name is required' }), { status: 400 });
+        const { data, error } = await supabaseAdmin.from('work_groups').insert([{ name, description }]).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ group: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'update-work-group': {
+        const { id, name, description, userIds } = payload;
+        if (!id || !name) return new Response(JSON.stringify({ error: 'Group ID and name are required' }), { status: 400 });
+        const { error } = await supabaseAdmin.rpc('update_work_group_with_members', { p_group_id: id, p_name: name, p_description: description, p_user_ids: userIds || [] });
+        if (error) throw error;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'delete-work-group': {
+        const { id } = payload;
+        if (!id) return new Response(JSON.stringify({ error: 'Group ID is required' }), { status: 400 });
+        const { error } = await supabaseAdmin.from('work_groups').delete().eq('id', id);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
       }
         
       case 'get-planned-tour-for-vehicle': {

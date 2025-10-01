@@ -11,7 +11,9 @@ import { AddWorkGroupDialog } from '@/components/work-group/AddWorkGroupDialog';
 import { EditWorkGroupDialog } from '@/components/work-group/EditWorkGroupDialog';
 
 const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
-  const { data, error } = await supabase.functions.invoke('get-work-groups');
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-work-groups' }
+  });
   if (error) throw new Error(error.message);
   return data.groups;
 };
@@ -29,7 +31,9 @@ const WorkGroupManagement = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const { error } = await supabase.functions.invoke('delete-work-group', { body: { id } });
+      const { error } = await supabase.functions.invoke('action', { 
+        body: { action: 'delete-work-group', payload: { id } } 
+      });
       if (error) throw error;
     },
     onSuccess: () => {
