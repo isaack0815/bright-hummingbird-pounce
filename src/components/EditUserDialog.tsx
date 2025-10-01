@@ -27,8 +27,8 @@ const formSchema = z.object({
   firstName: z.string().min(1, { message: "Vorname ist erforderlich." }),
   lastName: z.string().min(1, { message: "Nachname ist erforderlich." }),
   username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
-  roleIds: z.array(z.number()).optional(),
-  workGroupIds: z.array(z.number()).optional(),
+  roleIds: z.array(z.coerce.number()).optional(),
+  workGroupIds: z.array(z.coerce.number()).optional(),
 });
 
 type EditUserDialogProps = {
