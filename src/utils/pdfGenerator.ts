@@ -21,16 +21,17 @@ Erforderliche Angaben
 Bei fehlerhafter Dokumentation wird eine Bearbeitungsgebühr von 50€ erhoben.
 `;
 
-export const generateExternalOrderPDF = (order: FreightOrder, settings: any): Blob => {
+export const generateExternalOrderPDF = (order: FreightOrder, settings: any, version?: number): Blob => {
   const doc = new jsPDF();
   const pageHeight = doc.internal.pageSize.height;
   const margin = 14;
   const agbText = settings.agb_text || 'Keine AGB konfiguriert.';
 
   // Header
+  const title = version ? `Transportauftrag #${order.order_number} (Version ${version})` : `Transportauftrag #${order.order_number}`;
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Transportauftrag #${order.order_number}`, margin, 22);
+  doc.text(title, margin, 22);
   doc.setFont('helvetica', 'normal');
 
   // Auftraggeber / Auftragnehmer
