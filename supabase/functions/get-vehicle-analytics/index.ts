@@ -57,8 +57,7 @@ serve(async (req) => {
       .select('id, order_number, price, origin_address, destination_address, delivery_date, cargo_items(weight, loading_meters)')
       .eq('vehicle_id', vehicleId)
       .gte('delivery_date', startDate)
-      .lte('delivery_date', endDate)
-      .or('status.eq.Zugestellt,is_billed.eq.true');
+      .lte('delivery_date', endDate);
     if (ordersError) throw ordersError;
 
     const processedOrders = await Promise.all(orders.map(async (order) => {
