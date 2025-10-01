@@ -29,6 +29,7 @@ import InvoiceManagement from "./pages/InvoiceManagement";
 import DashboardSettings from "./pages/DashboardSettings";
 import TourManagement from "./pages/TourManagement";
 import VehicleGroupManagement from "./pages/VehicleGroupManagement";
+import OrderImport from "./pages/OrderImport";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const AppRoutes = () => {
             <Route path="freight-orders" element={<FreightOrderManagement />} />
             <Route path="freight-orders/new" element={<FreightOrderForm />} />
             <Route path="freight-orders/edit/:id" element={<FreightOrderForm />} />
+            <Route path="order-import" element={<OrderImport />} />
           </Route>
 
           <Route element={<ProtectedRoute requiredPermission="tours.manage" />}>
