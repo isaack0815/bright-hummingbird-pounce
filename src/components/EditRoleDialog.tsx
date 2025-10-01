@@ -24,7 +24,7 @@ type Role = {
 const formSchema = z.object({
   name: z.string().min(1, { message: "Gruppenname ist erforderlich." }),
   description: z.string().optional(),
-  permissionIds: z.array(z.number()).optional(),
+  permissionIds: z.array(z.coerce.number()).optional(),
 });
 
 type EditRoleDialogProps = {
@@ -123,7 +123,6 @@ export function EditRoleDialog({ role, show, onHide }: EditRoleDialogProps) {
                     label={permission.description || permission.name}
                     {...form.register("permissionIds")}
                     value={permission.id}
-                    defaultChecked={role.permissions.some(p => p.id === permission.id)}
                   />
                 ))}
               </div>
