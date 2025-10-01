@@ -17,7 +17,7 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
-import StatusHistoryTab from '@/components/freight/StatusHistoryTab';
+import StatusHistoryTab from '@/components/freight/StatusHistoryTab.tsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
 
