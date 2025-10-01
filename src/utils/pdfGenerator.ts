@@ -24,7 +24,9 @@ Bei fehlerhafter Dokumentation wird eine Bearbeitungsgebühr von 50€ erhoben.
 export const generateExternalOrderPDF = (order: FreightOrder, settings: any, version?: number): Blob => {
   const doc = new jsPDF();
   const pageHeight = doc.internal.pageSize.height;
+  const pageWidth = doc.internal.pageSize.width;
   const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
   const agbText = settings.agb_text || 'Keine AGB konfiguriert.';
 
   // Header
@@ -90,32 +92,44 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any, ver
 
   lastY = (doc as any).lastAutoTable.finalY + 10;
 
-  // AGB & Hinweise
+  // AGB & Hinweise with proper page break handling
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('AGB:', margin, lastY);
-  doc.setFont('helvetica', 'normal');
-  const splitAgb = doc.splitTextToSize(agbText, 180);
-  doc.text(splitAgb, margin, lastY + 5);
-  lastY = doc.getTextDimensions(splitAgb).h + lastY + 10;
 
-  if (lastY > pageHeight - 60) {
+  // AGB
+  const agbTitleHeight = 5;
+  const splitAgb = doc.splitTextToSize(agbText, contentWidth);
+  const agbHeight = doc.getTextDimensions(splitAgb).h;
+  if (lastY + agbTitleHeight + agbHeight > pageHeight - margin) {
     doc.addPage();
     lastY = margin;
   }
+  doc.setFont('helvetica', 'bold');
+  doc.text('AGB:', margin, lastY);
+  lastY += agbTitleHeight;
+  doc.setFont('helvetica', 'normal');
+  doc.text(splitAgb, margin, lastY);
+  lastY += agbHeight + 10;
 
+  // Hinweise
+  const hinweisTitleHeight = 5;
+  const splitHinweis = doc.splitTextToSize(hinweisText.trim(), contentWidth);
+  const hinweisHeight = doc.getTextDimensions(splitHinweis).h;
+  if (lastY + hinweisTitleHeight + hinweisHeight > pageHeight - margin) {
+    doc.addPage();
+    lastY = margin;
+  }
   doc.setFont('helvetica', 'bold');
   doc.text('Hinweis:', margin, lastY);
+  lastY += hinweisTitleHeight;
   doc.setFont('helvetica', 'normal');
-  const splitHinweis = doc.splitTextToSize(hinweisText, 180);
-  doc.text(splitHinweis, margin, lastY + 5);
-  lastY = doc.getTextDimensions(splitHinweis).h + lastY + 15;
+  doc.text(splitHinweis, margin, lastY);
+  lastY += hinweisHeight + 15;
 
+  // Unterschrift
   if (lastY > pageHeight - 40) {
     doc.addPage();
     lastY = margin;
   }
-
   doc.text('Unterschrift Auftragnehmer:', margin, lastY);
   doc.line(margin, lastY + 2, margin + 80, lastY + 2);
 
@@ -124,7 +138,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any, ver
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
-    doc.text(`Seite ${i} von ${pageCount}`, doc.internal.pageSize.width - 30, pageHeight - 10);
+    doc.text(`Seite ${i} von ${pageCount}`, pageWidth - 30, pageHeight - 10);
   }
 
   return doc.output('blob');
