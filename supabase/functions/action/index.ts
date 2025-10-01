@@ -85,9 +85,7 @@ serve(async (req) => {
         const filePath = `imports/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
     
-        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
-            contentType: fileType || 'application/octet-stream'
-        });
+        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer);
         if (uploadError) throw uploadError;
     
         return new Response(JSON.stringify({ success: true, filePath }), { status: 201, headers: corsHeaders });
