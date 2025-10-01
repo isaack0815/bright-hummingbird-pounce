@@ -82,6 +82,14 @@ const parseDateTime = (value: string | Date): { date: string | null, time: strin
 
   let cleanValue = String(value).trim().replace(/\*/g, '');
 
+  if (cleanValue.toLowerCase() === 'hierzu') {
+    const now = new Date();
+    return {
+      date: now.toISOString().split('T')[0],
+      time: now.toTimeString().substring(0, 5),
+    };
+  }
+
   const dateTimeParts = cleanValue.split('/');
   const datePartStr = dateTimeParts[0].trim();
   const timePartStr = dateTimeParts.length > 1 ? dateTimeParts[1].trim() : null;
