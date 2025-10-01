@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button, Card, Form, Tabs, Tab, Row, Col } from 'react-bootstrap';
@@ -17,6 +17,7 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
+import StatusHistoryTab from '@/components/freight/StatusHistoryTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
 
@@ -46,6 +47,8 @@ const formSchema = z.object({
   stops: z.array(stopSchema).min(1, "Es muss mindestens ein Stopp vorhanden sein."),
   cargoItems: z.array(cargoItemSchema).optional(),
 });
+
+type FormSchemaType = z.infer<typeof formSchema>;
 
 const fetchCustomers = async (): Promise<Customer[]> => {
   const { data, error } = await supabase.functions.invoke('get-customers');
@@ -97,7 +100,7 @@ const FreightOrderForm = () => {
     enabled: isEditMode,
   });
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormSchemaType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: 'Angelegt',
@@ -131,14 +134,14 @@ const FreightOrderForm = () => {
   }, [existingOrder, isEditMode, form]);
 
   const mutation = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>): Promise<FreightOrder> => {
+    mutationFn: async (values: FormSchemaType): Promise<FreightOrder> => {
       const cleanedOrderData = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value === '' ? null : value])
       );
       
-      const { stops, cargoItems, ...orderData } = cleanedOrderData;
+      const { stops, cargoItems, ...orderData } = cleanedOrderData as FormSchemaType;
 
-      const cleanedStops = Array.isArray(stops) ? stops.map(stop => ({
+      const cleanedStops = Array.isArray(stops) ? stops.map((stop: z.infer<typeof stopSchema>) => ({
         ...stop,
         stop_date: stop.stop_date || null,
         time_start: stop.time_start || null,
@@ -186,6 +189,7 @@ const FreightOrderForm = () => {
         queryClient.invalidateQueries({ queryKey: ['orderNotes', Number(id)] });
         queryClient.invalidateQueries({ queryKey: ['orderFiles', Number(id)] });
         queryClient.invalidateQueries({ queryKey: ['orderTeam', Number(id)] });
+        queryClient.invalidateQueries({ queryKey: ['orderStatusHistory', Number(id)] });
       }
     },
     onError: (err: any) => {
@@ -251,7 +255,7 @@ const FreightOrderForm = () => {
                                               <Button type="button" variant="ghost" size="sm" className="p-1" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
                                           </div>
                                           <Row className="g-3">
-                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
+                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control as="textarea" rows={2} {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Stopp-Art</Form.Label><Form.Select {...form.register(`stops.${index}.stop_type`)}><option value="Abholung">Abholung</option><option value="Teilladung">Teilladung</option><option value="Teillieferung">Teillieferung</option><option value="Lieferung">Lieferung</option></Form.Select></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Datum</Form.Label><Form.Control type="date" {...form.register(`stops.${index}.stop_date`)} /></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Zeitfenster (von)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_start`)} /></Form.Group></Col>
@@ -309,11 +313,17 @@ const FreightOrderForm = () => {
                       <Card.Body className="d-flex flex-column gap-3">
                           <Form.Group>
                               <Form.Label>Kunde</Form.Label>
-                              <CustomerCombobox
-                                  customers={customers || []}
-                                  value={form.watch('customer_id')}
-                                  onChange={(value) => form.setValue('customer_id', value)}
-                                  onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                              <Controller
+                                name="customer_id"
+                                control={form.control}
+                                render={({ field }) => (
+                                  <CustomerCombobox
+                                      customers={customers || []}
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      onAddNew={() => setIsAddCustomerDialogOpen(true)}
+                                  />
+                                )}
                               />
                           </Form.Group>
                           <Form.Group><Form.Label>Externe Auftragsnummer</Form.Label><Form.Control {...form.register("external_order_number")} /></Form.Group>
@@ -328,6 +338,7 @@ const FreightOrderForm = () => {
         <Tab eventKey="notes" title="Notizen"><NotesTab orderId={id ? Number(id) : null} /></Tab>
         <Tab eventKey="files" title="Dateien"><FilesTab orderId={id ? Number(id) : null} /></Tab>
         <Tab eventKey="team" title="Team"><TeamTab orderId={id ? Number(id) : null} /></Tab>
+        <Tab eventKey="history" title="Verlauf" disabled={!isEditMode}><StatusHistoryTab orderId={id ? Number(id) : null} /></Tab>
       </Tabs>
     </Form>
     <AddCustomerDialog
