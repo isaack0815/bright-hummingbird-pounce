@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button, Modal, Form, Spinner } from 'react-bootstrap';
+import { Button, Modal, Form, Spinner, InputGroup } from 'react-bootstrap';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,6 +23,7 @@ const formSchema = z.object({
   external_license_plate: z.string().optional(),
   external_transporter_dimensions: z.string().optional(),
   payment_term_days: z.coerce.number().optional(),
+  external_price: z.coerce.number().optional(),
 });
 
 type AssignExternalOrderDialogProps = {
@@ -66,6 +67,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
         external_license_plate: order.external_license_plate || '',
         external_transporter_dimensions: order.external_transporter_dimensions || '',
         payment_term_days: order.payment_term_days || Number(settings?.payment_term_default) || 45,
+        external_price: order.external_price || undefined,
       });
     }
     if (!open) {
@@ -238,6 +240,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
       const carrier = carriers?.find(c => c.id === option.value);
       if (carrier) {
         form.reset({
+          ...form.getValues(),
           external_company_address: carrier.company_address || '',
           external_email: carrier.email || '',
           driver_name: carrier.driver_name || '',
@@ -256,6 +259,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
         external_license_plate: order?.external_license_plate || '',
         external_transporter_dimensions: order?.external_transporter_dimensions || '',
         payment_term_days: order?.payment_term_days || Number(settings?.payment_term_default) || 45,
+        external_price: order?.external_price || undefined,
       });
     }
   };
@@ -288,6 +292,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
           <Form.Group className="mb-3"><Form.Label>Fahrer Telefon</Form.Label><Form.Control {...form.register("external_driver_phone")} /></Form.Group>
           <Form.Group className="mb-3"><Form.Label>Kennzeichen</Form.Label><Form.Control {...form.register("external_license_plate")} /></Form.Group>
           <Form.Group className="mb-3"><Form.Label>Transportermaße (LxBxH)</Form.Label><Form.Control {...form.register("external_transporter_dimensions")} /></Form.Group>
+          <Form.Group className="mb-3"><Form.Label>Frachtpreis (€)</Form.Label><InputGroup><Form.Control type="number" step="0.01" {...form.register("external_price")} /><InputGroup.Text>€</InputGroup.Text></InputGroup></Form.Group>
           <Form.Group className="mb-3"><Form.Label>Zahlungsfrist (Tage)</Form.Label><Form.Control type="number" {...form.register("payment_term_days")} /></Form.Group>
           <Form.Check 
             type="checkbox"
@@ -308,6 +313,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
           <div className="ps-3 border-start d-flex flex-column gap-1">
             <p><strong>Anschrift:</strong><br/>{order.external_company_address?.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) || '-'}</p>
             <p><strong>E-Mail:</strong> {order.external_email || '-'}</p>
+            <p><strong>Frachtpreis:</strong> {order.external_price ? `${order.external_price.toFixed(2)} €` : '-'}</p>
           </div>
         </div>
         <div>

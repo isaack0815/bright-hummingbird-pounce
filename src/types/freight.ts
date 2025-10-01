@@ -39,6 +39,7 @@ export type FreightOrder = {
   delivery_time_end: string | null;
 
   price: number | null;
+  external_price: number | null;
   description: string | null;
   created_at: string;
   created_by: string | null;

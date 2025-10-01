@@ -50,6 +50,7 @@ serve(async (req) => {
         external_license_plate: null,
         external_transporter_dimensions: null,
         payment_term_days: null,
+        external_price: null,
       })
       .eq('id', orderId)
       .select()

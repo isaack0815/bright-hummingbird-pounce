@@ -62,7 +62,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any, ver
     ['Ladung:', order.cargo_items.map(i => i.description).join(', ')],
     ['Gewicht:', `${order.cargo_items.reduce((sum, i) => sum + (i.weight || 0), 0)} kg`],
     ['Lademeter:', `${order.cargo_items.reduce((sum, i) => sum + (i.loading_meters || 0), 0)} m`],
-    ['Frachtpreis:', `${order.price?.toFixed(2) || '0.00'} €`],
+    ['Frachtpreis:', `${order.external_price?.toFixed(2) || '0.00'} €`],
     ['Zahlungsbedingungen:', `${order.payment_term_days || settings.payment_term_default || '45'} Tage nach Erhalt der Rechnung`],
     ['Fahrername:', order.external_driver_name || ''],
     ['Telefonnummer Fahrer:', order.external_driver_phone || ''],
