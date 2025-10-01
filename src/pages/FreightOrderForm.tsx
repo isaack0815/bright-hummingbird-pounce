@@ -90,7 +90,7 @@ const FreightOrderForm = () => {
   const { user } = useAuth();
   const [isAddCustomerDialogOpen, setIsAddCustomerDialogOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [routeDetails, setRouteDetails] = useState<{ distance: number | null, cost: number | null }>({ distance: null, cost: null });
+  const [routeDetails, setRouteDetails] = useState<{ distance: number | null, cost: number | null, travelTime: string | null }>({ distance: null, cost: null, travelTime: null });
   const [isCalculating, setIsCalculating] = useState(false);
   const lastCalculatedAddresses = useRef({ origin: '', destination: '' });
 
@@ -153,7 +153,7 @@ const FreightOrderForm = () => {
   useEffect(() => {
     const calculateRoute = async () => {
         if (watchedStops.length < 2) {
-            setRouteDetails({ distance: null, cost: null });
+            setRouteDetails({ distance: null, cost: null, travelTime: null });
             return;
         }
         const origin = watchedStops[0].address;
@@ -181,13 +181,19 @@ const FreightOrderForm = () => {
                 const pricePerKm = isLargeTransport ? settings.price_per_km_large : settings.price_per_km_small;
                 const cost = distanceInKm * pricePerKm;
 
-                setRouteDetails({ distance: distanceInKm, cost });
+                const averageSpeed = isLargeTransport ? 70 : 90; // km/h
+                const travelTimeHours = distanceInKm / averageSpeed;
+                const hours = Math.floor(travelTimeHours);
+                const minutes = Math.round((travelTimeHours - hours) * 60);
+                const travelTimeFormatted = `${hours}h ${String(minutes).padStart(2, '0')}min`;
+
+                setRouteDetails({ distance: distanceInKm, cost, travelTime: travelTimeFormatted });
             } else {
-                setRouteDetails({ distance: null, cost: null });
+                setRouteDetails({ distance: null, cost: null, travelTime: null });
             }
         } catch (err: any) {
             console.error("Error calculating route:", err);
-            setRouteDetails({ distance: null, cost: null });
+            setRouteDetails({ distance: null, cost: null, travelTime: null });
         } finally {
             setIsCalculating(false);
         }
@@ -428,6 +434,7 @@ const FreightOrderForm = () => {
                             ) : routeDetails.distance ? (
                                 <>
                                     <div className="d-flex justify-content-between small"><span>Distanz:</span> <strong>~ {routeDetails.distance.toFixed(0)} km</strong></div>
+                                    <div className="d-flex justify-content-between small"><span>Geschätzte Fahrzeit:</span> <strong>~ {routeDetails.travelTime}</strong></div>
                                     <div className="d-flex justify-content-between small"><span>Geschätzte Kosten:</span> <strong>~ {routeDetails.cost.toFixed(2)} €</strong></div>
                                 </>
                             ) : (
