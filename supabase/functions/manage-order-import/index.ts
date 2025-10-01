@@ -72,6 +72,7 @@ serve(async (req) => {
                 address: stop.address,
                 stop_type: stop.stop_type,
                 stop_date: stop.stop_date,
+                time_start: stop.time_start,
                 position: stop.position,
               }));
               const { error: stopsError } = await supabaseAdmin.from('freight_order_stops').insert(stopsToInsert);

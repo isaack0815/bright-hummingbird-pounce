@@ -41,7 +41,7 @@ const fetchTemplates = async (customerId: number): Promise<Template[]> => {
   return data.templates || [];
 };
 
-const extractCellData = (worksheet: XLSX.WorkSheet, mappingString: string): string => {
+const extractCellData = (worksheet: XLSX.WorkSheet, mappingString: string): any => {
   if (!mappingString || !worksheet) return '';
   try {
     if (mappingString.includes(':')) {
@@ -58,12 +58,53 @@ const extractCellData = (worksheet: XLSX.WorkSheet, mappingString: string): stri
       return values.join(' ');
     } else {
       const cell = worksheet[mappingString];
-      return cell ? String(cell.w || cell.v) : '';
+      return cell ? (cell.v ?? (cell.w ?? '')) : '';
     }
   } catch (e) {
     console.error(`Error parsing mapping string "${mappingString}":`, e);
     return `[Fehlerhafte Eingabe: ${mappingString}]`;
   }
+};
+
+const parseDateTime = (value: string | Date): { date: string | null, time: string | null } => {
+  if (!value) return { date: null, time: null };
+
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) {
+      return { date: null, time: null };
+    }
+    const hasTime = value.getHours() !== 0 || value.getMinutes() !== 0 || value.getSeconds() !== 0;
+    return {
+      date: value.toISOString().split('T')[0],
+      time: hasTime ? value.toTimeString().substring(0, 5) : null,
+    };
+  }
+
+  let cleanValue = String(value).trim().replace(/\*/g, '');
+
+  const dateTimeParts = cleanValue.split('/');
+  const datePartStr = dateTimeParts[0].trim();
+  const timePartStr = dateTimeParts.length > 1 ? dateTimeParts[1].trim() : null;
+
+  let date: string | null = null;
+  let time: string | null = null;
+
+  const dateMatch = datePartStr.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (dateMatch) {
+    const day = dateMatch[1].padStart(2, '0');
+    const month = dateMatch[2].padStart(2, '0');
+    const year = dateMatch[3];
+    date = `${year}-${month}-${day}`;
+  }
+
+  if (timePartStr) {
+    const timeMatch = timePartStr.match(/(\d{1,2})[:.](\d{2})/);
+    if (timeMatch) {
+      time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+    }
+  }
+
+  return { date, time };
 };
 
 const OrderImport = () => {
@@ -129,11 +170,16 @@ const OrderImport = () => {
         const mappingString = mapping[field.key];
         if (mappingString) {
           let value = extractCellData(worksheet, mappingString);
-          if ((field.key.includes('date')) && value) {
-            const dateMatch = value.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-            if (dateMatch) value = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+          if (field.key.includes('_date') && value) {
+            const { date, time } = parseDateTime(value);
+            const baseKey = field.key.replace('_date', '');
+            rowData[field.key] = date;
+            if (time) {
+              rowData[`${baseKey}_time_start`] = time;
+            }
+          } else {
+            rowData[field.key] = String(value);
           }
-          rowData[field.key] = value;
         }
       });
       return rowData;
@@ -151,6 +197,7 @@ const OrderImport = () => {
               address: order[`stop_${i}_address`],
               stop_type: order[`stop_${i}_type`] || (i === 1 ? 'Abholung' : 'Lieferung'),
               stop_date: order[`stop_${i}_date`] || null,
+              time_start: order[`stop_${i}_time_start`] || null,
               position: i - 1,
             });
           }
