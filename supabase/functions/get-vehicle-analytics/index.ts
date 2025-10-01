@@ -58,7 +58,7 @@ serve(async (req) => {
       .eq('vehicle_id', vehicleId)
       .gte('delivery_date', startDate)
       .lte('delivery_date', endDate)
-      .eq('is_billed', true);
+      .or('status.eq.Zugestellt,is_billed.eq.true');
     if (ordersError) throw ordersError;
 
     const processedOrders = await Promise.all(orders.map(async (order) => {
