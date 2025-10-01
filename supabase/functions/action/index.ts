@@ -51,7 +51,9 @@ serve(async (req) => {
         const filePath = `${orderId}/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
     
-        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer);
+        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
+            contentType: 'application/octet-stream'
+        });
         if (uploadError) throw uploadError;
     
         const { data: newFile, error: dbError } = await supabaseAdmin.from('order_files').insert({
@@ -83,7 +85,9 @@ serve(async (req) => {
         const filePath = `imports/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
     
-        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer);
+        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
+            contentType: 'application/octet-stream'
+        });
         if (uploadError) throw uploadError;
     
         return new Response(JSON.stringify({ success: true, filePath }), { status: 201, headers: corsHeaders });
@@ -100,7 +104,9 @@ serve(async (req) => {
         const filePath = `${vehicleId}/${crypto.randomUUID()}-${sanitizedName}`;
         const fileBuffer = Buffer.from(fileData, 'base64');
     
-        const { error: uploadError } = await supabaseAdmin.storage.from('vehicle-files').upload(filePath, fileBuffer);
+        const { error: uploadError } = await supabaseAdmin.storage.from('vehicle-files').upload(filePath, fileBuffer, {
+            contentType: 'application/octet-stream'
+        });
         if (uploadError) throw uploadError;
 
         await supabaseAdmin.from('vehicle_files').insert({
