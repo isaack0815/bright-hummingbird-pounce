@@ -17,7 +17,7 @@ import { AddCustomerDialog } from '@/components/AddCustomerDialog';
 import NotesTab from '@/components/freight/NotesTab';
 import FilesTab from '@/components/freight/FilesTab';
 import TeamTab from '@/components/freight/TeamTab';
-import StatusHistoryTab from '@/components/freight/StatusHistoryTab.tsx';
+import StatusHistoryTab from '@/components/freight/StatusHistoryTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { AssignExternalOrderDialog } from '@/components/freight/AssignExternalOrderDialog';
 
@@ -51,7 +51,9 @@ const formSchema = z.object({
 type FormSchemaType = z.infer<typeof formSchema>;
 
 const fetchCustomers = async (): Promise<Customer[]> => {
-  const { data, error } = await supabase.functions.invoke('get-customers');
+  const { data, error } = await supabase.functions.invoke('customers', {
+    method: 'GET',
+  });
   if (error) throw new Error(error.message);
   return data.customers;
 };

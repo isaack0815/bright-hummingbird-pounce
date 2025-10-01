@@ -48,7 +48,8 @@ export function AddCustomerDialog({ show, onHide, onCustomerCreated }: AddCustom
 
   const createMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>): Promise<Customer> => {
-      const { data, error } = await supabase.functions.invoke('create-customer', {
+      const { data, error } = await supabase.functions.invoke('customers', {
+        method: 'POST',
         body: values,
       });
       if (error) throw error;

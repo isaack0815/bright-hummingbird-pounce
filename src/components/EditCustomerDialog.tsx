@@ -55,7 +55,8 @@ export function EditCustomerDialog({ customer, show, onHide }: EditCustomerDialo
   const updateMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>) => {
       if (!customer) return;
-      const { error } = await supabase.functions.invoke('update-customer', {
+      const { error } = await supabase.functions.invoke('customers', {
+        method: 'PUT',
         body: { id: customer.id, ...values },
       });
       if (error) throw error;
