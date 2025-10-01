@@ -10,6 +10,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import type { Customer } from '@/pages/CustomerManagement';
 import Select from 'react-select';
 import { FileUploader } from '@/components/FileUploader';
+import { v4 as uuidv4 } from 'uuid';
 
 const baseImportFields = [
   { key: 'external_order_number', label: 'Externe Auftragsnr.', required: false },
@@ -130,6 +131,8 @@ const OrderImport = () => {
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [templateToSave, setTemplateToSave] = useState<{id?: number, name: string}>({name: ''});
   const [stopCount, setStopCount] = useState(2);
+  const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'], queryFn: fetchCustomers });
@@ -151,22 +154,38 @@ const OrderImport = () => {
     return [...baseImportFields, ...dynamicStopFields];
   }, [stopCount]);
 
-  const handleFileChange = (selectedFile: File | null) => {
+  const handleFileChange = async (selectedFile: File | null) => {
     if (selectedFile) {
       setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array', cellDates: true });
-        setWorkbook(wb);
-        setMapping({});
-        setStopCount(2);
-      };
-      reader.readAsArrayBuffer(selectedFile);
+      setUploadedFilePath(null);
+      setIsUploadingFile(true);
+
+      try {
+        const filePath = `imports/${uuidv4()}-${selectedFile.name}`;
+        const { error } = await supabase.storage.from('order-files').upload(filePath, selectedFile);
+        if (error) throw error;
+        setUploadedFilePath(filePath);
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: 'array', cellDates: true });
+          setWorkbook(wb);
+          setMapping({});
+          setStopCount(2);
+        };
+        reader.readAsArrayBuffer(selectedFile);
+      } catch (error: any) {
+        showError(`Fehler beim Hochladen der Importdatei: ${error.message}`);
+        setFile(null);
+      } finally {
+        setIsUploadingFile(false);
+      }
     } else {
       setFile(null);
       setWorkbook(null);
       setMapping({});
+      setUploadedFilePath(null);
     }
   };
 
@@ -201,7 +220,7 @@ const OrderImport = () => {
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedCustomerId || previewData.length === 0) throw new Error("Kunde oder Daten fehlen.");
+      if (!selectedCustomerId || previewData.length === 0 || !file || !uploadedFilePath) throw new Error("Kunde, Daten oder hochgeladene Datei fehlen.");
       const ordersToImport = previewData.map(order => {
         const stops = [];
         for (let i = 1; i <= stopCount; i++) {
@@ -221,14 +240,24 @@ const OrderImport = () => {
         }
         return { ...rest, stops };
       });
-      const { data, error } = await supabase.functions.invoke('manage-order-import', { body: { action: 'import-orders', payload: { customerId: selectedCustomerId, orders: ordersToImport } } });
+      const { data, error } = await supabase.functions.invoke('manage-order-import', { 
+        body: { 
+          action: 'import-orders', 
+          payload: { 
+            customerId: selectedCustomerId, 
+            orders: ordersToImport,
+            importFilePath: uploadedFilePath,
+            importFileName: file.name,
+          } 
+        } 
+      });
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       showSuccess(`${data.successCount} von ${data.totalCount} Aufträgen importiert!`);
       if (data.errorCount > 0) showError(`${data.errorCount} Aufträge fehlerhaft.`);
-      setFile(null); setWorkbook(null); setMapping({});
+      setFile(null); setWorkbook(null); setMapping({}); setUploadedFilePath(null);
     },
     onError: (err: any) => showError(err.data?.error || err.message),
   });
@@ -292,6 +321,7 @@ const OrderImport = () => {
                 <Form.Group>
                   <Form.Label className="d-flex align-items-center"><Upload size={16} className="me-2" />XLSX-Datei</Form.Label>
                   <FileUploader onFileSelect={handleFileChange} />
+                  {isUploadingFile && <div className="text-muted small mt-2"><Spinner size="sm" className="me-2" />Datei wird hochgeladen...</div>}
                 </Form.Group>
               </Col>
               <Col md={6}>

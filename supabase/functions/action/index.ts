@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { Buffer } from "https://deno.land/std@0.160.0/node/buffer.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +39,40 @@ serve(async (req) => {
     switch (action) {
       case 'ping': {
         return new Response(JSON.stringify({ message: 'pong', user_id: user.id, timestamp: new Date().toISOString() }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'upload-order-file': {
+        if (!user) throw new Error("User not authenticated");
+        const { orderId, fileName, fileType, fileData } = payload;
+        if (!orderId || !fileName || !fileData) {
+            return new Response(JSON.stringify({ error: 'Missing required fields for file upload.' }), { status: 400, headers: corsHeaders });
+        }
+    
+        const filePath = `${orderId}/${crypto.randomUUID()}-${fileName.replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/\s+/g, '_')}`;
+        const fileBuffer = Buffer.from(fileData, 'base64');
+    
+        const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
+            contentType: fileType || 'application/octet-stream'
+        });
+        if (uploadError) throw uploadError;
+    
+        const { data: newFile, error: dbError } = await supabaseAdmin.from('order_files').insert({
+            order_id: orderId,
+            user_id: user.id,
+            file_path: filePath,
+            file_name: fileName,
+            file_type: fileType,
+        }).select('id').single();
+        if (dbError) throw dbError;
+    
+        await supabaseAdmin.from('file_activity_logs').insert({
+            file_id: newFile.id,
+            user_id: user.id,
+            action: 'created',
+            details: { original_filename: fileName }
+        });
+    
+        return new Response(JSON.stringify({ success: true }), { status: 201, headers: corsHeaders });
       }
 
       case 'get-work-groups': {
