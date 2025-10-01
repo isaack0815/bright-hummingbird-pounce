@@ -36,6 +36,12 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any, ver
   doc.text(title, margin, 22);
   doc.setFont('helvetica', 'normal');
 
+  // Auftragnehmer-Adresse mit Steuernummer zusammenbauen
+  const auftragnehmerAddress = [
+    order.external_company_address || '',
+    order.external_tax_number ? `Ust-IdNr.: ${order.external_tax_number}` : ''
+  ].filter(Boolean).join('\n');
+
   // Auftraggeber / Auftragnehmer
   autoTable(doc, {
     startY: 30,
@@ -46,7 +52,7 @@ export const generateExternalOrderPDF = (order: FreightOrder, settings: any, ver
       ],
       [
         `${settings.company_name || ''}\n${settings.company_address || ''}\n${settings.company_city_zip || ''}\n${settings.company_country || ''}\nUstID: ${settings.company_tax_id || ''}`,
-        `${order.external_company_address || ''}`
+        auftragnehmerAddress
       ],
     ],
     theme: 'plain',

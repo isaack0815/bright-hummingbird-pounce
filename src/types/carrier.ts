@@ -8,4 +8,5 @@ export type Carrier = {
   license_plate: string | null;
   transporter_dimensions: string | null;
   payment_term_days: number | null;
+  tax_number: string | null;
 };

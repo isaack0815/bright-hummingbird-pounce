@@ -17,6 +17,7 @@ import CreatableSelect from 'react-select/creatable';
 
 const formSchema = z.object({
   external_company_address: z.string().min(1, "Anschrift ist erforderlich."),
+  external_tax_number: z.string().optional(),
   external_email: z.string().email({ message: "Ungültige E-Mail." }).optional().or(z.literal('')),
   external_driver_name: z.string().optional(),
   external_driver_phone: z.string().optional(),
@@ -61,6 +62,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     if (order) {
       form.reset({
         external_company_address: order.external_company_address || '',
+        external_tax_number: order.external_tax_number || '',
         external_email: order.external_email || '',
         external_driver_name: order.external_driver_name || '',
         external_driver_phone: order.external_driver_phone || '',
@@ -156,6 +158,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
         const newCarrierData = {
           name: selectedCarrierOption.label,
           company_address: values.external_company_address,
+          tax_number: values.external_tax_number,
           email: values.external_email,
           driver_name: values.external_driver_name,
           driver_phone: values.external_driver_phone,
@@ -242,6 +245,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
         form.reset({
           ...form.getValues(),
           external_company_address: carrier.company_address || '',
+          external_tax_number: carrier.tax_number || '',
           external_email: carrier.email || '',
           driver_name: carrier.driver_name || '',
           driver_phone: carrier.driver_phone || '',
@@ -253,6 +257,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
     } else if (!option) {
       form.reset({
         external_company_address: order?.external_company_address || '',
+        external_tax_number: order?.external_tax_number || '',
         external_email: order?.external_email || '',
         external_driver_name: order?.external_driver_name || '',
         external_driver_phone: order?.external_driver_phone || '',
@@ -287,6 +292,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
           </Form.Group>
           <hr/>
           <Form.Group className="mb-3"><Form.Label>Anschrift der Firma</Form.Label><Form.Control as="textarea" {...form.register("external_company_address")} /></Form.Group>
+          <Form.Group className="mb-3"><Form.Label>Steuernummer / Ust-IdNr.</Form.Label><Form.Control {...form.register("external_tax_number")} /></Form.Group>
           <Form.Group className="mb-3"><Form.Label>E-Mail-Adresse</Form.Label><Form.Control type="email" {...form.register("external_email")} /></Form.Group>
           <Form.Group className="mb-3"><Form.Label>Fahrername</Form.Label><Form.Control {...form.register("external_driver_name")} /></Form.Group>
           <Form.Group className="mb-3"><Form.Label>Fahrer Telefon</Form.Label><Form.Control {...form.register("external_driver_phone")} /></Form.Group>
@@ -312,6 +318,7 @@ export function AssignExternalOrderDialog({ order, settings, open, onOpenChange 
           <h4 className="h6 text-muted mb-2">Transporteur</h4>
           <div className="ps-3 border-start d-flex flex-column gap-1">
             <p><strong>Anschrift:</strong><br/>{order.external_company_address?.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) || '-'}</p>
+            <p><strong>Ust-IdNr.:</strong> {order.external_tax_number || '-'}</p>
             <p><strong>E-Mail:</strong> {order.external_email || '-'}</p>
             <p><strong>Frachtpreis:</strong> {order.external_price ? `${order.external_price.toFixed(2)} €` : '-'}</p>
           </div>

@@ -54,6 +54,7 @@ export type FreightOrder = {
   external_license_plate: string | null;
   external_transporter_dimensions: string | null;
   payment_term_days: number | null;
+  external_tax_number: string | null;
 
   discount_amount: number | null;
   vat_rate: number | null;

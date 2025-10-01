@@ -51,6 +51,7 @@ serve(async (req) => {
         external_transporter_dimensions: null,
         payment_term_days: null,
         external_price: null,
+        external_tax_number: null,
       })
       .eq('id', orderId)
       .select()
