@@ -276,7 +276,7 @@ const FreightOrderForm = () => {
                                               <Button type="button" variant="ghost" size="sm" className="p-1" onClick={() => removeStop(index)}><Trash2 className="h-4 w-4 text-danger" /></Button>
                                           </div>
                                           <Row className="g-3">
-                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
+                                              <Col md={12}><Form.Group><Form.Label>Adresse</Form.Label><Form.Control as="textarea" rows={2} {...form.register(`stops.${index}.address`)} /></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Stopp-Art</Form.Label><Form.Select {...form.register(`stops.${index}.stop_type`)}><option value="Abholung">Abholung</option><option value="Teilladung">Teilladung</option><option value="Teillieferung">Teillieferung</option><option value="Lieferung">Lieferung</option></Form.Select></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Datum</Form.Label><Form.Control type="date" {...form.register(`stops.${index}.stop_date`)} /></Form.Group></Col>
                                               <Col md={6}><Form.Group><Form.Label>Zeitfenster (von)</Form.Label><Form.Control type="time" {...form.register(`stops.${index}.time_start`)} /></Form.Group></Col>
