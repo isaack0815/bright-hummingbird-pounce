@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Card, Button, Form, Table, Badge } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit, Users } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Users, BarChart2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { showSuccess, showError } from '@/utils/toast';
@@ -77,6 +77,10 @@ const VehicleManagement = () => {
       <div className="d-flex align-items-center justify-content-between mb-4">
         <h1 className="h2">Fahrzeugverwaltung</h1>
         <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => navigate('/vehicle-analytics')}>
+                <BarChart2 className="me-2" size={16} />
+                Auswertung
+            </Button>
             <Button variant="outline-secondary" onClick={() => navigate('/vehicle-groups')}>
                 <Users className="me-2" size={16} />
                 Gruppen verwalten
