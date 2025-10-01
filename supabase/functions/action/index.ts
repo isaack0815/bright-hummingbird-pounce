@@ -52,7 +52,7 @@ serve(async (req) => {
         const fileBuffer = Buffer.from(fileData, 'base64');
     
         const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
-            contentType: 'application/octet-stream'
+            contentType: fileType || 'application/octet-stream'
         });
         if (uploadError) throw uploadError;
     
@@ -86,7 +86,7 @@ serve(async (req) => {
         const fileBuffer = Buffer.from(fileData, 'base64');
     
         const { error: uploadError } = await supabaseAdmin.storage.from('order-files').upload(filePath, fileBuffer, {
-            contentType: 'application/octet-stream'
+            contentType: fileType || 'application/octet-stream'
         });
         if (uploadError) throw uploadError;
     
@@ -105,7 +105,7 @@ serve(async (req) => {
         const fileBuffer = Buffer.from(fileData, 'base64');
     
         const { error: uploadError } = await supabaseAdmin.storage.from('vehicle-files').upload(filePath, fileBuffer, {
-            contentType: 'application/octet-stream'
+            contentType: fileType || 'application/octet-stream'
         });
         if (uploadError) throw uploadError;
 
