@@ -121,6 +121,15 @@ const parseDateTime = (value: string | Date): { date: string | null, time: strin
   return { date, time };
 };
 
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = error => reject(error);
+  });
+};
+
 const OrderImport = () => {
   const [file, setFile] = useState<File | null>(null);
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
@@ -161,10 +170,19 @@ const OrderImport = () => {
       setIsUploadingFile(true);
 
       try {
-        const filePath = `imports/${uuidv4()}-${selectedFile.name}`;
-        const { error } = await supabase.storage.from('order-files').upload(filePath, selectedFile);
+        const fileData = await fileToBase64(selectedFile);
+        const { data, error } = await supabase.functions.invoke('action', {
+          body: {
+            action: 'upload-import-file',
+            payload: {
+              fileName: selectedFile.name,
+              fileType: selectedFile.type,
+              fileData,
+            }
+          }
+        });
         if (error) throw error;
-        setUploadedFilePath(filePath);
+        setUploadedFilePath(data.filePath);
 
         const reader = new FileReader();
         reader.onload = (event) => {
