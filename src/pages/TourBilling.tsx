@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 
 type Tour = { id: number; name: string; tour_type: string | null };
 type TourStop = { id: number; name: string; address: string; };
-type OnCallStop = { tour_id: number; tour_stops: TourStop };
+type TourStopMapping = { tour_id: number; tour_stops: TourStop };
 type BillingEntry = {
   userId: string;
   firstName: string | null;
@@ -20,7 +20,7 @@ type BillingEntry = {
 };
 type BillingData = Record<string, Record<number, BillingEntry>>;
 
-const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData, onCallStops: OnCallStop[] }> => {
+const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData, tourStopMappings: TourStopMapping[] }> => {
   const { data, error } = await supabase.functions.invoke('action', {
     body: { 
       action: 'get-tour-billing-data',
@@ -180,10 +180,10 @@ const TourBilling = () => {
   const hasSavedOverrides = useMemo(() => Object.values(editedData || {}).some(day => Object.values(day).some(entry => entry.is_override)), [editedData]);
 
   const zusatzstopsData = useMemo(() => {
-    if (!data || !data.onCallStops || !editedData) return { uniqueStops: [], stopVisitMap: new Map() };
+    if (!data || !data.tourStopMappings || !editedData) return { uniqueStops: [], stopVisitMap: new Map() };
 
     const uniqueStops = new Map<number, TourStop>();
-    data.onCallStops.forEach(item => {
+    data.tourStopMappings.forEach(item => {
       if (item.tour_stops && !uniqueStops.has(item.tour_stops.id)) {
         uniqueStops.set(item.tour_stops.id, item.tour_stops);
       }
@@ -193,8 +193,9 @@ const TourBilling = () => {
     for (const dateKey in editedData) {
       for (const tourIdStr in editedData[dateKey]) {
         const tourId = Number(tourIdStr);
-        if (onCallTours.some(t => t.id === tourId)) {
-          const stopsForThisTour = data.onCallStops.filter(s => s.tour_id === tourId).map(s => s.tour_stops.id);
+        // Check if this tour was actually driven on this day (has kilometers)
+        if (editedData[dateKey][tourId]?.kilometers) {
+          const stopsForThisTour = data.tourStopMappings.filter(s => s.tour_id === tourId).map(s => s.tour_stops.id);
           for (const stopId of stopsForThisTour) {
             if (!stopVisitMap.has(stopId)) {
               stopVisitMap.set(stopId, new Set());
@@ -205,7 +206,7 @@ const TourBilling = () => {
       }
     }
     return { uniqueStops: Array.from(uniqueStops.values()).sort((a, b) => a.name.localeCompare(b.name)), stopVisitMap };
-  }, [data, editedData, onCallTours]);
+  }, [data, editedData]);
 
   const handleExport = () => {
     if (!data || !editedData || hasUnsavedChanges) return;
@@ -377,7 +378,7 @@ const TourBilling = () => {
               </tbody>
             </Table>
           ) : (
-            <p className="text-muted text-center py-4">In diesem Monat wurden keine Bereitschaftstouren mit zugewiesenen Stops gefunden.</p>
+            <p className="text-muted text-center py-4">In diesem Monat wurden keine Touren mit zugewiesenen Stops gefunden.</p>
           )}
         </Card.Body>
       </Card>
