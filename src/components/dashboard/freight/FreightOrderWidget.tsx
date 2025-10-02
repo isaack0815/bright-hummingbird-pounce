@@ -20,6 +20,23 @@ const fetchOrders = async (): Promise<Order[]> => {
   return data.orders;
 };
 
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case 'Angelegt':
+      return 'secondary';
+    case 'Geplant':
+      return 'info';
+    case 'Unterwegs':
+      return 'warning';
+    case 'Zugestellt':
+      return 'success';
+    case 'Storniert':
+      return 'danger';
+    default:
+      return 'light';
+  }
+};
+
 export function FreightOrderWidget() {
   const { data: orders, isLoading } = useQuery<Order[]>({
     queryKey: ['dashboardFreightOrders'],
@@ -92,7 +109,7 @@ export function FreightOrderWidget() {
                   <td>{order.customers?.company_name || '-'}</td>
                   <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
                   <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
-                  <td><Badge bg="secondary">{order.status}</Badge></td>
+                  <td><Badge bg={getStatusBadgeVariant(order.status)}>{order.status}</Badge></td>
                 </tr>
               ))}
             </tbody>

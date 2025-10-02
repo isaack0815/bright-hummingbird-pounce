@@ -16,6 +16,23 @@ type OrderTableProps = {
   onSelectionChange?: (id: number) => void;
 };
 
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case 'Angelegt':
+      return 'secondary';
+    case 'Geplant':
+      return 'info';
+    case 'Unterwegs':
+      return 'warning';
+    case 'Zugestellt':
+      return 'success';
+    case 'Storniert':
+      return 'danger';
+    default:
+      return 'light';
+  }
+};
+
 export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingContext = false, selectedIds = [], onSelectionChange }: OrderTableProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -132,7 +149,7 @@ export const OrderTable = ({ orders, onDelete, showBillingColumn, isBillingConte
             <td className="fw-medium">{order.order_number}</td>
             <td>{order.customers?.company_name || 'N/A'}</td>
             <td>{order.vehicles?.license_plate || '-'}</td>
-            <td><Badge bg="secondary">{order.status}</Badge></td>
+            <td><Badge bg={getStatusBadgeVariant(order.status)}>{order.status}</Badge></td>
             <td>{order.pickup_date ? new Date(order.pickup_date).toLocaleDateString('de-DE') : '-'}</td>
             <td>{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('de-DE') : '-'}</td>
             {showBillingColumn && (
