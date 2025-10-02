@@ -16,4 +16,8 @@ npm install
 echo "Baue die Anwendung..."
 npm run build
 
-echo "Update abgeschlossen! Bitte starten Sie den Anwendungs-Server bei Bedarf neu."
+# 4. Server mit PM2 neu starten
+echo "Starte alle Anwendungs-Server mit PM2 neu..."
+pm2 restart all
+
+echo "Update und Neustart erfolgreich abgeschlossen!"
