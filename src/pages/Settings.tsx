@@ -64,7 +64,9 @@ const Settings = () => {
   const { data: workGroups, isLoading: isLoadingWorkGroups } = useQuery<WorkGroup[]>({
     queryKey: ['workGroups'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('get-work-groups');
+      const { data, error } = await supabase.functions.invoke('action', {
+        body: { action: 'get-work-groups' }
+      });
       if (error) throw new Error(error.message);
       return data.groups;
     },
