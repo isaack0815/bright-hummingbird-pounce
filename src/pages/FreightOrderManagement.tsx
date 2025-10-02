@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Card, Button, Tabs, Tab } from 'react-bootstrap';
+import { useMemo, useState } from 'react';
+import { Card, Button, Tabs, Tab, Form } from 'react-bootstrap';
 import { PlusCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -18,6 +18,7 @@ const fetchFreightOrders = async (): Promise<FreightOrder[]> => {
 };
 
 const FreightOrderManagement = () => {
+  const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
   const { addError } = useError();
   const navigate = useNavigate();
@@ -55,15 +56,28 @@ const FreightOrderManagement = () => {
       return { myOrders: [], otherOrders: [], completedOrders: [] };
     }
 
-    const activeOrders = orders.filter(o => o.status !== 'Zugestellt' && o.status !== 'Storniert');
-    const completed = orders.filter(o => o.status === 'Zugestellt' || o.status === 'Storniert');
+    const lowercasedFilter = searchTerm.toLowerCase();
+
+    const filteredOrders = searchTerm
+      ? orders.filter(order => {
+          return (
+            order.order_number.toLowerCase().includes(lowercasedFilter) ||
+            (order.origin_address && order.origin_address.toLowerCase().includes(lowercasedFilter)) ||
+            (order.destination_address && order.destination_address.toLowerCase().includes(lowercasedFilter)) ||
+            (order.customers?.company_name && order.customers.company_name.toLowerCase().includes(lowercasedFilter))
+          );
+        })
+      : orders;
+
+    const activeOrders = filteredOrders.filter(o => o.status !== 'Zugestellt' && o.status !== 'Storniert');
+    const completed = filteredOrders.filter(o => o.status === 'Zugestellt' || o.status === 'Storniert');
 
     return {
       myOrders: activeOrders.filter(o => o.created_by === user.id),
       otherOrders: activeOrders.filter(o => o.created_by !== user.id),
       completedOrders: completed,
     };
-  }, [orders, user]);
+  }, [orders, user, searchTerm]);
 
   if (error) {
     addError(error, 'API');
@@ -87,6 +101,14 @@ const FreightOrderManagement = () => {
           <Card.Text className="text-muted">Hier sehen Sie alle für Sie zugänglichen Aufträge, aufgeteilt nach Kategorien.</Card.Text>
         </Card.Header>
         <Card.Body>
+          <div className="mb-3" style={{ maxWidth: '400px' }}>
+            <Form.Control
+              type="text"
+              placeholder="Suche nach Auftragsnr., Adresse, Kunde..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           <Tabs defaultActiveKey="my-orders" id="order-tabs" className="mb-3 nav-fill">
             <Tab eventKey="my-orders" title="Meine Aufträge">
               {isLoading ? <TablePlaceholder cols={tableCols} /> : <OrderTable orders={myOrders} onDelete={handleDeleteClick} showBillingColumn={canBill} />}
