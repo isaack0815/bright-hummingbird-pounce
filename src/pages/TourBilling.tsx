@@ -357,10 +357,10 @@ const TourBilling = () => {
         </Card.Body>
       </Card>
 
-      {zusatzstopsData.uniqueStops.length > 0 && (
-        <Card className="mt-4">
-          <Card.Header><Card.Title>Zusatzstops / Bereitschaft</Card.Title></Card.Header>
-          <Card.Body className="table-responsive">
+      <Card className="mt-4">
+        <Card.Header><Card.Title>Zusatzstops / Bereitschaft</Card.Title></Card.Header>
+        <Card.Body className="table-responsive">
+          {isLoading ? <div className="text-center p-3"><Spinner size="sm" /></div> : zusatzstopsData.uniqueStops.length > 0 ? (
             <Table bordered size="sm">
               <thead><tr><th>Stop</th>{daysInMonth.map(day => <th key={day.getDate()} className="text-center">{format(day, 'd')}</th>)}</tr></thead>
               <tbody>
@@ -376,9 +376,11 @@ const TourBilling = () => {
                 ))}
               </tbody>
             </Table>
-          </Card.Body>
-        </Card>
-      )}
+          ) : (
+            <p className="text-muted text-center py-4">In diesem Monat wurden keine Bereitschaftstouren mit zugewiesenen Stops gefunden.</p>
+          )}
+        </Card.Body>
+      </Card>
 
       <Card className="mt-4">
         <Card.Header><Card.Title>Zusammenfassung</Card.Title></Card.Header>
