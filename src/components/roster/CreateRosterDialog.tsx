@@ -22,26 +22,35 @@ type CreateRosterDialogProps = {
 };
 
 const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
-  const { data, error } = await supabase
+  const { data: groupsData, error: groupsError } = await supabase
     .from('work_groups')
-    .select(`
-      id,
-      name,
-      description,
-      user_work_groups (
-        profiles (
-          id,
-          first_name,
-          last_name
-        )
-      )
-    `)
+    .select(`id, name, description, user_work_groups(user_id)`)
     .order('name');
 
-  if (error) throw new Error(error.message);
+  if (groupsError) throw new Error(groupsError.message);
+  if (!groupsData) return [];
 
-  const groupsWithMembers = data.map(group => {
-    const members = group.user_work_groups.map((m: any) => m.profiles).filter(Boolean);
+  const allUserIds = [...new Set(groupsData.flatMap(g => g.user_work_groups.map((m: any) => m.user_id)))];
+
+  if (allUserIds.length === 0) {
+    return groupsData.map(group => {
+      const { user_work_groups, ...restOfGroup } = group;
+      return { ...restOfGroup, members: [] };
+    });
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name')
+    .in('id', allUserIds);
+
+  if (profilesError) throw new Error(profilesError.message);
+  if (!profiles) return [];
+
+  const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+  const groupsWithMembers = groupsData.map(group => {
+    const members = group.user_work_groups.map((m: any) => profilesMap.get(m.user_id)).filter(Boolean);
     const { user_work_groups, ...restOfGroup } = group;
     return { ...restOfGroup, members };
   });
