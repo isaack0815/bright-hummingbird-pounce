@@ -90,6 +90,55 @@ const TourBilling = () => {
   };
 
   const daysInMonth = useMemo(() => eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) }), [currentMonth]);
+  
+  const handleKeyDown = (e: React.KeyboardEvent, currentDate: string, currentTourId: number) => {
+    if (e.key !== 'Enter' && e.key !== 'Tab' && e.key !== 'Escape') return;
+    
+    if (e.key === 'Escape') {
+        (e.target as HTMLElement).blur();
+        return;
+    }
+
+    e.preventDefault();
+    (e.target as HTMLElement).blur();
+
+    const tours = data?.tours || [];
+    const days = daysInMonth.map(d => format(d, 'yyyy-MM-dd'));
+
+    const currentRowIndex = days.indexOf(currentDate);
+    const currentColIndex = tours.findIndex(t => t.id === currentTourId);
+
+    let nextRowIndex = currentRowIndex;
+    let nextColIndex = currentColIndex;
+
+    if (e.key === 'Enter') {
+        nextRowIndex++;
+    } else if (e.key === 'Tab') {
+        if (e.shiftKey) { // Move Right
+            nextColIndex++;
+            if (nextColIndex >= tours.length) {
+                nextColIndex = 0;
+                nextRowIndex++;
+            }
+        } else { // Move Left
+            nextColIndex--;
+            if (nextColIndex < 0) {
+                nextColIndex = tours.length - 1;
+                nextRowIndex--;
+            }
+        }
+    }
+
+    if (nextRowIndex >= 0 && nextRowIndex < days.length && nextColIndex >= 0 && nextColIndex < tours.length) {
+        const nextDate = days[nextRowIndex];
+        const nextTourId = tours[nextColIndex].id;
+        
+        setTimeout(() => {
+            setEditingCell({ date: nextDate, tourId: nextTourId });
+        }, 10);
+    }
+  };
+
   const totals = useMemo(() => {
     if (!editedData) return {};
     const totals: Record<number, number> = {};
@@ -156,7 +205,7 @@ const TourBilling = () => {
                                 autoFocus
                                 defaultValue={entry?.kilometers ?? ''}
                                 onBlur={(e) => { handleCellChange(dateKey, tour.id, e.target.value); setEditingCell(null); }}
-                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); (e.target as HTMLElement).blur(); } }}
+                                onKeyDown={(e) => handleKeyDown(e, dateKey, tour.id)}
                               />
                             ) : (
                               entry?.kilometers ?? '-'
