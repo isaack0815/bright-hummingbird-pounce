@@ -45,6 +45,7 @@ const WorkTimeAnnualSummary = lazy(() => import('@/pages/WorkTimeAnnualSummary')
 const VacationRequestManagement = lazy(() => import('@/pages/VacationRequestManagement'));
 const VehicleAnalytics = lazy(() => import('@/pages/VehicleAnalytics'));
 const TourBilling = lazy(() => import('@/pages/TourBilling'));
+const Dispatch = lazy(() => import('@/pages/Dispatch'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -96,6 +97,7 @@ const AppRoutes = () => {
             <Route path="/work-time-admin" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAdministration /></ProtectedRoute>} />
             <Route path="/work-time-admin/annual-summary" element={<ProtectedRoute requiredPermission="work_time.manage"><WorkTimeAnnualSummary /></ProtectedRoute>} />
             <Route path="/vacation-requests" element={<VacationRequestManagement />} />
+            <Route path="/dispatch" element={<ProtectedRoute><Dispatch /></ProtectedRoute>} />
             <Route path="/access-denied" element={<AccessDenied />} />
           </Route>
           <Route path="*" element={<NotFound />} />
