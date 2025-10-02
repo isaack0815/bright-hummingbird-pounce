@@ -9,6 +9,8 @@ import { showSuccess, showError } from '@/utils/toast';
 import * as XLSX from 'xlsx';
 
 type Tour = { id: number; name: string; tour_type: string | null };
+type TourStop = { id: number; name: string; address: string; };
+type OnCallStop = { tour_id: number; tour_stops: TourStop };
 type BillingEntry = {
   userId: string;
   firstName: string | null;
@@ -18,7 +20,7 @@ type BillingEntry = {
 };
 type BillingData = Record<string, Record<number, BillingEntry>>;
 
-const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData }> => {
+const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData, onCallStops: OnCallStop[] }> => {
   const { data, error } = await supabase.functions.invoke('action', {
     body: { 
       action: 'get-tour-billing-data',
@@ -177,6 +179,34 @@ const TourBilling = () => {
   const grandTotalOnCall = useMemo(() => onCallTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0), [totals, onCallTours]);
   const hasSavedOverrides = useMemo(() => Object.values(editedData || {}).some(day => Object.values(day).some(entry => entry.is_override)), [editedData]);
 
+  const zusatzstopsData = useMemo(() => {
+    if (!data || !data.onCallStops || !editedData) return { uniqueStops: [], stopVisitMap: new Map() };
+
+    const uniqueStops = new Map<number, TourStop>();
+    data.onCallStops.forEach(item => {
+      if (item.tour_stops && !uniqueStops.has(item.tour_stops.id)) {
+        uniqueStops.set(item.tour_stops.id, item.tour_stops);
+      }
+    });
+
+    const stopVisitMap = new Map<number, Set<string>>();
+    for (const dateKey in editedData) {
+      for (const tourIdStr in editedData[dateKey]) {
+        const tourId = Number(tourIdStr);
+        if (onCallTours.some(t => t.id === tourId)) {
+          const stopsForThisTour = data.onCallStops.filter(s => s.tour_id === tourId).map(s => s.tour_stops.id);
+          for (const stopId of stopsForThisTour) {
+            if (!stopVisitMap.has(stopId)) {
+              stopVisitMap.set(stopId, new Set());
+            }
+            stopVisitMap.get(stopId)!.add(dateKey);
+          }
+        }
+      }
+    }
+    return { uniqueStops: Array.from(uniqueStops.values()).sort((a, b) => a.name.localeCompare(b.name)), stopVisitMap };
+  }, [data, editedData, onCallTours]);
+
   const handleExport = () => {
     if (!data || !editedData || hasUnsavedChanges) return;
 
@@ -222,7 +252,23 @@ const TourBilling = () => {
     const onCallWorksheet = XLSX.utils.aoa_to_sheet(onCallSheetData);
     XLSX.utils.book_append_sheet(workbook, onCallWorksheet, 'Zusammenfassung Bereitschaft');
 
-    // Sheet 4: Grand Total
+    // Sheet 4: Zusatzstops
+    if (zusatzstopsData.uniqueStops.length > 0) {
+      const zusatzstopsSheetData: (string | number)[][] = [];
+      zusatzstopsSheetData.push(['Stop', ...daysInMonth.map(d => format(d, 'dd.MM.'))]);
+      zusatzstopsData.uniqueStops.forEach(stop => {
+        const row = [stop.name];
+        daysInMonth.forEach(day => {
+          const dateKey = format(day, 'yyyy-MM-dd');
+          row.push(zusatzstopsData.stopVisitMap.get(stop.id)?.has(dateKey) ? 'X' : '');
+        });
+        zusatzstopsSheetData.push(row);
+      });
+      const zusatzstopsWorksheet = XLSX.utils.aoa_to_sheet(zusatzstopsSheetData);
+      XLSX.utils.book_append_sheet(workbook, zusatzstopsWorksheet, 'Zusatzstops');
+    }
+
+    // Sheet 5: Grand Total
     const grandTotalSheetData: (string | number)[][] = [
         ['Gesamtkilometer (Alle Touren)', `${grandTotal} km`]
     ];
@@ -310,6 +356,29 @@ const TourBilling = () => {
           )}
         </Card.Body>
       </Card>
+
+      {zusatzstopsData.uniqueStops.length > 0 && (
+        <Card className="mt-4">
+          <Card.Header><Card.Title>Zusatzstops / Bereitschaft</Card.Title></Card.Header>
+          <Card.Body className="table-responsive">
+            <Table bordered size="sm">
+              <thead><tr><th>Stop</th>{daysInMonth.map(day => <th key={day.getDate()} className="text-center">{format(day, 'd')}</th>)}</tr></thead>
+              <tbody>
+                {zusatzstopsData.uniqueStops.map(stop => (
+                  <tr key={stop.id}>
+                    <td className="fw-medium">{stop.name}</td>
+                    {daysInMonth.map(day => {
+                      const dateKey = format(day, 'yyyy-MM-dd');
+                      const wasVisited = zusatzstopsData.stopVisitMap.get(stop.id)?.has(dateKey);
+                      return <td key={day.getDate()} className="text-center">{wasVisited ? 'X' : ''}</td>;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
+      )}
 
       <Card className="mt-4">
         <Card.Header><Card.Title>Zusammenfassung</Card.Title></Card.Header>

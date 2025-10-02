@@ -616,8 +616,19 @@ serve(async (req) => {
                 is_override: true,
             };
         }
+        
+        const onCallTourIds = tours.filter((t: any) => t.tour_type === 'bereitschaft').map((t: any) => t.id);
+        let onCallStops: any[] = [];
+        if (onCallTourIds.length > 0) {
+            const { data, error } = await supabaseAdmin
+                .from('tour_route_points')
+                .select('tour_id, tour_stops(*)')
+                .in('tour_id', onCallTourIds);
+            if (error) throw error;
+            onCallStops = data || [];
+        }
 
-        return new Response(JSON.stringify({ tours: tours || [], billingData }), {
+        return new Response(JSON.stringify({ tours: tours || [], billingData, onCallStops }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
