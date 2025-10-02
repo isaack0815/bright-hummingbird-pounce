@@ -10,6 +10,8 @@ type WorkSession = {
   end_time: string | null;
   break_duration_minutes: number;
   notes: string | null;
+  start_km: number | null;
+  end_km: number | null;
 };
 
 type WorkTimeHistoryProps = {
@@ -30,7 +32,7 @@ const formatDuration = (minutes: number) => {
   return `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
-const editableColumns = ['start_time', 'end_time', 'break_duration_minutes', 'notes'];
+const editableColumns = ['start_time', 'end_time', 'break_duration_minutes', 'notes', 'start_km', 'end_km'];
 
 export const WorkTimeHistory = ({ sessions, onEdit, onDelete, onCreate, month, targetHoursPerWeek, onSave }: WorkTimeHistoryProps) => {
   const [editingCell, setEditingCell] = useState<{ rowId: number; column: string } | null>(null);
@@ -76,6 +78,8 @@ export const WorkTimeHistory = ({ sessions, onEdit, onDelete, onCreate, month, t
         break;
       }
       case 'break_duration_minutes':
+      case 'start_km':
+      case 'end_km':
         updateData[editingCell.column] = Number(editValue);
         break;
       default:
@@ -146,6 +150,8 @@ export const WorkTimeHistory = ({ sessions, onEdit, onDelete, onCreate, month, t
           <th>Soll</th>
           <th>Ist</th>
           <th>Saldo</th>
+          <th>Start-km</th>
+          <th>End-km</th>
           <th>Notizen</th>
           <th className="text-end">Aktionen</th>
         </tr>
@@ -167,6 +173,8 @@ export const WorkTimeHistory = ({ sessions, onEdit, onDelete, onCreate, month, t
                 <td>{formatDuration(targetMinutes)}</td>
                 <td>{formatDuration(0)}</td>
                 <td>{formatDuration(0 - targetMinutes)}</td>
+                <td></td>
+                <td></td>
                 <td onDoubleClick={() => onCreate(day)}></td>
                 <td></td>
               </tr>
@@ -189,6 +197,8 @@ export const WorkTimeHistory = ({ sessions, onEdit, onDelete, onCreate, month, t
                 <td>{index === 0 ? formatDuration(targetMinutes) : ''}</td>
                 <td className="fw-bold">{formatDuration(workMinutes)}</td>
                 <td className={deltaMinutes >= 0 ? 'text-success' : 'text-danger'}>{formatDuration(deltaMinutes)}</td>
+                <td onDoubleClick={() => handleDoubleClick(session, 'start_km')}>{renderCell(session, 'start_km', 4)}</td>
+                <td onDoubleClick={() => handleDoubleClick(session, 'end_km')}>{renderCell(session, 'end_km', 5)}</td>
                 <td onDoubleClick={() => handleDoubleClick(session, 'notes')}>{renderCell(session, 'notes', 3)}</td>
                 <td className="text-end">
                   <Button variant="ghost" size="sm" onClick={() => onEdit(session)}><Edit size={16} /></Button>

@@ -17,6 +17,8 @@ type WorkSession = {
   end_time: string | null;
   break_duration_minutes: number;
   notes: string | null;
+  start_km: number | null;
+  end_km: number | null;
 };
 
 const manageWorkTime = async (action: string, payload: any = {}) => {
@@ -119,8 +121,8 @@ const WorkTimeManagement = () => {
           <TimeClock
             status={statusData?.status}
             isLoading={isLoadingStatus}
-            onClockIn={() => mutation.mutate({ action: 'clock-in' })}
-            onClockOut={() => mutation.mutate({ action: 'clock-out' })}
+            onClockIn={(payload) => mutation.mutate({ action: 'clock-in', payload })}
+            onClockOut={(payload) => mutation.mutate({ action: 'clock-out', payload })}
             isMutating={mutation.isPending}
           />
         </Card.Header>

@@ -36,6 +36,15 @@ serve(async (req) => {
     }
 
     switch (action) {
+      case 'get-user-vehicle-assignment': {
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('id, license_plate')
+          .eq('driver_id', user.id)
+          .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return new Response(JSON.stringify({ vehicle: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
       case 'get-planned-tour-for-vehicle': {
         const { vehicleId } = payload;
         if (!vehicleId) return new Response(JSON.stringify({ error: 'Vehicle ID is required' }), { status: 400 });
@@ -360,7 +369,11 @@ serve(async (req) => {
         }
         const { data, error } = await supabase
           .from('work_sessions')
-          .insert({ user_id: user.id, start_time: new Date().toISOString() })
+          .insert({ 
+            user_id: user.id, 
+            start_time: new Date().toISOString(),
+            start_km: payload?.start_km || null,
+          })
           .select()
           .single();
         if (error) throw error;
@@ -379,7 +392,10 @@ serve(async (req) => {
         }
         const { data, error } = await supabase
           .from('work_sessions')
-          .update({ end_time: new Date().toISOString() })
+          .update({ 
+            end_time: new Date().toISOString(),
+            end_km: payload?.end_km || null,
+          })
           .eq('id', activeSession.id)
           .select()
           .single();

@@ -11,6 +11,8 @@ const formSchema = z.object({
   end_time: z.string(),
   break_duration_minutes: z.coerce.number().min(0),
   notes: z.string().optional(),
+  start_km: z.coerce.number().optional().nullable(),
+  end_km: z.coerce.number().optional().nullable(),
 });
 
 type WorkSession = {
@@ -19,6 +21,8 @@ type WorkSession = {
   end_time: string | null;
   break_duration_minutes: number;
   notes: string | null;
+  start_km: number | null;
+  end_km: number | null;
 };
 
 type EditWorkTimeDialogProps = {
@@ -43,6 +47,8 @@ export function EditWorkTimeDialog({ session, show, onHide, onSave }: EditWorkTi
         end_time: session.end_time ? format(end, 'HH:mm') : '',
         break_duration_minutes: session.break_duration_minutes,
         notes: session.notes || '',
+        start_km: session.start_km,
+        end_km: session.end_km,
       });
     }
   }, [session, form, show]);
@@ -56,6 +62,8 @@ export function EditWorkTimeDialog({ session, show, onHide, onSave }: EditWorkTi
       end_time: endDateTime?.toISOString(),
       break_duration_minutes: values.break_duration_minutes,
       notes: values.notes,
+      start_km: values.start_km,
+      end_km: values.end_km,
     });
   };
 
@@ -72,6 +80,10 @@ export function EditWorkTimeDialog({ session, show, onHide, onSave }: EditWorkTi
             <div className="col"><Form.Group className="mb-3"><Form.Label>Endzeit</Form.Label><Form.Control type="time" {...form.register("end_time")} /></Form.Group></div>
           </div>
           <Form.Group className="mb-3"><Form.Label>Pause (Minuten)</Form.Label><Form.Control type="number" {...form.register("break_duration_minutes")} /></Form.Group>
+          <div className="row">
+            <div className="col"><Form.Group className="mb-3"><Form.Label>Start-km</Form.Label><Form.Control type="number" {...form.register("start_km")} /></Form.Group></div>
+            <div className="col"><Form.Group className="mb-3"><Form.Label>End-km</Form.Label><Form.Control type="number" {...form.register("end_km")} /></Form.Group></div>
+          </div>
           <Form.Group><Form.Label>Notizen</Form.Label><Form.Control as="textarea" {...form.register("notes")} /></Form.Group>
         </Modal.Body>
         <Modal.Footer>
