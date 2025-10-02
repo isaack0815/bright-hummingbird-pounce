@@ -16,8 +16,11 @@ type BillingEntry = {
 type BillingData = Record<string, Record<number, BillingEntry>>;
 
 const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData }> => {
-  const { data, error } = await supabase.functions.invoke('get-tour-billing-data', {
-    body: { year, month },
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { 
+      action: 'get-tour-billing-data',
+      payload: { year, month }
+    },
   });
   if (error) throw new Error(error.message);
   return data;
