@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const Login = lazy(() => import('@/pages/Login'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const DriverDashboard = lazy(() => import('@/pages/DriverDashboard'));
 const RoleManagement = lazy(() => import('@/pages/RoleManagement'));
 const AccessDenied = lazy(() => import('@/pages/AccessDenied'));
 const MenuManagement = lazy(() => import('@/pages/MenuManagement'));
@@ -64,6 +65,7 @@ const AppRoutes = () => {
           <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/driver/dashboard" element={<ProtectedRoute requiredPermission="driver.dashboard.access"><DriverDashboard /></ProtectedRoute>} />
             <Route path="/profile/dashboard-settings" element={<DashboardSettings />} />
             <Route path="/fernverkehr" element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr"><Fernverkehr /></ProtectedRoute>} />
             <Route path="/freight-orders" element={<FreightOrderManagement />} />
