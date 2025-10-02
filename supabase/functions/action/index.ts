@@ -617,12 +617,14 @@ serve(async (req) => {
             };
         }
         
-        const { data: tourStopMappings, error: mappingsError } = await supabaseAdmin
-            .from('tour_route_points')
-            .select('tour_id, tour_stops(*)');
-        if (mappingsError) throw mappingsError;
+        const { data: dailyAssignments, error: assignmentsError } = await supabaseAdmin
+            .from('daily_tour_assignments')
+            .select('dispatch_date, tour_id, tour_stops(*)')
+            .gte('dispatch_date', startDate)
+            .lte('dispatch_date', endDate);
+        if (assignmentsError) throw assignmentsError;
 
-        return new Response(JSON.stringify({ tours: tours || [], billingData, tourStopMappings: tourStopMappings || [] }), {
+        return new Response(JSON.stringify({ tours: tours || [], billingData, dailyAssignments: dailyAssignments || [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });

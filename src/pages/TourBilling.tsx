@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 
 type Tour = { id: number; name: string; tour_type: string | null };
 type TourStop = { id: number; name: string; address: string; };
-type TourStopMapping = { tour_id: number; tour_stops: TourStop };
+type DailyAssignment = { dispatch_date: string; tour_id: number; tour_stops: TourStop | null };
 type BillingEntry = {
   userId: string;
   firstName: string | null;
@@ -20,7 +20,7 @@ type BillingEntry = {
 };
 type BillingData = Record<string, Record<number, BillingEntry>>;
 
-const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData, tourStopMappings: TourStopMapping[] }> => {
+const fetchBillingData = async (year: number, month: number): Promise<{ tours: Tour[], billingData: BillingData, dailyAssignments: DailyAssignment[] }> => {
   const { data, error } = await supabase.functions.invoke('action', {
     body: { 
       action: 'get-tour-billing-data',
@@ -180,33 +180,29 @@ const TourBilling = () => {
   const hasSavedOverrides = useMemo(() => Object.values(editedData || {}).some(day => Object.values(day).some(entry => entry.is_override)), [editedData]);
 
   const zusatzstopsData = useMemo(() => {
-    if (!data || !data.tourStopMappings || !editedData) return { uniqueStops: [], stopVisitMap: new Map() };
+    if (!data || !data.dailyAssignments) return { uniqueStops: [], stopVisitMap: new Map() };
 
     const uniqueStops = new Map<number, TourStop>();
-    data.tourStopMappings.forEach(item => {
+    data.dailyAssignments.forEach(item => {
       if (item.tour_stops && !uniqueStops.has(item.tour_stops.id)) {
         uniqueStops.set(item.tour_stops.id, item.tour_stops);
       }
     });
 
     const stopVisitMap = new Map<number, Set<string>>();
-    for (const dateKey in editedData) {
-      for (const tourIdStr in editedData[dateKey]) {
-        const tourId = Number(tourIdStr);
-        // Check if this tour was actually driven on this day (has kilometers)
-        if (editedData[dateKey][tourId]?.kilometers) {
-          const stopsForThisTour = data.tourStopMappings.filter(s => s.tour_id === tourId).map(s => s.tour_stops.id);
-          for (const stopId of stopsForThisTour) {
-            if (!stopVisitMap.has(stopId)) {
-              stopVisitMap.set(stopId, new Set());
-            }
-            stopVisitMap.get(stopId)!.add(dateKey);
-          }
+    data.dailyAssignments.forEach(assignment => {
+      if (assignment.tour_stops) {
+        const stopId = assignment.tour_stops.id;
+        const dateKey = assignment.dispatch_date;
+        if (!stopVisitMap.has(stopId)) {
+          stopVisitMap.set(stopId, new Set());
         }
+        stopVisitMap.get(stopId)!.add(dateKey);
       }
-    }
+    });
+    
     return { uniqueStops: Array.from(uniqueStops.values()).sort((a, b) => a.name.localeCompare(b.name)), stopVisitMap };
-  }, [data, editedData]);
+  }, [data]);
 
   const handleExport = () => {
     if (!data || !editedData || hasUnsavedChanges) return;
