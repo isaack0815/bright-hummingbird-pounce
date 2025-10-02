@@ -11,9 +11,7 @@ import { AddWorkGroupDialog } from '@/components/work-group/AddWorkGroupDialog';
 import { EditWorkGroupDialog } from '@/components/work-group/EditWorkGroupDialog';
 
 const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
-  const { data, error } = await supabase.functions.invoke('action', {
-    body: { action: 'get-work-groups' }
-  });
+  const { data, error } = await supabase.functions.invoke('get-work-groups');
   if (error) throw new Error(error.message);
   return data.groups;
 };

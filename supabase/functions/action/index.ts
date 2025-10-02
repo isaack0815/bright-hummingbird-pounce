@@ -36,54 +36,6 @@ serve(async (req) => {
     }
 
     switch (action) {
-      case 'get-work-groups': {
-        const { data: groups, error: groupsError } = await supabase
-          .from('work_groups')
-          .select(`
-            *,
-            user_work_groups(user_id)
-          `)
-          .order('name');
-
-        if (groupsError) throw groupsError;
-        if (!groups) {
-            return new Response(JSON.stringify({ groups: [] }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-            });
-        }
-
-        const userIds = [...new Set(groups.flatMap(g => g.user_work_groups.map((m: any) => m.user_id)))];
-
-        if (userIds.length === 0) {
-            const groupsWithEmptyMembers = groups.map(({ user_work_groups, ...rest }) => ({ ...rest, members: [] }));
-            return new Response(JSON.stringify({ groups: groupsWithEmptyMembers }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200,
-            });
-        }
-
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name')
-          .in('id', userIds);
-        if (profilesError) throw profilesError;
-
-        const profilesMap = new Map(profiles.map(p => [p.id, p]));
-
-        const groupsWithMembers = groups.map(group => {
-          const members = group.user_work_groups
-            .map((m: any) => profilesMap.get(m.user_id))
-            .filter(Boolean);
-          const { user_work_groups, ...restOfGroup } = group;
-          return { ...restOfGroup, members };
-        });
-
-        return new Response(JSON.stringify({ groups: groupsWithMembers }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
-      }
       case 'get-user-vehicle-assignment': {
         const { data, error } = await supabase
           .from('vehicles')
