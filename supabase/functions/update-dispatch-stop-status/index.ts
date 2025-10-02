@@ -21,19 +21,22 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error("User not authenticated");
 
-    const { assignmentId, status } = await req.json();
-    if (!assignmentId || !status) {
-      return new Response(JSON.stringify({ error: 'Assignment ID and status are required' }), { status: 400 });
+    const { assignmentId, status, latitude, longitude } = await req.json();
+    if (!assignmentId || !status || latitude === undefined || longitude === undefined) {
+      return new Response(JSON.stringify({ error: 'Assignment ID, status, and coordinates are required' }), { status: 400 });
     }
 
-    let updateData = {};
-    if (status === 'start') {
-      updateData = { started_at: new Date().toISOString(), action_by: user.id };
-    } else if (status === 'complete') {
-      updateData = { completed_at: new Date().toISOString(), action_by: user.id };
-    } else {
+    if (status !== 'completed' && status !== 'failed') {
       return new Response(JSON.stringify({ error: 'Invalid status' }), { status: 400 });
     }
+
+    const updateData = {
+      status: status,
+      completed_at: new Date().toISOString(),
+      action_by: user.id,
+      completion_latitude: latitude,
+      completion_longitude: longitude,
+    };
 
     const { data, error } = await supabase
       .from('daily_tour_assignments')
