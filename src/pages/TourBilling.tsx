@@ -180,10 +180,11 @@ const TourBilling = () => {
   const handleExport = () => {
     if (!data || !editedData || hasUnsavedChanges) return;
 
-    const sheetData: (string | number)[][] = [];
+    const workbook = XLSX.utils.book_new();
 
-    // Main table
-    sheetData.push(['Tag', ...data.tours.map(t => t.name)]);
+    // Sheet 1: Main Grid
+    const mainSheetData: (string | number)[][] = [];
+    mainSheetData.push(['Tag', ...data.tours.map(t => t.name)]);
     daysInMonth.forEach(day => {
       const dateKey = format(day, 'yyyy-MM-dd');
       const row = [format(day, 'E, dd.MM.', { locale: de })];
@@ -191,36 +192,43 @@ const TourBilling = () => {
         const km = editedData[dateKey]?.[tour.id]?.kilometers;
         row.push(km ?? '');
       });
-      sheetData.push(row);
+      mainSheetData.push(row);
     });
     const totalRow = ['Gesamt'];
     data.tours.forEach(tour => {
       totalRow.push(`${totals[tour.id] || 0} km`);
     });
-    sheetData.push(totalRow);
+    mainSheetData.push(totalRow);
+    const mainWorksheet = XLSX.utils.aoa_to_sheet(mainSheetData);
+    XLSX.utils.book_append_sheet(workbook, mainWorksheet, 'Übersicht');
 
-    sheetData.push([]); // Spacer
-
-    // Summary tables
-    sheetData.push(['Reguläre Touren', 'Gesamtkilometer']);
+    // Sheet 2: Regular Tours Summary
+    const regularSheetData: (string | number)[][] = [];
+    regularSheetData.push(['Reguläre Touren', 'Gesamtkilometer']);
     regularTours.forEach(tour => {
-      sheetData.push([tour.name, `${totals[tour.id] || 0} km`]);
+      regularSheetData.push([tour.name, `${totals[tour.id] || 0} km`]);
     });
-    sheetData.push(['Gesamt Regulär', `${grandTotalRegular} km`]);
-    sheetData.push([]);
+    regularSheetData.push(['Gesamt Regulär', `${grandTotalRegular} km`]);
+    const regularWorksheet = XLSX.utils.aoa_to_sheet(regularSheetData);
+    XLSX.utils.book_append_sheet(workbook, regularWorksheet, 'Zusammenfassung Regulär');
 
-    sheetData.push(['Bereitschaftstouren', 'Gesamtkilometer']);
+    // Sheet 3: On-Call Tours Summary
+    const onCallSheetData: (string | number)[][] = [];
+    onCallSheetData.push(['Bereitschaftstouren', 'Gesamtkilometer']);
     onCallTours.forEach(tour => {
-      sheetData.push([tour.name, `${totals[tour.id] || 0} km`]);
+      onCallSheetData.push([tour.name, `${totals[tour.id] || 0} km`]);
     });
-    sheetData.push(['Gesamt Bereitschaft', `${grandTotalOnCall} km`]);
-    sheetData.push([]);
+    onCallSheetData.push(['Gesamt Bereitschaft', `${grandTotalOnCall} km`]);
+    const onCallWorksheet = XLSX.utils.aoa_to_sheet(onCallSheetData);
+    XLSX.utils.book_append_sheet(workbook, onCallWorksheet, 'Zusammenfassung Bereitschaft');
 
-    sheetData.push(['Gesamtkilometer (Alle Touren)', `${grandTotal} km`]);
+    // Sheet 4: Grand Total
+    const grandTotalSheetData: (string | number)[][] = [
+        ['Gesamtkilometer (Alle Touren)', `${grandTotal} km`]
+    ];
+    const grandTotalWorksheet = XLSX.utils.aoa_to_sheet(grandTotalSheetData);
+    XLSX.utils.book_append_sheet(workbook, grandTotalWorksheet, 'Gesamt');
 
-    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tourenabrechnung');
     XLSX.writeFile(workbook, `Tourenabrechnung_${format(currentMonth, 'yyyy-MM')}.xlsx`);
   };
 
