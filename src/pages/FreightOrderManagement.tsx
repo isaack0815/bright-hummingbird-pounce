@@ -69,8 +69,36 @@ const FreightOrderManagement = () => {
         })
       : orders;
 
-    const activeOrders = filteredOrders.filter(o => o.status !== 'Zugestellt' && o.status !== 'Storniert');
-    const completed = filteredOrders.filter(o => o.status === 'Zugestellt' || o.status === 'Storniert');
+    const statusOrder: { [key: string]: number } = {
+      'Unterwegs': 1,
+      'Geplant': 2,
+      'Angelegt': 3,
+      'Zugestellt': 4,
+      'Storniert': 5,
+    };
+
+    const sortOrders = (a: FreightOrder, b: FreightOrder) => {
+      const statusA = statusOrder[a.status] || 99;
+      const statusB = statusOrder[b.status] || 99;
+
+      if (statusA !== statusB) {
+        return statusA - statusB;
+      }
+
+      const dateA = a.pickup_date ? new Date(a.pickup_date).getTime() : Infinity;
+      const dateB = b.pickup_date ? new Date(b.pickup_date).getTime() : Infinity;
+      
+      if (dateA !== dateB) {
+        return dateA - dateB;
+      }
+
+      return 0;
+    };
+
+    const sortedOrders = [...filteredOrders].sort(sortOrders);
+
+    const activeOrders = sortedOrders.filter(o => o.status !== 'Zugestellt' && o.status !== 'Storniert');
+    const completed = sortedOrders.filter(o => o.status === 'Zugestellt' || o.status === 'Storniert');
 
     return {
       myOrders: activeOrders.filter(o => o.created_by === user.id),

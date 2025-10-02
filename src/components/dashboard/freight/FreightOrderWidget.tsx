@@ -43,7 +43,7 @@ export function FreightOrderWidget() {
     queryFn: fetchOrders,
   });
 
-  const [sortConfig, setSortConfig] = useState<{ key: keyof Order; direction: 'ascending' | 'descending' } | null>({ key: 'pickup_date', direction: 'ascending' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Order; direction: 'ascending' | 'descending' } | null>(null);
 
   const sortedOrders = useMemo(() => {
     let sortableItems = [...(orders || [])];
@@ -60,6 +60,32 @@ export function FreightOrderWidget() {
         if (aValue > bValue) {
           return sortConfig.direction === 'ascending' ? 1 : -1;
         }
+        return 0;
+      });
+    } else {
+      // Default sort: status primary, pickup_date secondary
+      const statusOrder: { [key: string]: number } = {
+        'Unterwegs': 1,
+        'Geplant': 2,
+        'Angelegt': 3,
+        'Zugestellt': 4,
+        'Storniert': 5,
+      };
+      sortableItems.sort((a, b) => {
+        const statusA = statusOrder[a.status] || 99;
+        const statusB = statusOrder[b.status] || 99;
+
+        if (statusA !== statusB) {
+          return statusA - statusB;
+        }
+
+        const dateA = a.pickup_date ? new Date(a.pickup_date).getTime() : Infinity;
+        const dateB = b.pickup_date ? new Date(b.pickup_date).getTime() : Infinity;
+        
+        if (dateA !== dateB) {
+          return dateA - dateB;
+        }
+
         return 0;
       });
     }
