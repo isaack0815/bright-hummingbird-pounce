@@ -10,6 +10,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfYear } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Vehicle } from '@/types/vehicle';
 
 type WorkSession = {
   id: number;
@@ -29,6 +30,14 @@ const manageWorkTime = async (action: string, payload: any = {}) => {
   return data;
 };
 
+const fetchAssignedVehicle = async (): Promise<Vehicle | null> => {
+    const { data, error } = await supabase.functions.invoke('action', {
+        body: { action: 'get-user-vehicle-assignment' }
+    });
+    if (error) throw error;
+    return data.vehicle;
+}
+
 const WorkTimeManagement = () => {
   const [editSession, setEditSession] = useState<WorkSession | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -37,6 +46,11 @@ const WorkTimeManagement = () => {
   const { data: statusData, isLoading: isLoadingStatus } = useQuery({
     queryKey: ['workTimeStatus'],
     queryFn: () => manageWorkTime('get-work-time-status'),
+  });
+
+  const { data: assignedVehicle, isLoading: isLoadingVehicle } = useQuery({
+    queryKey: ['assignedVehicle'],
+    queryFn: fetchAssignedVehicle,
   });
 
   const monthRange = useMemo(() => ({
@@ -120,10 +134,11 @@ const WorkTimeManagement = () => {
           </div>
           <TimeClock
             status={statusData?.status}
-            isLoading={isLoadingStatus}
+            isLoading={isLoadingStatus || isLoadingVehicle}
             onClockIn={(payload) => mutation.mutate({ action: 'clock-in', payload })}
             onClockOut={(payload) => mutation.mutate({ action: 'clock-out', payload })}
             isMutating={mutation.isPending}
+            assignedVehicle={assignedVehicle || null}
           />
         </Card.Header>
         <Card.Body>

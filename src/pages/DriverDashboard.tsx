@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { DriverTimeClock } from '@/components/driver/DriverTimeClock';
 import { CurrentTour } from '@/components/driver/CurrentTour';
 import { showError } from '@/utils/toast';
+import type { Vehicle } from '@/types/vehicle';
 
 const fetchDashboardData = async () => {
   const { data, error } = await supabase.functions.invoke('get-driver-dashboard-data');
@@ -19,12 +20,25 @@ const manageWorkTime = async (action: string, payload: any = {}) => {
   return data;
 };
 
+const fetchAssignedVehicle = async (): Promise<Vehicle | null> => {
+    const { data, error } = await supabase.functions.invoke('action', {
+        body: { action: 'get-user-vehicle-assignment' }
+    });
+    if (error) throw error;
+    return data.vehicle;
+}
+
 const DriverDashboard = () => {
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['driverDashboardData'],
     queryFn: fetchDashboardData,
+  });
+
+  const { data: assignedVehicle, isLoading: isLoadingVehicle } = useQuery({
+    queryKey: ['assignedVehicle'],
+    queryFn: fetchAssignedVehicle,
   });
 
   const mutation = useMutation({
@@ -35,7 +49,7 @@ const DriverDashboard = () => {
     onError: (err: any) => showError(err.message || "Ein Fehler ist aufgetreten."),
   });
 
-  if (isLoading) {
+  if (isLoading || isLoadingVehicle) {
     return <div className="d-flex justify-content-center align-items-center" style={{ height: '80vh' }}><Spinner /></div>;
   }
 
@@ -53,7 +67,7 @@ const DriverDashboard = () => {
           onClockIn={(payload) => mutation.mutate({ action: 'clock-in', payload })}
           onClockOut={(payload) => mutation.mutate({ action: 'clock-out', payload })}
           isMutating={mutation.isPending}
-          assignedVehicle={null} // Vehicle logic can be added later if needed
+          assignedVehicle={assignedVehicle || null}
         />
         <CurrentTour tours={data.tours || []} />
       </div>

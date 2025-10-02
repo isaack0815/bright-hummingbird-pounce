@@ -3,10 +3,8 @@ import { Button, Spinner } from 'react-bootstrap';
 import { PlayCircle, StopCircle } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import type { Vehicle } from '@/types/vehicle';
 import { ClockInOutModal } from './ClockInOutModal';
+import type { Vehicle } from '@/types/vehicle';
 
 type WorkSession = {
   id: number;
@@ -19,24 +17,12 @@ type TimeClockProps = {
   onClockIn: (payload?: { start_km?: number }) => void;
   onClockOut: (payload?: { end_km?: number; notes?: string }) => void;
   isMutating: boolean;
+  assignedVehicle: Vehicle | null;
 };
 
-const fetchAssignedVehicle = async (): Promise<Vehicle | null> => {
-    const { data, error } = await supabase.functions.invoke('action', {
-        body: { action: 'get-user-vehicle-assignment' }
-    });
-    if (error) throw error;
-    return data.vehicle;
-}
-
-export const TimeClock = ({ status, isLoading, onClockIn, onClockOut, isMutating }: TimeClockProps) => {
+export const TimeClock = ({ status, isLoading, onClockIn, onClockOut, isMutating, assignedVehicle }: TimeClockProps) => {
   const [elapsedTime, setElapsedTime] = useState('');
   const [showModal, setShowModal] = useState<'in' | 'out' | null>(null);
-
-  const { data: assignedVehicle } = useQuery({
-    queryKey: ['assignedVehicle'],
-    queryFn: fetchAssignedVehicle,
-  });
 
   useEffect(() => {
     let intervalId: number;
