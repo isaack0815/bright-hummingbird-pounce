@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Container, Card, Button, Spinner, Table, Alert, Row, Col, Form } from 'react-bootstrap';
-import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { Container, Card, Button, Spinner, Table, Alert, Row, Col, Form, ButtonGroup, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { ChevronLeft, ChevronRight, Save, FileDown } from 'lucide-react';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { showSuccess, showError } from '@/utils/toast';
+import * as XLSX from 'xlsx';
 
 type Tour = { id: number; name: string; tour_type: string | null };
 type BillingEntry = {
@@ -174,10 +175,54 @@ const TourBilling = () => {
   }, [data]);
   const grandTotalRegular = useMemo(() => regularTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0), [totals, regularTours]);
   const grandTotalOnCall = useMemo(() => onCallTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0), [totals, onCallTours]);
-  const hasSavedOverrides = useMemo(() => {
-    if (!data) return false;
-    return Object.values(data.billingData || {}).some(day => Object.values(day).some(entry => entry.is_override));
-  }, [data]);
+  const hasSavedOverrides = useMemo(() => Object.values(editedData || {}).some(day => Object.values(day).some(entry => entry.is_override)), [editedData]);
+
+  const handleExport = () => {
+    if (!data || !editedData || hasUnsavedChanges) return;
+
+    const sheetData: (string | number)[][] = [];
+
+    // Main table
+    sheetData.push(['Tag', ...data.tours.map(t => t.name)]);
+    daysInMonth.forEach(day => {
+      const dateKey = format(day, 'yyyy-MM-dd');
+      const row = [format(day, 'E, dd.MM.', { locale: de })];
+      data.tours.forEach(tour => {
+        const km = editedData[dateKey]?.[tour.id]?.kilometers;
+        row.push(km ?? '');
+      });
+      sheetData.push(row);
+    });
+    const totalRow = ['Gesamt'];
+    data.tours.forEach(tour => {
+      totalRow.push(`${totals[tour.id] || 0} km`);
+    });
+    sheetData.push(totalRow);
+
+    sheetData.push([]); // Spacer
+
+    // Summary tables
+    sheetData.push(['Reguläre Touren', 'Gesamtkilometer']);
+    regularTours.forEach(tour => {
+      sheetData.push([tour.name, `${totals[tour.id] || 0} km`]);
+    });
+    sheetData.push(['Gesamt Regulär', `${grandTotalRegular} km`]);
+    sheetData.push([]);
+
+    sheetData.push(['Bereitschaftstouren', 'Gesamtkilometer']);
+    onCallTours.forEach(tour => {
+      sheetData.push([tour.name, `${totals[tour.id] || 0} km`]);
+    });
+    sheetData.push(['Gesamt Bereitschaft', `${grandTotalOnCall} km`]);
+    sheetData.push([]);
+
+    sheetData.push(['Gesamtkilometer (Alle Touren)', `${grandTotal} km`]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tourenabrechnung');
+    XLSX.writeFile(workbook, `Tourenabrechnung_${format(currentMonth, 'yyyy-MM')}.xlsx`);
+  };
 
   return (
     <Container fluid>
@@ -187,7 +232,19 @@ const TourBilling = () => {
           <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft size={16} /></Button>
           <h5 className="mb-0 fw-normal" style={{ width: '150px', textAlign: 'center' }}>{format(currentMonth, 'MMMM yyyy', { locale: de })}</h5>
           <Button variant="outline-secondary" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight size={16} /></Button>
-          <Button onClick={handleSave} disabled={saveMutation.isPending}><Save size={16} className="me-2" />{saveMutation.isPending ? 'Speichern...' : 'Änderungen speichern'}</Button>
+          <ButtonGroup>
+            <Button onClick={handleSave} disabled={saveMutation.isPending}><Save size={16} className="me-2" />{saveMutation.isPending ? 'Speichern...' : 'Speichern'}</Button>
+            <OverlayTrigger
+              placement="top"
+              overlay={<Tooltip id="tooltip-export">{hasUnsavedChanges ? 'Bitte zuerst speichern' : 'Als Excel exportieren'}</Tooltip>}
+            >
+              <span className="d-inline-block">
+                <Button variant="outline-secondary" onClick={handleExport} disabled={hasUnsavedChanges || saveMutation.isPending}>
+                  <FileDown size={16} />
+                </Button>
+              </span>
+            </OverlayTrigger>
+          </ButtonGroup>
         </div>
       </div>
 
