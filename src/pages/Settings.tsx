@@ -6,7 +6,7 @@ import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Terminal, Wifi, CheckCircle2, XCircle, RefreshCw, GitPullRequest } from "lucide-react";
+import { Terminal, Wifi, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import type { Setting } from "@/types/settings";
 import type { VehicleGroup } from "@/types/vehicle";
 
@@ -163,20 +163,6 @@ const Settings = () => {
     },
   });
 
-  const triggerUpdateMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('trigger-update');
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data: any) => {
-      showSuccess(data.message || "Update-Prozess erfolgreich gestartet.");
-    },
-    onError: (err: any) => {
-      showError(err.data?.error || err.message || "Fehler beim Starten des Updates.");
-    },
-  });
-
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateSettingsMutation.mutate(values);
   };
@@ -213,23 +199,6 @@ const Settings = () => {
           </Tab>
           <Tab eventKey="documents" title="Dokumente & E-Mail">
             {/* ... existing documents tab content ... */}
-          </Tab>
-          <Tab eventKey="system" title="System">
-            <Card>
-              <Card.Header>
-                <Card.Title>Anwendungs-Update</Card.Title>
-                <Card.Text className="text-muted">Lösen Sie hier ein manuelles Update der Anwendung aus.</Card.Text>
-              </Card.Header>
-              <Card.Body>
-                <Alert variant="info">
-                  Stellen Sie sicher, dass der Webhook-Server auf Ihrem Host läuft, bevor Sie das Update starten.
-                </Alert>
-                <Button onClick={() => triggerUpdateMutation.mutate()} disabled={triggerUpdateMutation.isPending}>
-                  <GitPullRequest size={16} className="me-2" />
-                  {triggerUpdateMutation.isPending ? 'Update wird ausgelöst...' : 'Update starten'}
-                </Button>
-              </Card.Body>
-            </Card>
           </Tab>
         </Tabs>
       </Form>
