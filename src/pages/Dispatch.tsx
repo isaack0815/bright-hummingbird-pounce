@@ -10,7 +10,9 @@ import type { Tour, TourStop } from '@/types/tour';
 import { showSuccess, showError } from '@/utils/toast';
 
 const fetchTours = async (): Promise<Tour[]> => {
-  const { data, error } = await supabase.functions.invoke('get-tours');
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-tours' }
+  });
   if (error) throw error;
   return data.tours;
 };

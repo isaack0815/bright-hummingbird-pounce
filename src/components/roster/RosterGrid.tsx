@@ -18,7 +18,9 @@ const fetchRosterDetailsForMonth = async (workGroupId: number, year: number, mon
 };
 
 const fetchTours = async (): Promise<Tour[]> => {
-  const { data, error } = await supabase.functions.invoke('get-tours');
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-tours' }
+  });
   if (error) throw new Error(error.message);
   return data.tours;
 };

@@ -54,13 +54,16 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
 
   const createTourMutation = useMutation({
     mutationFn: async (values: z.infer<typeof formSchema>): Promise<{ tourId: number }> => {
-      const { data, error } = await supabase.functions.invoke('update-tour', {
+      const { data, error } = await supabase.functions.invoke('action', {
         body: {
-          name: values.name,
-          description: "",
-          vehicle_id: values.vehicle_id,
-          tour_type: values.tour_type,
-          stops: [], // Create with no stops initially
+          action: 'update-tour',
+          payload: {
+            name: values.name,
+            description: "",
+            vehicle_id: values.vehicle_id,
+            tour_type: values.tour_type,
+            stops: [], // Create with no stops initially
+          }
         },
       });
       if (error) throw error;
