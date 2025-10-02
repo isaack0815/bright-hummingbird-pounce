@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Container, Spinner, Alert } from 'react-bootstrap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +34,16 @@ const fetchAssignedVehicle = async (): Promise<Vehicle | null> => {
 const DriverDashboard = () => {
   const queryClient = useQueryClient();
   const { permissionState, getCurrentPosition } = useGeolocation();
+
+  useEffect(() => {
+    // This will trigger the browser's permission prompt if the state is 'prompt'
+    if (permissionState === 'prompt') {
+      getCurrentPosition().catch(() => {
+        // User likely denied the prompt, the state will update automatically.
+        // No need to show an error here as the UI will reflect the 'denied' state.
+      });
+    }
+  }, [permissionState, getCurrentPosition]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['driverDashboardData'],
@@ -75,14 +86,20 @@ const DriverDashboard = () => {
           assignedVehicle={assignedVehicle || null}
         />
         
-        {!isGpsGranted && (
+        {permissionState !== 'granted' && (
           <Alert variant="warning" className="d-flex align-items-center">
             <ShieldAlert className="me-3" size={40} />
             <div>
               <Alert.Heading>Standortfreigabe erforderlich</Alert.Heading>
-              <p className="mb-0">
-                Um Ihre Tour zu bearbeiten, müssen Sie dieser App den Zugriff auf Ihren Standort erlauben. Bitte aktivieren Sie die Standortermittlung in den Einstellungen Ihres Browsers für diese Seite.
-              </p>
+              {permissionState === 'denied' ? (
+                <p className="mb-0">
+                  Der Standortzugriff wurde blockiert. Bitte ändern Sie die Berechtigung in den Einstellungen Ihres Browsers, um die Tour-Funktionen nutzen zu können.
+                </p>
+              ) : (
+                <p className="mb-0">
+                  Um Ihre Tour zu bearbeiten, müssen Sie dieser App den Zugriff auf Ihren Standort erlauben. Bitte bestätigen Sie die Anfrage Ihres Browsers.
+                </p>
+              )}
             </div>
           </Alert>
         )}
