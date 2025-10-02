@@ -227,7 +227,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({ signedUrl: data.signedUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
-      // New cases for personal file manager
       case 'get-user-files-and-folders': {
         const { data: folders, error: foldersError } = await supabase.from('user_folders').select('*').eq('user_id', user.id).order('name');
         if (foldersError) throw foldersError;
@@ -235,7 +234,6 @@ serve(async (req) => {
         const { data: ownedFiles, error: ownedFilesError } = await supabase.from('user_files').select('*').eq('user_id', user.id).order('file_name');
         if (ownedFilesError) throw ownedFilesError;
 
-        // Manual join to bypass schema cache issues
         const { data: shares, error: sharesError } = await supabase.from('file_shares').select('file_id').eq('shared_with_user_id', user.id);
         if (sharesError) throw sharesError;
 
@@ -279,7 +277,6 @@ serve(async (req) => {
       case 'delete-user-folder': {
         const { folderId } = payload;
         if (!folderId) return new Response(JSON.stringify({ error: 'Folder ID is required' }), { status: 400 });
-        // Note: Assumes folder is empty of files and subfolders (enforced on client)
         const { error } = await supabase.from('user_folders').delete().eq('id', folderId);
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
@@ -337,6 +334,154 @@ serve(async (req) => {
         const { error } = await supabase.from('file_shares').delete().match({ file_id: fileId, shared_with_user_id: userIdToUnshare });
         if (error) throw error;
         return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      case 'get-work-time-status': {
+        const { data, error } = await supabase
+          .from('work_sessions')
+          .select('id, start_time')
+          .eq('user_id', user.id)
+          .is('end_time', null)
+          .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return new Response(JSON.stringify({ status: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'clock-in': {
+        const { data: existing, error: existingError } = await supabase
+          .from('work_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+          .is('end_time', null)
+          .single();
+        if (existingError && existingError.code !== 'PGRST116') throw existingError;
+        if (existing) {
+          return new Response(JSON.stringify({ error: 'User is already clocked in.' }), { status: 409, headers: corsHeaders });
+        }
+        const { data, error } = await supabase
+          .from('work_sessions')
+          .insert({ user_id: user.id, start_time: new Date().toISOString() })
+          .select()
+          .single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'clock-out': {
+        const { data: activeSession, error: fetchError } = await supabase
+          .from('work_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+          .is('end_time', null)
+          .single();
+        if (fetchError || !activeSession) {
+          return new Response(JSON.stringify({ error: 'No active session found to clock out.' }), { status: 404, headers: corsHeaders });
+        }
+        const { data, error } = await supabase
+          .from('work_sessions')
+          .update({ end_time: new Date().toISOString() })
+          .eq('id', activeSession.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-work-time-history': {
+        const { userId, startDate, endDate } = payload;
+        const targetUserId = userId || user.id;
+        const { data, error } = await supabase
+          .from('work_sessions')
+          .select('*')
+          .eq('user_id', targetUserId)
+          .gte('start_time', startDate)
+          .lte('start_time', endDate)
+          .order('start_time', { ascending: false });
+        if (error) throw error;
+        return new Response(JSON.stringify({ history: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-user-work-details': {
+        const { userId } = payload;
+        const targetUserId = userId || user.id;
+        const { data, error } = await supabase
+          .from('work_hours_history')
+          .select('hours_per_week')
+          .eq('user_id', targetUserId)
+          .order('effective_date', { ascending: false })
+          .limit(1)
+          .single();
+        if (error && error.code !== 'PGRST116') throw error;
+        return new Response(JSON.stringify({ details: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'update-work-time': {
+        const { id, ...updateData } = payload;
+        if (!id) return new Response(JSON.stringify({ error: 'Session ID is required' }), { status: 400 });
+        const { data, error } = await supabase
+          .from('work_sessions')
+          .update(updateData)
+          .eq('id', id)
+          .select()
+          .single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'delete-work-time': {
+        const { id } = payload;
+        if (!id) return new Response(JSON.stringify({ error: 'Session ID is required' }), { status: 400 });
+        const { error } = await supabase.from('work_sessions').delete().eq('id', id);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      case 'create-work-time': {
+        const { userId, ...sessionData } = payload;
+        if (!userId) return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400 });
+        const { data, error } = await supabase
+          .from('work_sessions')
+          .insert({ user_id: userId, ...sessionData })
+          .select()
+          .single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ session: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'delete-work-hour-history': {
+        if (!await checkPermission('personnel_files.manage')) throw new Error('Forbidden');
+        const { id } = payload;
+        if (!id) return new Response(JSON.stringify({ error: 'History ID is required' }), { status: 400 });
+        const { error } = await supabaseAdmin.from('work_hours_history').delete().eq('id', id);
+        if (error) throw error;
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      case 'get-annual-work-time-summary': {
+        if (!await checkPermission('work_time.manage')) throw new Error('Forbidden');
+        const { userId, year } = payload;
+        if (!userId || !year) return new Response(JSON.stringify({ error: 'User ID and year are required' }), { status: 400 });
+      
+        const startDate = new Date(year, 0, 1).toISOString();
+        const endDate = new Date(year, 11, 31, 23, 59, 59).toISOString();
+      
+        const { data: sessions, error: sessionsError } = await supabaseAdmin
+          .from('work_sessions')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('start_time', startDate)
+          .lte('start_time', endDate);
+        if (sessionsError) throw sessionsError;
+      
+        const { data: workHoursHistory, error: historyError } = await supabaseAdmin
+          .from('work_hours_history')
+          .select('*')
+          .eq('user_id', userId)
+          .lte('effective_date', endDate)
+          .order('effective_date', { ascending: true });
+        if (historyError) throw historyError;
+      
+        return new Response(JSON.stringify({ sessions, workHoursHistory }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
       default:
