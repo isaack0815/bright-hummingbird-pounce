@@ -567,6 +567,14 @@ serve(async (req) => {
           .lt('start_time', new Date(year, month + 1, 1).toISOString());
         if (sessionsError) throw sessionsError;
 
+        const { data: overrides, error: overridesError } = await supabaseAdmin
+          .from('tour_billing_overrides')
+          .select('*')
+          .gte('billing_date', startDate)
+          .lte('billing_date', endDate);
+        if (overridesError) throw overridesError;
+        const overridesMap = new Map(overrides.map((o: any) => [`${o.billing_date}-${o.tour_id}`, o.kilometers]));
+
         const billingData: { [key: string]: { [key: number]: any } } = {};
         for (const entry of entries) {
           const dateKey = entry.duty_date;
@@ -580,7 +588,12 @@ serve(async (req) => {
           );
 
           let kilometers = null;
-          if (session && session.start_km != null && session.end_km != null) {
+          const overrideKey = `${dateKey}-${entry.tour_id}`;
+          const isOverridden = overridesMap.has(overrideKey);
+
+          if (isOverridden) {
+            kilometers = overridesMap.get(overrideKey);
+          } else if (session && session.start_km != null && session.end_km != null) {
             kilometers = session.end_km - session.start_km;
           }
 
@@ -591,6 +604,7 @@ serve(async (req) => {
             firstName: profile?.first_name || null,
             lastName: profile?.last_name || null,
             kilometers: kilometers,
+            is_override: isOverridden,
           };
         }
 
@@ -598,6 +612,45 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
+      }
+
+      case 'save-tour-billing-overrides': {
+        if (!await checkPermission('Abrechnung Fernverkehr')) throw new Error('Forbidden');
+        const { overrides } = payload;
+        if (!Array.isArray(overrides)) {
+            return new Response(JSON.stringify({ error: 'Payload must be an array of overrides.' }), { status: 400 });
+        }
+
+        const toUpsert = overrides
+            .filter((o: any) => o.kilometers !== null && o.kilometers !== '')
+            .map((o: any) => ({
+                billing_date: o.date,
+                tour_id: o.tourId,
+                kilometers: Number(o.kilometers),
+                user_id: user.id,
+            }));
+
+        const toDelete = overrides
+            .filter((o: any) => o.kilometers === null || o.kilometers === '')
+            .map((o: any) => ({ date: o.date, tourId: o.tourId }));
+
+        if (toUpsert.length > 0) {
+            const { error: upsertError } = await supabaseAdmin
+                .from('tour_billing_overrides')
+                .upsert(toUpsert, { onConflict: 'tour_id,billing_date' });
+            if (upsertError) throw upsertError;
+        }
+
+        if (toDelete.length > 0) {
+            for (const item of toDelete) {
+                await supabaseAdmin
+                    .from('tour_billing_overrides')
+                    .delete()
+                    .match({ billing_date: item.date, tour_id: item.tourId });
+            }
+        }
+        
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
 
       default:
