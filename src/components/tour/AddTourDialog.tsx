@@ -27,7 +27,7 @@ const fetchSettings = async (): Promise<Setting[]> => {
 };
 
 const fetchVehiclesByGroup = async (groupId: number | null): Promise<Vehicle[]> => {
-  const { data, error } = await supabase.functions.invoke('get-vehicles-by-group', { body: { groupId } });
+  const { data, error } = await supabase.functions.invoke('action', { body: { action: 'get-vehicles-by-group', payload: { groupId } } });
   if (error) throw new Error(error.message);
   return data.vehicles;
 };

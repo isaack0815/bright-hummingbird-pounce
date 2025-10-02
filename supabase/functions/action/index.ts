@@ -36,6 +36,101 @@ serve(async (req) => {
     }
 
     switch (action) {
+      case 'get-tours': {
+        const { data, error } = await supabaseAdmin.from('tours').select('id, name, tour_type').order('name');
+        if (error) throw error;
+        return new Response(JSON.stringify({ tours: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-tour-details': {
+        const { tourId } = payload;
+        if (!tourId) return new Response(JSON.stringify({ error: 'Tour ID is required' }), { status: 400 });
+        const { data: tour, error: tourError } = await supabaseAdmin.from('tours').select('*').eq('id', tourId).single();
+        if (tourError) throw tourError;
+        const { data: stops, error: stopsError } = await supabaseAdmin
+          .from('tour_route_points')
+          .select('*, tour_stops(*)')
+          .eq('tour_id', tourId)
+          .order('position');
+        if (stopsError) throw stopsError;
+        const tourDetails = { ...tour, stops: stops.map((s: any) => ({ ...s.tour_stops, ...s })) };
+        return new Response(JSON.stringify({ tour: tourDetails }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-tour-stops': {
+        const { data, error } = await supabaseAdmin.from('tour_stops').select('*').order('name');
+        if (error) throw error;
+        return new Response(JSON.stringify({ stops: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'create-tour-stop': {
+        const { name, address } = payload;
+        if (!name || !address) return new Response(JSON.stringify({ error: 'Name and address are required' }), { status: 400 });
+        const { data, error } = await supabaseAdmin.from('tour_stops').insert({ name, address }).select().single();
+        if (error) throw error;
+        return new Response(JSON.stringify({ stop: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 });
+      }
+
+      case 'update-tour-stop': {
+        const { id, name, address, weekdays, arrival_time, remarks, route_point_id } = payload;
+        if (!id) return new Response(JSON.stringify({ error: 'Stop ID is required' }), { status: 400 });
+        const { error: stopError } = await supabaseAdmin.from('tour_stops').update({ name, address }).eq('id', id);
+        if (stopError) throw stopError;
+        const { error: routePointError } = await supabaseAdmin.from('tour_route_points').update({ weekdays, arrival_time, remarks }).eq('id', route_point_id);
+        if (routePointError) throw routePointError;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'update-tour': {
+        const { id, name, description, stops, vehicle_id, tour_type } = payload;
+        if (!name || !stops) return new Response(JSON.stringify({ error: 'Name and stops are required' }), { status: 400 });
+        let tourId = id;
+        const tourData = { name, description, vehicle_id: vehicle_id || null, tour_type: tour_type || 'regulär' };
+        if (tourId) {
+          const { error } = await supabaseAdmin.from('tours').update(tourData).eq('id', tourId);
+          if (error) throw error;
+        } else {
+          const { data, error } = await supabaseAdmin.from('tours').insert(tourData).select('id').single();
+          if (error) throw error;
+          tourId = data.id;
+        }
+        const { error: deleteError } = await supabaseAdmin.from('tour_route_points').delete().eq('tour_id', tourId);
+        if (deleteError) throw deleteError;
+        if (stops.length > 0) {
+          const routePointsToInsert = stops.map((stop: any, index: number) => ({
+            tour_id: tourId,
+            stop_id: stop.id,
+            position: index,
+            weekdays: stop.weekdays ?? null,
+            arrival_time: stop.arrival_time ?? null,
+            remarks: stop.remarks ?? null,
+          }));
+          const { error: insertError } = await supabaseAdmin.from('tour_route_points').insert(routePointsToInsert);
+          if (insertError) throw insertError;
+        }
+        return new Response(JSON.stringify({ success: true, tourId }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'delete-tour': {
+        const { tourId } = payload;
+        if (!tourId) return new Response(JSON.stringify({ error: 'Tour ID is required' }), { status: 400 });
+        const { error: pointsError } = await supabaseAdmin.from('tour_route_points').delete().eq('tour_id', tourId);
+        if (pointsError) throw pointsError;
+        const { error: tourError } = await supabaseAdmin.from('tours').delete().eq('id', tourId);
+        if (tourError) throw tourError;
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+
+      case 'get-vehicles-by-group': {
+        const { groupId } = payload;
+        let query = supabaseAdmin.from('vehicles').select('id, license_plate, brand, model');
+        if (groupId) {
+          query = query.eq('group_id', groupId);
+        }
+        const { data, error } = await query.order('license_plate');
+        if (error) throw error;
+        return new Response(JSON.stringify({ vehicles: data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
       case 'get-user-vehicle-assignment': {
         const { data, error } = await supabase
           .from('vehicles')
