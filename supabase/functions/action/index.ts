@@ -532,20 +532,17 @@ serve(async (req) => {
           .select('id')
           .eq('work_group_id', workGroupId);
         if (rosterIdsError) throw rosterIdsError;
-        if (!rosterIds || rosterIds.length === 0) {
-            return new Response(JSON.stringify({ tours: tours || [], billingData: {} }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-        }
-
-        const { data: entries, error: entriesError } = await supabaseAdmin
-          .from('duty_roster_entries')
-          .select('duty_date, tour_id, user_id')
-          .in('roster_id', rosterIds.map(r => r.id))
-          .gte('duty_date', startDate)
-          .lte('duty_date', endDate);
-        if (entriesError) throw entriesError;
-
-        if (!entries || entries.length === 0) {
-            return new Response(JSON.stringify({ tours: tours || [], billingData: {} }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        
+        let entries: any[] = [];
+        if (rosterIds && rosterIds.length > 0) {
+            const { data: rosterEntries, error: entriesError } = await supabaseAdmin
+              .from('duty_roster_entries')
+              .select('duty_date, tour_id, user_id')
+              .in('roster_id', rosterIds.map(r => r.id))
+              .gte('duty_date', startDate)
+              .lte('duty_date', endDate);
+            if (entriesError) throw entriesError;
+            entries = rosterEntries || [];
         }
 
         const userIds = [...new Set(entries.map((e: any) => e.user_id))];
@@ -573,9 +570,10 @@ serve(async (req) => {
           .gte('billing_date', startDate)
           .lte('billing_date', endDate);
         if (overridesError) throw overridesError;
-        const overridesMap = new Map(overrides.map((o: any) => [`${o.billing_date}-${o.tour_id}`, o.kilometers]));
 
         const billingData: { [key: string]: { [key: number]: any } } = {};
+
+        // First, process roster entries
         for (const entry of entries) {
           const dateKey = entry.duty_date;
           if (!billingData[dateKey]) {
@@ -588,12 +586,7 @@ serve(async (req) => {
           );
 
           let kilometers = null;
-          const overrideKey = `${dateKey}-${entry.tour_id}`;
-          const isOverridden = overridesMap.has(overrideKey);
-
-          if (isOverridden) {
-            kilometers = overridesMap.get(overrideKey);
-          } else if (session && session.start_km != null && session.end_km != null) {
+          if (session && session.start_km != null && session.end_km != null) {
             kilometers = session.end_km - session.start_km;
           }
 
@@ -604,8 +597,24 @@ serve(async (req) => {
             firstName: profile?.first_name || null,
             lastName: profile?.last_name || null,
             kilometers: kilometers,
-            is_override: isOverridden,
+            is_override: false,
           };
+        }
+
+        // Now, layer overrides on top
+        for (const override of overrides) {
+            const dateKey = override.billing_date;
+            const tourId = override.tour_id;
+
+            if (!billingData[dateKey]) {
+                billingData[dateKey] = {};
+            }
+
+            billingData[dateKey][tourId] = {
+                ...billingData[dateKey][tourId],
+                kilometers: override.kilometers,
+                is_override: true,
+            };
         }
 
         return new Response(JSON.stringify({ tours: tours || [], billingData }), {
