@@ -5,15 +5,16 @@ import { Modal, Button, Form, Spinner } from 'react-bootstrap';
 import type { Vehicle } from '@/types/vehicle';
 
 const formSchema = z.object({
-  kilometers: z.coerce.number().min(0, "Kilometerstand muss positiv sein."),
+  kilometers: z.coerce.number().min(0, "Kilometerstand muss positiv sein.").optional(),
+  notes: z.string().optional(),
 });
 
 type ClockInOutModalProps = {
   show: boolean;
   onHide: () => void;
   type: 'in' | 'out';
-  vehicle: Vehicle;
-  onSubmit: (kilometers: number) => void;
+  vehicle: Vehicle | null;
+  onSubmit: (payload: { kilometers?: number; notes?: string }) => void;
   isMutating: boolean;
 };
 
@@ -23,7 +24,7 @@ export function ClockInOutModal({ show, onHide, type, vehicle, onSubmit, isMutat
   });
 
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
-    onSubmit(values.kilometers);
+    onSubmit({ kilometers: values.kilometers, notes: values.notes });
     onHide();
     form.reset();
   };
@@ -35,17 +36,29 @@ export function ClockInOutModal({ show, onHide, type, vehicle, onSubmit, isMutat
       </Modal.Header>
       <Form onSubmit={form.handleSubmit(handleSubmit)}>
         <Modal.Body>
-          <p>Bitte geben Sie den aktuellen Kilometerstand für das Fahrzeug <strong>{vehicle.license_plate}</strong> ein.</p>
-          <Form.Group>
-            <Form.Label>Aktueller Kilometerstand</Form.Label>
-            <Form.Control 
-              type="number" 
-              {...form.register("kilometers")} 
-              isInvalid={!!form.formState.errors.kilometers}
-              autoFocus
-            />
-            <Form.Control.Feedback type="invalid">{form.formState.errors.kilometers?.message}</Form.Control.Feedback>
-          </Form.Group>
+          {vehicle && (
+            <Form.Group className="mb-3">
+              <Form.Label>Aktueller Kilometerstand für <strong>{vehicle.license_plate}</strong></Form.Label>
+              <Form.Control 
+                type="number" 
+                {...form.register("kilometers")} 
+                isInvalid={!!form.formState.errors.kilometers}
+                autoFocus={!!vehicle}
+              />
+              <Form.Control.Feedback type="invalid">{form.formState.errors.kilometers?.message}</Form.Control.Feedback>
+            </Form.Group>
+          )}
+          {type === 'out' && (
+            <Form.Group>
+              <Form.Label>Notizen (optional)</Form.Label>
+              <Form.Control 
+                as="textarea" 
+                rows={3} 
+                {...form.register("notes")} 
+                autoFocus={!vehicle}
+              />
+            </Form.Group>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onHide}>Abbrechen</Button>

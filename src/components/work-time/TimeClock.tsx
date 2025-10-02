@@ -17,7 +17,7 @@ type TimeClockProps = {
   status: WorkSession | null;
   isLoading: boolean;
   onClockIn: (payload?: { start_km?: number }) => void;
-  onClockOut: (payload?: { end_km?: number }) => void;
+  onClockOut: (payload?: { end_km?: number; notes?: string }) => void;
   isMutating: boolean;
 };
 
@@ -60,18 +60,14 @@ export const TimeClock = ({ status, isLoading, onClockIn, onClockOut, isMutating
   };
 
   const handleClockOut = () => {
-    if (assignedVehicle) {
-      setShowModal('out');
-    } else {
-      onClockOut();
-    }
+    setShowModal('out');
   };
 
-  const handleModalSubmit = (kilometers: number) => {
+  const handleModalSubmit = (payload: { kilometers?: number; notes?: string }) => {
     if (showModal === 'in') {
-      onClockIn({ start_km: kilometers });
+      onClockIn({ start_km: payload.kilometers });
     } else {
-      onClockOut({ end_km: kilometers });
+      onClockOut({ end_km: payload.kilometers, notes: payload.notes });
     }
   };
 
@@ -104,16 +100,14 @@ export const TimeClock = ({ status, isLoading, onClockIn, onClockOut, isMutating
           </>
         )}
       </div>
-      {assignedVehicle && (
-        <ClockInOutModal
-          show={!!showModal}
-          onHide={() => setShowModal(null)}
-          type={showModal!}
-          vehicle={assignedVehicle}
-          onSubmit={handleModalSubmit}
-          isMutating={isMutating}
-        />
-      )}
+      <ClockInOutModal
+        show={!!showModal}
+        onHide={() => setShowModal(null)}
+        type={showModal!}
+        vehicle={assignedVehicle || null}
+        onSubmit={handleModalSubmit}
+        isMutating={isMutating}
+      />
     </>
   );
 };

@@ -395,6 +395,7 @@ serve(async (req) => {
           .update({ 
             end_time: new Date().toISOString(),
             end_km: payload?.end_km || null,
+            notes: payload?.notes || null,
           })
           .eq('id', activeSession.id)
           .select()
