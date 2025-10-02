@@ -40,11 +40,17 @@ export const useGeolocation = () => {
             lat: position.coords.latitude,
             lon: position.coords.longitude,
           };
-          setState(s => ({ ...s, coordinates: coords, error: null }));
+          // Set permission state to 'granted' immediately on success
+          setState(s => ({ ...s, coordinates: coords, error: null, permissionState: 'granted' }));
           resolve(coords);
         },
         (error) => {
-          setState(s => ({ ...s, error }));
+          // If user denies permission, update state immediately
+          if (error.code === 1) { // PERMISSION_DENIED
+            setState(s => ({ ...s, error, permissionState: 'denied' }));
+          } else {
+            setState(s => ({ ...s, error }));
+          }
           reject(error);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
