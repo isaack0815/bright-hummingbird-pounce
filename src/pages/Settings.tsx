@@ -64,9 +64,31 @@ const Settings = () => {
   const { data: workGroups, isLoading: isLoadingWorkGroups } = useQuery<WorkGroup[]>({
     queryKey: ['workGroups'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('get-work-groups');
+      const { data, error } = await supabase
+        .from('work_groups')
+        .select(`
+          id,
+          name,
+          description,
+          user_work_groups (
+            profiles (
+              id,
+              first_name,
+              last_name
+            )
+          )
+        `)
+        .order('name');
+
       if (error) throw new Error(error.message);
-      return data.groups;
+
+      const groupsWithMembers = data.map(group => {
+        const members = group.user_work_groups.map((m: any) => m.profiles).filter(Boolean);
+        const { user_work_groups, ...restOfGroup } = group;
+        return { ...restOfGroup, members };
+      });
+
+      return groupsWithMembers;
     },
   });
 

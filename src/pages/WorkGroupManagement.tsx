@@ -11,9 +11,31 @@ import { AddWorkGroupDialog } from '@/components/work-group/AddWorkGroupDialog';
 import { EditWorkGroupDialog } from '@/components/work-group/EditWorkGroupDialog';
 
 const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
-  const { data, error } = await supabase.functions.invoke('get-work-groups');
+  const { data, error } = await supabase
+    .from('work_groups')
+    .select(`
+      id,
+      name,
+      description,
+      user_work_groups (
+        profiles (
+          id,
+          first_name,
+          last_name
+        )
+      )
+    `)
+    .order('name');
+
   if (error) throw new Error(error.message);
-  return data.groups;
+
+  const groupsWithMembers = data.map(group => {
+    const members = group.user_work_groups.map((m: any) => m.profiles).filter(Boolean);
+    const { user_work_groups, ...restOfGroup } = group;
+    return { ...restOfGroup, members };
+  });
+
+  return groupsWithMembers;
 };
 
 const WorkGroupManagement = () => {
