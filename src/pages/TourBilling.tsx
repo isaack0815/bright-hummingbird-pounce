@@ -58,6 +58,11 @@ const TourBilling = () => {
     return totals;
   }, [data]);
 
+  const grandTotal = useMemo(() => {
+    if (!totals) return 0;
+    return Object.values(totals).reduce((sum, km) => sum + km, 0);
+  }, [totals]);
+
   return (
     <Container fluid>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -114,6 +119,40 @@ const TourBilling = () => {
                       {totals[tour.id] || 0} km
                     </td>
                   ))}
+                </tr>
+              </tfoot>
+            </Table>
+          )}
+        </Card.Body>
+      </Card>
+
+      <Card className="mt-4">
+        <Card.Header>
+          <Card.Title>Zusammenfassung</Card.Title>
+        </Card.Header>
+        <Card.Body>
+          {isLoading ? (
+            <div className="text-center p-3"><Spinner /></div>
+          ) : data && (
+            <Table striped bordered hover size="sm">
+              <thead>
+                <tr>
+                  <th>Tour</th>
+                  <th className="text-end">Gesamtkilometer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.tours.map(tour => (
+                  <tr key={tour.id}>
+                    <td>{tour.name}</td>
+                    <td className="text-end">{totals[tour.id] || 0} km</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="fw-bold table-light">
+                  <td>Gesamt</td>
+                  <td className="text-end">{grandTotal} km</td>
                 </tr>
               </tfoot>
             </Table>
