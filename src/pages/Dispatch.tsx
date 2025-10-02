@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Container, Row, Col, Card, Spinner, Button, ListGroup, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Spinner, Button, ListGroup } from 'react-bootstrap';
 import { DndContext, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core';
 import { DayPicker } from 'react-day-picker';
 import { de } from 'date-fns/locale';
 import { format } from 'date-fns';
 import type { Tour, TourStop } from '@/types/tour';
-import { showSuccess } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 
 const fetchTours = async (): Promise<Tour[]> => {
   const { data, error } = await supabase.functions.invoke('get-tours');
@@ -19,6 +19,14 @@ const fetchAllStops = async (): Promise<TourStop[]> => {
   const { data, error } = await supabase.functions.invoke('get-tour-stops');
   if (error) throw error;
   return data.stops;
+};
+
+const fetchAssignments = async (date: string): Promise<{ tour_id: number, stop_id: number }[]> => {
+    const { data, error } = await supabase.functions.invoke('manage-dispatch', {
+        body: { action: 'get-assignments-for-date', payload: { date } }
+    });
+    if (error) throw error;
+    return data.assignments || [];
 };
 
 function DraggableStop({ stop }: { stop: TourStop }) {
@@ -43,7 +51,7 @@ function DroppableArea({ id, children, title }: { id: string, children: React.Re
     transition: 'background-color 0.2s ease',
   };
   return (
-    <Card className="h-100">
+    <Card className="h-100 mb-3">
       <Card.Header>{title}</Card.Header>
       <Card.Body ref={setNodeRef} style={style} className="p-2">
         {children}
@@ -56,25 +64,70 @@ const Dispatch = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [availableStops, setAvailableStops] = useState<TourStop[]>([]);
   const [assignedStops, setAssignedStops] = useState<Record<number, TourStop[]>>({});
+  const queryClient = useQueryClient();
 
   const { data: tours, isLoading: isLoadingTours } = useQuery({ queryKey: ['tours'], queryFn: fetchTours });
   const { data: allStops, isLoading: isLoadingStops } = useQuery({ queryKey: ['allStops'], queryFn: fetchAllStops });
 
-  useEffect(() => {
-    if (allStops) {
-      setAvailableStops(allStops);
-    }
-  }, [allStops]);
+  const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+  const { data: dailyAssignments, isLoading: isLoadingAssignments } = useQuery({
+    queryKey: ['dispatchAssignments', formattedDate],
+    queryFn: () => fetchAssignments(formattedDate),
+  });
 
   useEffect(() => {
-    if (tours) {
-      const initialAssignments: Record<number, TourStop[]> = {};
+    if (allStops && tours && dailyAssignments) {
+      const allStopsMap = new Map(allStops.map(s => [s.id, s]));
+      const assignedStopIds = new Set(dailyAssignments.map(a => a.stop_id));
+      
+      const newAvailable = allStops.filter(s => !assignedStopIds.has(s.id));
+      setAvailableStops(newAvailable);
+
+      const newAssigned: Record<number, TourStop[]> = {};
       tours.forEach(tour => {
-        initialAssignments[tour.id] = [];
+        newAssigned[tour.id] = [];
       });
-      setAssignedStops(initialAssignments);
+
+      dailyAssignments.forEach(assignment => {
+        const stop = allStopsMap.get(assignment.stop_id);
+        if (stop && newAssigned[assignment.tour_id]) {
+          newAssigned[assignment.tour_id].push(stop);
+        }
+      });
+
+      setAssignedStops(newAssigned);
+    } else if (allStops && tours) {
+        setAvailableStops(allStops);
+        const initialAssignments: Record<number, TourStop[]> = {};
+        tours.forEach(tour => {
+            initialAssignments[tour.id] = [];
+        });
+        setAssignedStops(initialAssignments);
     }
-  }, [tours]);
+  }, [allStops, tours, dailyAssignments]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const assignmentsToSave: Record<number, number[]> = {};
+      for (const tourId in assignedStops) {
+        assignmentsToSave[tourId] = assignedStops[tourId].map(stop => stop.id);
+      }
+      const { error } = await supabase.functions.invoke('manage-dispatch', {
+        body: {
+          action: 'save-assignments-for-date',
+          payload: { date: formattedDate, assignments: assignmentsToSave }
+        }
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess(`Tagesplanung für ${format(selectedDate, 'PPP', { locale: de })} gespeichert!`);
+      queryClient.invalidateQueries({ queryKey: ['dispatchAssignments', formattedDate] });
+    },
+    onError: (err: any) => {
+      showError(err.message || "Fehler beim Speichern.");
+    }
+  });
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { over, active } = event;
@@ -85,54 +138,39 @@ const Dispatch = () => {
 
     const dropTargetId = String(over.id);
 
-    // Find where the stop currently is
-    let stopSource: 'unassigned' | number = 'unassigned';
-    let stopIndex = availableStops.findIndex(s => s.id === stop.id);
-
-    if (stopIndex === -1) {
-      for (const tourId in assignedStops) {
-        const index = assignedStops[tourId].findIndex(s => s.id === stop.id);
-        if (index !== -1) {
-          stopSource = Number(tourId);
-          stopIndex = index;
-          break;
+    // Remove from wherever it was
+    setAvailableStops(prev => prev.filter(s => s.id !== stop.id));
+    setAssignedStops(prev => {
+        const newAssigned = { ...prev };
+        for (const tourId in newAssigned) {
+            newAssigned[tourId] = newAssigned[tourId].filter((s: TourStop) => s.id !== stop.id);
         }
-      }
-    }
+        return newAssigned;
+    });
 
-    if (stopIndex !== -1) {
-      const newAvailable = [...availableStops];
-      const newAssigned = JSON.parse(JSON.stringify(assignedStops));
-
-      // Remove from source
-      if (stopSource === 'unassigned') {
-        newAvailable.splice(stopIndex, 1);
-      } else {
-        newAssigned[stopSource].splice(stopIndex, 1);
-      }
-
-      // Add to destination
-      if (dropTargetId === 'unassigned') {
-        newAvailable.push(stop);
-      } else {
+    // Add to new location
+    if (dropTargetId === 'unassigned') {
+        setAvailableStops(prev => [...prev, stop]);
+    } else if (dropTargetId.startsWith('tour-')) {
         const tourId = Number(dropTargetId.replace('tour-', ''));
-        if (!newAssigned[tourId]) newAssigned[tourId] = [];
-        newAssigned[tourId].push(stop);
-      }
-
-      setAvailableStops(newAvailable);
-      setAssignedStops(newAssigned);
+        setAssignedStops(prev => ({
+            ...prev,
+            [tourId]: [...(prev[tourId] || []), stop]
+        }));
     }
   };
 
-  const isLoading = isLoadingTours || isLoadingStops;
+  const isLoading = isLoadingTours || isLoadingStops || isLoadingAssignments;
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
       <Container fluid>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h1 className="h2">Disposition für {format(selectedDate, 'PPP', { locale: de })}</h1>
-          <Button variant="primary" disabled>Tagesplanung speichern (in Kürze)</Button>
+          <Button variant="primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? <Spinner as="span" size="sm" className="me-2" /> : null}
+            {saveMutation.isPending ? 'Wird gespeichert...' : 'Tagesplanung speichern'}
+          </Button>
         </div>
         <Row className="g-4">
           <Col md={4}>
