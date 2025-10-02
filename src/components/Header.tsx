@@ -110,6 +110,7 @@ const Header = () => {
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
             {isLoadingMenu ? <Spinner animation="border" size="sm" /> : renderMenuItems(menuTree)}
+            {hasPermission('Abrechnung Fernverkehr') && <Nav.Link as={NavLink} to="/tour-billing">Tourenabrechnung</Nav.Link>}
           </Nav>
           <Nav>
             <NavDropdown title={<User />} id="user-dropdown" align="end" renderMenuOnMount>

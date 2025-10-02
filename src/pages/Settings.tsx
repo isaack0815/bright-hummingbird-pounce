@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Terminal, Wifi, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import type { Setting } from "@/types/settings";
 import type { VehicleGroup } from "@/types/vehicle";
+import type { WorkGroup } from "@/types/workgroup";
 
 const settingsSchema = z.object({
   company_name: z.string().optional(),
@@ -20,7 +21,8 @@ const settingsSchema = z.object({
   email_bcc: z.string().email({ message: "Ungültige E-Mail-Adresse." }).optional().or(z.literal('')),
   payment_term_default: z.coerce.number().optional(),
   agb_text: z.string().optional(),
-  tour_planning_vehicle_group_id: z.coerce.number().optional(),
+  tour_planning_vehicle_group_id: z.preprocess((val) => (val === "" ? null : val), z.coerce.number().nullable().optional()),
+  tour_billing_work_group_id: z.preprocess((val) => (val === "" ? null : val), z.coerce.number().nullable().optional()),
   price_per_km_small: z.coerce.number().optional(),
   price_per_km_large: z.coerce.number().optional(),
   weight_limit_small_kg: z.coerce.number().optional(),
@@ -59,6 +61,15 @@ const Settings = () => {
     },
   });
 
+  const { data: workGroups, isLoading: isLoadingWorkGroups } = useQuery<WorkGroup[]>({
+    queryKey: ['workGroups'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('get-work-groups');
+      if (error) throw new Error(error.message);
+      return data.groups;
+    },
+  });
+
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
@@ -72,6 +83,7 @@ const Settings = () => {
       payment_term_default: 45,
       agb_text: "",
       tour_planning_vehicle_group_id: undefined,
+      tour_billing_work_group_id: undefined,
       price_per_km_small: 0.9,
       price_per_km_large: 1.8,
       weight_limit_small_kg: 1000,
@@ -93,6 +105,7 @@ const Settings = () => {
         payment_term_default: Number(settingsMap.get('payment_term_default')) || 45,
         agb_text: settingsMap.get('agb_text') || "",
         tour_planning_vehicle_group_id: Number(settingsMap.get('tour_planning_vehicle_group_id')) || undefined,
+        tour_billing_work_group_id: Number(settingsMap.get('tour_billing_work_group_id')) || undefined,
         price_per_km_small: Number(settingsMap.get('price_per_km_small')) || 0.9,
         price_per_km_large: Number(settingsMap.get('price_per_km_large')) || 1.8,
         weight_limit_small_kg: Number(settingsMap.get('weight_limit_small_kg')) || 1000,
@@ -244,18 +257,29 @@ const Settings = () => {
             </Card>
             <Card className="mb-4">
               <Card.Header>
-                <Card.Title>Tourenplanung</Card.Title>
+                <Card.Title>Tourenplanung & Abrechnung</Card.Title>
                 <Card.Text className="text-muted">Einstellungen für die Tourenverwaltung.</Card.Text>
               </Card.Header>
               <Card.Body>
-                {isLoading || isLoadingVehicleGroups ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
-                  <Row>
+                {isLoading || isLoadingVehicleGroups || isLoadingWorkGroups ? <Placeholder as="div" animation="glow"><Placeholder xs={6} /></Placeholder> : (
+                  <Row className="g-3">
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label>Standard-Fahrzeuggruppe für Touren</Form.Label>
                         <Form.Select {...form.register("tour_planning_vehicle_group_id")}>
                           <option value="">Alle Fahrzeuge</option>
                           {vehicleGroups?.map(group => (
+                            <option key={group.id} value={group.id}>{group.name}</option>
+                          ))}
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Arbeitsgruppe für Tourenabrechnung</Form.Label>
+                        <Form.Select {...form.register("tour_billing_work_group_id")}>
+                          <option value="">Bitte auswählen...</option>
+                          {workGroups?.map(group => (
                             <option key={group.id} value={group.id}>{group.name}</option>
                           ))}
                         </Form.Select>
