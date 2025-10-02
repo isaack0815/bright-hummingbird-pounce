@@ -32,6 +32,7 @@ const TourBilling = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [editedData, setEditedData] = useState<BillingData | null>(null);
   const [editingCell, setEditingCell] = useState<{ date: string; tourId: number } | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
@@ -44,6 +45,16 @@ const TourBilling = () => {
       setEditedData(JSON.parse(JSON.stringify(data.billingData)));
     }
   }, [data]);
+
+  useEffect(() => {
+    if (data && editedData) {
+      if (JSON.stringify(data.billingData) !== JSON.stringify(editedData)) {
+        setHasUnsavedChanges(true);
+      } else {
+        setHasUnsavedChanges(false);
+      }
+    }
+  }, [editedData, data]);
 
   const saveMutation = useMutation({
     mutationFn: async (overrides: any[]) => {
@@ -163,7 +174,10 @@ const TourBilling = () => {
   }, [data]);
   const grandTotalRegular = useMemo(() => regularTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0), [totals, regularTours]);
   const grandTotalOnCall = useMemo(() => onCallTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0), [totals, onCallTours]);
-  const hasOverrides = useMemo(() => Object.values(editedData || {}).some(day => Object.values(day).some(entry => entry.is_override)), [editedData]);
+  const hasSavedOverrides = useMemo(() => {
+    if (!data) return false;
+    return Object.values(data.billingData || {}).some(day => Object.values(day).some(entry => entry.is_override));
+  }, [data]);
 
   return (
     <Container fluid>
@@ -177,7 +191,16 @@ const TourBilling = () => {
         </div>
       </div>
 
-      {hasOverrides && <Alert variant="info">Sie sehen zwischengespeicherte, manuell angepasste Werte. Klicken Sie auf "Änderungen speichern", um diese final zu übernehmen.</Alert>}
+      {hasUnsavedChanges && (
+        <Alert variant="warning">
+          Sie haben ungespeicherte Änderungen. Bitte speichern Sie, da Ihre Änderungen sonst verloren gehen.
+        </Alert>
+      )}
+      {hasSavedOverrides && !hasUnsavedChanges && (
+        <Alert variant="info">
+          Hinweis: Einige Kilometerwerte in dieser Ansicht wurden manuell überschrieben (gelb markiert).
+        </Alert>
+      )}
 
       <Card>
         <Card.Body className="table-responsive">
