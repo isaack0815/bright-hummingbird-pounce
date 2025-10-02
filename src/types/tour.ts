@@ -8,6 +8,7 @@ export type TourStop = {
 export type Tour = {
   id: number;
   name: string;
+  tour_type: string | null;
 };
 
 export type RoutePoint = TourStop & { 
@@ -24,5 +25,6 @@ export type TourDetails = {
   description: string | null;
   created_at: string;
   vehicle_id: number | null;
+  tour_type: string | null;
   stops: RoutePoint[];
 };

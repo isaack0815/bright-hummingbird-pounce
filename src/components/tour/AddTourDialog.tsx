@@ -11,6 +11,7 @@ import type { Setting } from "@/types/settings";
 const formSchema = z.object({
   name: z.string().min(1, { message: "Tourname ist erforderlich." }),
   vehicle_id: z.coerce.number().nullable().optional(),
+  tour_type: z.string(),
 });
 
 type AddTourDialogProps = {
@@ -35,7 +36,7 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
   const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "", vehicle_id: null },
+    defaultValues: { name: "", vehicle_id: null, tour_type: 'regulär' },
   });
 
   const { data: settings } = useQuery({ 
@@ -58,6 +59,7 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
           name: values.name,
           description: "",
           vehicle_id: values.vehicle_id,
+          tour_type: values.tour_type,
           stops: [], // Create with no stops initially
         },
       });
@@ -87,6 +89,13 @@ export function AddTourDialog({ show, onHide, onTourCreated }: AddTourDialogProp
             <Form.Label>Tourname</Form.Label>
             <Form.Control {...form.register("name")} isInvalid={!!form.formState.errors.name} />
             <Form.Control.Feedback type="invalid">{form.formState.errors.name?.message}</Form.Control.Feedback>
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Art der Tour</Form.Label>
+            <Form.Select {...form.register("tour_type")}>
+              <option value="regulär">Reguläre Runde</option>
+              <option value="bereitschaft">Bereitschaftsrunde</option>
+            </Form.Select>
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Fahrzeug</Form.Label>

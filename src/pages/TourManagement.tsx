@@ -87,6 +87,7 @@ const TourManagement = () => {
   const [isEditStopDialogOpen, setIsEditStopDialogOpen] = useState(false);
   const [currentStop, setCurrentStop] = useState<RoutePoint | null>(null);
   const [tourName, setTourName] = useState('');
+  const [tourType, setTourType] = useState('regulär');
   const [tourStops, setTourStops] = useState<RoutePoint[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const queryClient = useQueryClient();
@@ -114,6 +115,7 @@ const TourManagement = () => {
       setTourName(tourDetails.name);
       setTourStops(tourDetails.stops);
       setSelectedVehicleId(tourDetails.vehicle_id);
+      setTourType(tourDetails.tour_type || 'regulär');
     }
   }, [tourDetails]);
 
@@ -165,7 +167,7 @@ const TourManagement = () => {
   const saveTourMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke('update-tour', {
-        body: { id: selectedTourId, name: tourName, description: "", stops: tourStops, vehicle_id: selectedVehicleId },
+        body: { id: selectedTourId, name: tourName, description: "", stops: tourStops, vehicle_id: selectedVehicleId, tour_type: tourType },
       });
       if (error) throw error;
     },
@@ -247,6 +249,7 @@ const TourManagement = () => {
                     <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} className="d-flex justify-content-between align-items-center">
                       <span onClick={() => handleSelectTour(tour.id)} className="flex-grow-1" style={{ cursor: 'pointer' }}>
                         {tour.name}
+                        {tour.tour_type === 'bereitschaft' && <Badge bg="warning" text="dark" className="ms-2">Bereitschaft</Badge>}
                       </span>
                       <Button 
                         variant="ghost" 
@@ -279,8 +282,9 @@ const TourManagement = () => {
                 ) : (
                   <>
                     <Row>
-                      <Col md={8}><Form.Group className="mb-3"><Form.Label>Tourname</Form.Label><Form.Control value={tourName} onChange={e => setTourName(e.target.value)} /></Form.Group></Col>
-                      <Col md={4}><Form.Group className="mb-3"><Form.Label>Fahrzeug</Form.Label><Form.Select value={selectedVehicleId ?? ''} onChange={e => setSelectedVehicleId(Number(e.target.value) || null)} disabled={isLoadingVehicles}><option value="">- Kein Fahrzeug -</option>{vehicleOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</Form.Select></Form.Group></Col>
+                      <Col md={6}><Form.Group className="mb-3"><Form.Label>Tourname</Form.Label><Form.Control value={tourName} onChange={e => setTourName(e.target.value)} /></Form.Group></Col>
+                      <Col md={3}><Form.Group className="mb-3"><Form.Label>Art der Tour</Form.Label><Form.Select value={tourType} onChange={e => setTourType(e.target.value)}><option value="regulär">Reguläre Runde</option><option value="bereitschaft">Bereitschaftsrunde</option></Form.Select></Form.Group></Col>
+                      <Col md={3}><Form.Group className="mb-3"><Form.Label>Fahrzeug</Form.Label><Form.Select value={selectedVehicleId ?? ''} onChange={e => setSelectedVehicleId(Number(e.target.value) || null)} disabled={isLoadingVehicles}><option value="">- Kein Fahrzeug -</option>{vehicleOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</Form.Select></Form.Group></Col>
                     </Row>
                     <hr />
                     <h6>Stopps</h6>

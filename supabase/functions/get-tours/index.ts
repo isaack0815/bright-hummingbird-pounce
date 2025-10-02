@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const { data, error } = await supabase
       .from('tours')
-      .select('id, name')
+      .select('id, name, tour_type')
       .order('name');
 
     if (error) throw error
