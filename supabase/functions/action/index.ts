@@ -523,7 +523,7 @@ serve(async (req) => {
 
         const { data: tours, error: toursError } = await supabaseAdmin
           .from('tours')
-          .select('id, name')
+          .select('id, name, tour_type')
           .order('name');
         if (toursError) throw toursError;
 

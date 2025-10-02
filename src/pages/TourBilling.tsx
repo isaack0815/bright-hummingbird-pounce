@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Container, Card, Button, Spinner, Table, Alert } from 'react-bootstrap';
+import { Container, Card, Button, Spinner, Table, Alert, Row, Col } from 'react-bootstrap';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { de } from 'date-fns/locale';
 
-type Tour = { id: number; name: string };
+type Tour = { id: number; name: string; tour_type: string | null };
 type BillingEntry = {
   userId: string;
   firstName: string | null;
@@ -62,6 +62,23 @@ const TourBilling = () => {
     if (!totals) return 0;
     return Object.values(totals).reduce((sum, km) => sum + km, 0);
   }, [totals]);
+
+  const { regularTours, onCallTours } = useMemo(() => {
+    if (!data?.tours) return { regularTours: [], onCallTours: [] };
+    const regular = data.tours.filter(t => t.tour_type !== 'bereitschaft');
+    const onCall = data.tours.filter(t => t.tour_type === 'bereitschaft');
+    return { regularTours: regular, onCallTours: onCall };
+  }, [data]);
+
+  const grandTotalRegular = useMemo(() => {
+    if (!totals || !regularTours) return 0;
+    return regularTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0);
+  }, [totals, regularTours]);
+
+  const grandTotalOnCall = useMemo(() => {
+    if (!totals || !onCallTours) return 0;
+    return onCallTours.reduce((sum, tour) => sum + (totals[tour.id] || 0), 0);
+  }, [totals, onCallTours]);
 
   return (
     <Container fluid>
@@ -134,28 +151,62 @@ const TourBilling = () => {
           {isLoading ? (
             <div className="text-center p-3"><Spinner /></div>
           ) : data && (
-            <Table striped bordered hover size="sm">
-              <thead>
-                <tr>
-                  <th>Tour</th>
-                  <th className="text-end">Gesamtkilometer</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tours.map(tour => (
-                  <tr key={tour.id}>
-                    <td>{tour.name}</td>
-                    <td className="text-end">{totals[tour.id] || 0} km</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="fw-bold table-light">
-                  <td>Gesamt</td>
-                  <td className="text-end">{grandTotal} km</td>
-                </tr>
-              </tfoot>
-            </Table>
+            <>
+              <Row>
+                <Col md={6}>
+                  <h6>Reguläre Touren</h6>
+                  <Table striped bordered hover size="sm">
+                    <thead>
+                      <tr>
+                        <th>Tour</th>
+                        <th className="text-end">Gesamtkilometer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {regularTours.map(tour => (
+                        <tr key={tour.id}>
+                          <td>{tour.name}</td>
+                          <td className="text-end">{totals[tour.id] || 0} km</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="fw-bold table-light">
+                        <td>Gesamt Regulär</td>
+                        <td className="text-end">{grandTotalRegular} km</td>
+                      </tr>
+                    </tfoot>
+                  </Table>
+                </Col>
+                <Col md={6}>
+                  <h6>Bereitschaftstouren</h6>
+                  <Table striped bordered hover size="sm">
+                    <thead>
+                      <tr>
+                        <th>Tour</th>
+                        <th className="text-end">Gesamtkilometer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {onCallTours.map(tour => (
+                        <tr key={tour.id}>
+                          <td>{tour.name}</td>
+                          <td className="text-end">{totals[tour.id] || 0} km</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="fw-bold table-light">
+                        <td>Gesamt Bereitschaft</td>
+                        <td className="text-end">{grandTotalOnCall} km</td>
+                      </tr>
+                    </tfoot>
+                  </Table>
+                </Col>
+              </Row>
+              <hr />
+              <h5 className="text-end">Gesamtkilometer (Alle Touren): {grandTotal} km</h5>
+            </>
           )}
         </Card.Body>
       </Card>
