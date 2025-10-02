@@ -6,7 +6,7 @@ import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Terminal, Wifi, CheckCircle2, XCircle, RefreshCw, GitPull, AlertCircle } from "lucide-react";
+import { Terminal, Wifi, CheckCircle2, XCircle, RefreshCw, GitPullRequest, AlertCircle } from "lucide-react";
 import type { Setting } from "@/types/settings";
 import type { VehicleGroup } from "@/types/vehicle";
 
@@ -296,7 +296,7 @@ const Settings = () => {
                       <RefreshCw size={16} className={isCheckingForUpdates ? 'animate-spin' : ''} />
                     </Button>
                     <Button onClick={handleRunUpdate} disabled={!updateStatus?.updateAvailable || isUpdating || isCheckingForUpdates}>
-                      <GitPull size={16} className="me-2" />
+                      <GitPullRequest size={16} className="me-2" />
                       {isUpdating ? 'Update läuft...' : 'Jetzt updaten'}
                     </Button>
                   </div>
