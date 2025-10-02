@@ -177,6 +177,21 @@ const TourManagement = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Speichern der Tour."),
   });
 
+  const deleteTourMutation = useMutation({
+    mutationFn: async (tourId: number) => {
+      const { error } = await supabase.functions.invoke('delete-tour', {
+        body: { tourId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess("Tour erfolgreich gelöscht!");
+      queryClient.invalidateQueries({ queryKey: ['tours'] });
+      setSelectedTourId(null);
+    },
+    onError: (err: any) => showError(err.message || "Fehler beim Löschen der Tour."),
+  });
+
   const handleSelectTour = (id: number) => setSelectedTourId(id);
   const handleAddStop = (selected: any) => {
     if (selected) {
@@ -229,7 +244,25 @@ const TourManagement = () => {
               {isLoadingTours ? <Card.Body><Spinner size="sm" /></Card.Body> : (
                 <ListGroup variant="flush">
                   {tours?.map(tour => (
-                    <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} onClick={() => handleSelectTour(tour.id)}>{tour.name}</ListGroup.Item>
+                    <ListGroup.Item key={tour.id} action active={tour.id === selectedTourId} className="d-flex justify-content-between align-items-center">
+                      <span onClick={() => handleSelectTour(tour.id)} className="flex-grow-1" style={{ cursor: 'pointer' }}>
+                        {tour.name}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-danger p-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Sind Sie sicher, dass Sie die Tour "${tour.name}" löschen möchten?`)) {
+                            deleteTourMutation.mutate(tour.id);
+                          }
+                        }}
+                        disabled={deleteTourMutation.isPending && deleteTourMutation.variables === tour.id}
+                      >
+                        {deleteTourMutation.isPending && deleteTourMutation.variables === tour.id ? <Spinner size="sm" /> : <Trash2 size={16} />}
+                      </Button>
+                    </ListGroup.Item>
                   ))}
                 </ListGroup>
               )}
