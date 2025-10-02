@@ -52,15 +52,25 @@ serve(async (req) => {
 
     const { data: entries, error: entriesError } = await supabaseAdmin
       .from('duty_roster_entries')
-      .select('duty_date, tour_id, user_id, profiles(first_name, last_name)')
+      .select('duty_date, tour_id, user_id')
       .in('roster_id', rosterIds.map(r => r.id))
       .gte('duty_date', startDate)
       .lte('duty_date', endDate);
     if (entriesError) throw entriesError;
 
-    const userIds = [...new Set(entries.map((e: any) => e.user_id))];
-    if (userIds.length === 0) {
+    if (!entries || entries.length === 0) {
         return new Response(JSON.stringify({ tours: tours || [], billingData: {} }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
+
+    const userIds = [...new Set(entries.map((e: any) => e.user_id))];
+    let profilesMap = new Map();
+    if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .in('id', userIds);
+        if (profilesError) throw profilesError;
+        profilesMap = new Map(profiles.map(p => [p.id, p]));
     }
 
     const { data: sessions, error: sessionsError } = await supabaseAdmin
@@ -88,10 +98,12 @@ serve(async (req) => {
         kilometers = session.end_km - session.start_km;
       }
 
+      const profile = profilesMap.get(entry.user_id);
+
       billingData[dateKey][entry.tour_id] = {
         userId: entry.user_id,
-        firstName: (entry.profiles as any)?.first_name,
-        lastName: (entry.profiles as any)?.last_name,
+        firstName: profile?.first_name || null,
+        lastName: profile?.last_name || null,
         kilometers: kilometers,
       };
     }
