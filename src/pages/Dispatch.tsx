@@ -18,7 +18,9 @@ const fetchTours = async (): Promise<Tour[]> => {
 };
 
 const fetchAllStops = async (): Promise<TourStop[]> => {
-  const { data, error } = await supabase.functions.invoke('get-tour-stops');
+  const { data, error } = await supabase.functions.invoke('action', {
+    body: { action: 'get-tour-stops' }
+  });
   if (error) throw error;
   return data.stops;
 };
