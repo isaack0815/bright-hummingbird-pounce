@@ -17,19 +17,19 @@ import { EditTourStopDialog } from '@/components/tour/EditTourStopDialog';
 
 // API Functions
 const fetchTours = async (): Promise<Tour[]> => {
-  const { data, error } = await supabase.functions.invoke('action', { body: { action: 'get-tours' } });
+  const { data, error } = await supabase.functions.invoke('get-tours');
   if (error) throw error;
   return data.tours;
 };
 
 const fetchTourDetails = async (tourId: number): Promise<TourDetails> => {
-  const { data, error } = await supabase.functions.invoke('action', { body: { action: 'get-tour-details', payload: { tourId } } });
+  const { data, error } = await supabase.functions.invoke('get-tour-details', { body: { tourId } });
   if (error) throw error;
   return data.tour;
 };
 
 const fetchTourStops = async (): Promise<TourStop[]> => {
-  const { data, error } = await supabase.functions.invoke('action', { body: { action: 'get-tour-stops' } });
+  const { data, error } = await supabase.functions.invoke('get-tour-stops');
   if (error) throw error;
   return data.stops;
 };
@@ -121,7 +121,7 @@ const TourManagement = () => {
 
   const createStopMutation = useMutation({
     mutationFn: async (newStop: { name: string; address: string }): Promise<TourStop> => {
-      const { data, error } = await supabase.functions.invoke('action', { body: { action: 'create-tour-stop', payload: newStop } });
+      const { data, error } = await supabase.functions.invoke('create-tour-stop', { body: newStop });
       if (error) throw error;
       return data.stop;
     },
@@ -143,18 +143,15 @@ const TourManagement = () => {
 
   const updateStopMutation = useMutation({
     mutationFn: async (stop: RoutePoint) => {
-      const { error } = await supabase.functions.invoke('action', { 
+      const { error } = await supabase.functions.invoke('update-tour-stop', { 
         body: {
-          action: 'update-tour-stop',
-          payload: {
-            id: stop.id,
-            route_point_id: stop.route_point_id,
-            name: stop.name,
-            address: stop.address,
-            weekdays: stop.weekdays,
-            arrival_time: stop.arrival_time,
-            remarks: stop.remarks,
-          }
+          id: stop.id,
+          route_point_id: stop.route_point_id,
+          name: stop.name,
+          address: stop.address,
+          weekdays: stop.weekdays,
+          arrival_time: stop.arrival_time,
+          remarks: stop.remarks,
         } 
       });
       if (error) throw error;
@@ -169,11 +166,8 @@ const TourManagement = () => {
 
   const saveTourMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.functions.invoke('action', {
-        body: { 
-          action: 'update-tour',
-          payload: { id: selectedTourId, name: tourName, description: "", stops: tourStops, vehicle_id: selectedVehicleId, tour_type: tourType }
-        },
+      const { error } = await supabase.functions.invoke('update-tour', {
+        body: { id: selectedTourId, name: tourName, description: "", stops: tourStops, vehicle_id: selectedVehicleId, tour_type: tourType },
       });
       if (error) throw error;
     },
@@ -187,8 +181,8 @@ const TourManagement = () => {
 
   const deleteTourMutation = useMutation({
     mutationFn: async (tourId: number) => {
-      const { error } = await supabase.functions.invoke('action', {
-        body: { action: 'delete-tour', payload: { tourId } },
+      const { error } = await supabase.functions.invoke('delete-tour', {
+        body: { tourId },
       });
       if (error) throw error;
     },
