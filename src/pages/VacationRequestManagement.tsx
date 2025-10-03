@@ -30,7 +30,7 @@ const fetchAllRequests = async (): Promise<VacationRequest[]> => {
   if (error) throw error;
 
   // The view returns profile fields at the top level, we need to nest them for consistency
-  const formattedRequests = data.requests?.map((req: any) => {
+  const formattedRequests = data?.map((req: any) => {
     const { first_name, last_name, ...rest } = req;
     return {
       ...rest,
@@ -153,8 +153,7 @@ const VacationRequestManagement = () => {
             </Table>
           ) : <Card.Body><p className="text-muted">Keine offenen Anträge vorhanden.</p></Card.Body>}
         </Card>
-      </Card>
-    )}
+      )}
 
       <Card>
         <Card.Header><Card.Title>Meine Anträge</Card.Title></Card.Header>
