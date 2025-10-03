@@ -107,19 +107,9 @@ const OrganizationChart = () => {
     }
   };
 
-  const { tree, unassignedUsers } = useMemo(() => {
-    if (!users) return { tree: [], unassignedUsers: [] };
-    const treeData = buildTree(users);
-    const assignedIds = new Set<string>();
-    const traverse = (nodes: TreeNodeData[]) => {
-      nodes.forEach(node => {
-        assignedIds.add(node.id);
-        traverse(node.children);
-      });
-    };
-    traverse(treeData);
-    const unassigned = users.filter(user => !assignedIds.has(user.id));
-    return { tree: treeData, unassignedUsers: unassigned };
+  const tree = useMemo(() => {
+    if (!users) return [];
+    return buildTree(users);
   }, [users]);
 
   return (
@@ -155,18 +145,6 @@ const OrganizationChart = () => {
                   >
                     {renderTree(tree)}
                   </Tree>
-                  {unassignedUsers.length > 0 && (
-                    <div className="mt-4">
-                      <h6>Nicht zugewiesene Mitarbeiter</h6>
-                      <div className="d-flex flex-wrap gap-2">
-                        {unassignedUsers.map(user => (
-                          <div key={user.id} className="p-2 border rounded bg-light">
-                            {user.first_name} {user.last_name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </Card.Body>
               </Card>
             </Col>
