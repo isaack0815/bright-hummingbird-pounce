@@ -12,8 +12,12 @@ import { showError, showSuccess } from '@/utils/toast';
 
 type View = 'list' | 'conversation' | 'search';
 
-export const ChatWidget = () => {
-  const [isOpen, setIsOpen] = useState(false);
+type ChatWidgetProps = {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+};
+
+export const ChatWidget = ({ isOpen, setIsOpen }: ChatWidgetProps) => {
   const [view, setView] = useState<View>('list');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
@@ -150,11 +154,6 @@ export const ChatWidget = () => {
 
   return (
     <div style={{ position: 'fixed', bottom: '1rem', right: '1rem', zIndex: 1050 }}>
-      {!isOpen && (
-        <Button onClick={() => setIsOpen(true)} size="lg" className="rounded-circle shadow-lg p-3">
-          <MessageCircle size={24} />
-        </Button>
-      )}
       {isOpen && (
         <div className="card shadow-xl" style={{ width: '24rem', height: '32rem', display: 'flex', flexDirection: 'column' }}>
           <header className="card-header p-3 d-flex justify-content-between align-items-center">

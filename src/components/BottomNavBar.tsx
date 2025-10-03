@@ -1,8 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Truck, Clock, User, Plane } from 'lucide-react';
+import { LayoutDashboard, Truck, Clock, User, Plane, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-const BottomNavBar = () => {
+type BottomNavBarProps = {
+  onChatClick: () => void;
+};
+
+const BottomNavBar = ({ onChatClick }: BottomNavBarProps) => {
   const { hasPermission } = useAuth();
   const isDriver = hasPermission('driver.dashboard.access');
 
@@ -37,6 +41,13 @@ const BottomNavBar = () => {
             </NavLink>
           );
         })}
+        <button
+          onClick={onChatClick}
+          className={`d-flex flex-column align-items-center text-decoration-none btn btn-link p-0 ${inactiveLinkClass}`}
+        >
+          <MessageCircle size={24} />
+          <span className="small" style={{ fontSize: '0.7rem' }}>Chat</span>
+        </button>
       </div>
     </nav>
   );

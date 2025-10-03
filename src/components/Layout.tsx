@@ -3,10 +3,12 @@ import Header from './Header';
 import { ChatWidget } from './chat/ChatWidget';
 import { Container } from 'react-bootstrap';
 import BottomNavBar from './BottomNavBar';
+import { useState } from 'react';
 
 const Layout = () => {
   const location = useLocation();
   const isDriverDashboard = location.pathname === '/driver/dashboard';
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   return (
     <div className="d-flex flex-column min-vh-100">
@@ -16,8 +18,8 @@ const Layout = () => {
           <Outlet />
         </Container>
       </main>
-      <ChatWidget />
-      <BottomNavBar />
+      <ChatWidget isOpen={isChatOpen} setIsOpen={setIsChatOpen} />
+      <BottomNavBar onChatClick={() => setIsChatOpen(true)} />
     </div>
   );
 };
