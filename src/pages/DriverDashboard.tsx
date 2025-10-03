@@ -99,18 +99,6 @@ const DriverDashboard = () => {
   }
 
   const isGpsGranted = permissionState === 'granted';
-  const hasManager = !!data.managerId;
-
-  const sickButton = (
-    <Button 
-      variant="outline-danger" 
-      onClick={() => reportSickMutation.mutate()}
-      disabled={!hasManager || reportSickMutation.isPending}
-    >
-      <HeartPulse className="me-2" />
-      {reportSickMutation.isPending ? 'Wird gesendet...' : 'Krankmeldung'}
-    </Button>
-  );
 
   return (
     <Container>
@@ -136,13 +124,14 @@ const DriverDashboard = () => {
         
         <Card>
           <Card.Body className="d-flex justify-content-center">
-            {!hasManager ? (
-              <OverlayTrigger overlay={<Tooltip>Ihnen ist kein Vorgesetzter zugewiesen.</Tooltip>}>
-                <span className="d-inline-block">
-                  {sickButton}
-                </span>
-              </OverlayTrigger>
-            ) : sickButton}
+            <Button 
+              variant="outline-danger" 
+              onClick={() => reportSickMutation.mutate()}
+              disabled={reportSickMutation.isPending}
+            >
+              <HeartPulse className="me-2" />
+              {reportSickMutation.isPending ? 'Wird gesendet...' : 'Krankmeldung'}
+            </Button>
           </Card.Body>
         </Card>
 
