@@ -63,6 +63,15 @@ serve(async (req) => {
       throw workSessionError;
     }
 
+    // 3. Get manager ID
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('manager_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (profileError) throw profileError;
+
     // Group assignments by tour
     const tours = userAssignments.reduce((acc, assignment) => {
       const tourId = assignment.tours.id;
@@ -86,6 +95,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       tours: Object.values(tours),
       workSession: workSession || null,
+      managerId: profile?.manager_id || null,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

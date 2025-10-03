@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Container, Spinner, Alert, Button } from 'react-bootstrap';
+import { Container, Spinner, Alert, Button, Card, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { DriverTimeClock } from '@/components/driver/DriverTimeClock';
 import { CurrentTour } from '@/components/driver/CurrentTour';
 import { TourSelection } from '@/components/driver/TourSelection';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import type { Vehicle } from '@/types/vehicle';
 import { useGeolocation } from '@/hooks/use-geolocation';
-import { ShieldAlert, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, HeartPulse } from 'lucide-react';
 
 type Stop = {
   id: number;
@@ -68,12 +68,26 @@ const DriverDashboard = () => {
     queryFn: fetchAssignedVehicle,
   });
 
-  const mutation = useMutation({
+  const workTimeMutation = useMutation({
     mutationFn: ({ action, payload }: { action: string, payload?: any }) => manageWorkTime(action, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['driverDashboardData'] });
     },
     onError: (err: any) => showError(err.message || "Ein Fehler ist aufgetreten."),
+  });
+
+  const reportSickMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('report-sick');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      showSuccess(data.message);
+    },
+    onError: (err: any) => {
+      showError(err.data?.error || err.message || "Fehler beim Senden der Krankmeldung.");
+    },
   });
 
   if (isLoading || isLoadingVehicle) {
@@ -85,6 +99,18 @@ const DriverDashboard = () => {
   }
 
   const isGpsGranted = permissionState === 'granted';
+  const hasManager = !!data.managerId;
+
+  const sickButton = (
+    <Button 
+      variant="outline-danger" 
+      onClick={() => reportSickMutation.mutate()}
+      disabled={!hasManager || reportSickMutation.isPending}
+    >
+      <HeartPulse className="me-2" />
+      {reportSickMutation.isPending ? 'Wird gesendet...' : 'Krankmeldung'}
+    </Button>
+  );
 
   return (
     <Container>
@@ -102,12 +128,24 @@ const DriverDashboard = () => {
         <DriverTimeClock
           status={data.workSession}
           isLoading={isLoading}
-          onClockIn={(payload) => mutation.mutate({ action: 'clock-in', payload })}
-          onClockOut={(payload) => mutation.mutate({ action: 'clock-out', payload })}
-          isMutating={mutation.isPending}
+          onClockIn={(payload) => workTimeMutation.mutate({ action: 'clock-in', payload })}
+          onClockOut={(payload) => workTimeMutation.mutate({ action: 'clock-out', payload })}
+          isMutating={workTimeMutation.isPending}
           assignedVehicle={assignedVehicle || null}
         />
         
+        <Card>
+          <Card.Body className="d-flex justify-content-center">
+            {!hasManager ? (
+              <OverlayTrigger overlay={<Tooltip>Ihnen ist kein Vorgesetzter zugewiesen.</Tooltip>}>
+                <span className="d-inline-block">
+                  {sickButton}
+                </span>
+              </OverlayTrigger>
+            ) : sickButton}
+          </Card.Body>
+        </Card>
+
         {permissionState !== 'granted' && (
           <Alert variant="warning" className="d-flex align-items-center">
             <ShieldAlert className="me-3" size={40} />
