@@ -24,22 +24,33 @@ const fetchUsers = async (): Promise<User[]> => {
 };
 
 const buildTree = (users: User[]): TreeNodeData[] => {
+  if (!users || users.length === 0) {
+    return [];
+  }
+  
   const userMap = new Map<string, TreeNodeData>();
-  const roots: TreeNodeData[] = [];
+  const allUserIds = new Set(users.map(u => u.id));
 
+  // Initialize map for every user
   users.forEach(user => {
     userMap.set(user.id, { ...user, children: [] });
   });
 
+  // Link children to parents
   users.forEach(user => {
-    if (user.manager_id && userMap.has(user.manager_id)) {
-      const manager = userMap.get(user.manager_id)!;
-      manager.children.push(userMap.get(user.id)!);
-    } else {
-      roots.push(userMap.get(user.id)!);
+    if (user.manager_id && allUserIds.has(user.manager_id)) {
+      const manager = userMap.get(user.manager_id);
+      if (manager) {
+        manager.children.push(userMap.get(user.id)!);
+      }
     }
   });
 
+  // Find roots: users whose manager_id is null, or points to a non-existent user
+  const roots = users
+    .filter(user => !user.manager_id || !allUserIds.has(user.manager_id))
+    .map(user => userMap.get(user.id)!);
+    
   return roots;
 };
 
