@@ -146,7 +146,7 @@ export function EditUserDialog({ user, users, show, onHide }: EditUserDialogProp
               {isLoadingRoles ? <p>Gruppen werden geladen...</p> : (
                 <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {allRoles?.map((role) => (
-                    <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} />
+                    <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} defaultChecked={user.roles.some(userRole => userRole.id === role.id)} />
                   ))}
                 </div>
               )}
@@ -156,7 +156,7 @@ export function EditUserDialog({ user, users, show, onHide }: EditUserDialogProp
               {isLoadingWorkGroups ? <p>Arbeitsgruppen werden geladen...</p> : (
                 <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {allWorkGroups?.map((group) => (
-                    <Form.Check type="checkbox" id={`work-group-${group.id}`} key={group.id} label={group.name} {...form.register("workGroupIds")} value={group.id} />
+                    <Form.Check type="checkbox" id={`work-group-${group.id}`} key={group.id} label={group.name} {...form.register("workGroupIds")} value={group.id} defaultChecked={user.work_groups.some(userGroup => userGroup.id === group.id)} />
                   ))}
                 </div>
               )}
