@@ -31,6 +31,7 @@ const TourManagement = lazy(() => import('@/pages/TourManagement'));
 const CustomerDetail = lazy(() => import('@/pages/CustomerDetail'));
 const UserManagement = lazy(() => import('@/pages/UserManagement'));
 const Profile = lazy(() => import('@/pages/Profile'));
+const DriverProfile = lazy(() => import('@/pages/DriverProfile'));
 const PersonnelFile = lazy(() => import('@/pages/PersonnelFile'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const EmailClient = lazy(() => import('@/pages/EmailClient'));
@@ -67,6 +68,7 @@ const AppRoutes = () => {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/driver/dashboard" element={<ProtectedRoute requiredPermission="driver.dashboard.access"><DriverDashboard /></ProtectedRoute>} />
+            <Route path="/driver/profile" element={<DriverProfile />} />
             <Route path="/profile/dashboard-settings" element={<DashboardSettings />} />
             <Route path="/fernverkehr" element={<ProtectedRoute requiredPermission="Abrechnung Fernverkehr"><Fernverkehr /></ProtectedRoute>} />
             <Route path="/freight-orders" element={<FreightOrderManagement />} />

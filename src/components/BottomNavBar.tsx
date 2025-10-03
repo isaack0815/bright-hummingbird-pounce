@@ -15,7 +15,7 @@ const BottomNavBar = ({ onChatClick }: BottomNavBarProps) => {
     !isDriver && { href: '/driver/dashboard', icon: Truck, label: 'Fahrer', permission: 'driver.dashboard.access' },
     { href: '/work-time', icon: Clock, label: 'Zeiterfassung', permission: null },
     { href: '/vacation-requests', icon: Plane, label: 'Urlaub', permission: null },
-    { href: '/profile', icon: User, label: 'Profil', permission: null },
+    { href: '/driver/profile', icon: User, label: 'Profil', permission: null },
   ].filter(Boolean) as { href: string; icon: React.ElementType; label: string; permission: string | null; }[];
 
   const activeLinkClass = "text-primary";
