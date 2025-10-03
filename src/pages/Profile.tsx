@@ -5,10 +5,11 @@ import { Button, Card, Form, Spinner, Placeholder } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, Plane } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { AddVacationRequestDialog } from "@/components/vacation/AddVacationRequestDialog";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "Vorname ist erforderlich."),
@@ -43,6 +44,7 @@ const fetchUserProfile = async () => {
 const Profile = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const [isAddVacationDialogOpen, setIsAddVacationDialogOpen] = useState(false);
 
   const { data: userProfile, isLoading } = useQuery({
     queryKey: ['userProfile'],
@@ -103,71 +105,81 @@ const Profile = () => {
   };
 
   return (
-    <div>
-      <h1 className="h2 mb-4">Mein Profil</h1>
-      <div className="row g-4">
-        <div className="col-lg-8">
-          <Card>
-            <Card.Header>
-              <Card.Title>Profilinformationen</Card.Title>
-              <Card.Text className="text-muted">Bearbeiten Sie hier Ihre persönlichen Daten.</Card.Text>
-            </Card.Header>
-            <Card.Body>
-              {isLoading ? (
-                <Placeholder as="div" animation="glow">
-                  <Placeholder xs={12} className="mb-3" />
-                  <Placeholder xs={12} className="mb-3" />
-                  <Placeholder xs={12} className="mb-3" />
-                  <Placeholder.Button xs={3} />
-                </Placeholder>
-              ) : (
-                <Form onSubmit={form.handleSubmit(onSubmit)}>
-                  <Form.Group className="mb-3" controlId="profileEmail">
-                    <Form.Label>Email</Form.Label>
-                    <Form.Control type="email" {...form.register("email")} disabled />
-                  </Form.Group>
-                  <Form.Group className="mb-3" controlId="profileFirstName">
-                    <Form.Label>Vorname</Form.Label>
-                    <Form.Control type="text" placeholder="Max" {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} />
-                    <Form.Control.Feedback type="invalid">{form.formState.errors.firstName?.message}</Form.Control.Feedback>
-                  </Form.Group>
-                  <Form.Group className="mb-3" controlId="profileLastName">
-                    <Form.Label>Nachname</Form.Label>
-                    <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
-                    <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
-                  </Form.Group>
-                  <Form.Group className="mb-3" controlId="profileUsername">
-                    <Form.Label>Benutzername</Form.Label>
-                    <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
-                    <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
-                  </Form.Group>
-                  <Form.Group className="mb-3" controlId="profileSignature">
-                    <Form.Label>E-Mail Signatur (HTML)</Form.Label>
-                    <Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen,<br/>Max Mustermann</p>" {...form.register("email_signature")} />
-                  </Form.Group>
-                  <Button type="submit" disabled={updateProfileMutation.isPending}>
-                    {updateProfileMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}
-                  </Button>
-                </Form>
-              )}
-            </Card.Body>
-          </Card>
-        </div>
-        <div className="col-lg-4">
-          <Card>
-            <Card.Header>
-              <Card.Title>Einstellungen</Card.Title>
-            </Card.Header>
-            <Card.Body>
-              <NavLink to="/profile/dashboard-settings" className="btn btn-outline-secondary w-100">
-                <LayoutDashboard className="me-2" size={16} />
-                Dashboard anpassen
-              </NavLink>
-            </Card.Body>
-          </Card>
+    <>
+      <div>
+        <h1 className="h2 mb-4">Mein Profil</h1>
+        <div className="row g-4">
+          <div className="col-lg-8">
+            <Card>
+              <Card.Header>
+                <Card.Title>Profilinformationen</Card.Title>
+                <Card.Text className="text-muted">Bearbeiten Sie hier Ihre persönlichen Daten.</Card.Text>
+              </Card.Header>
+              <Card.Body>
+                {isLoading ? (
+                  <Placeholder as="div" animation="glow">
+                    <Placeholder xs={12} className="mb-3" />
+                    <Placeholder xs={12} className="mb-3" />
+                    <Placeholder xs={12} className="mb-3" />
+                    <Placeholder.Button xs={3} />
+                  </Placeholder>
+                ) : (
+                  <Form onSubmit={form.handleSubmit(onSubmit)}>
+                    <Form.Group className="mb-3" controlId="profileEmail">
+                      <Form.Label>Email</Form.Label>
+                      <Form.Control type="email" {...form.register("email")} disabled />
+                    </Form.Group>
+                    <Form.Group className="mb-3" controlId="profileFirstName">
+                      <Form.Label>Vorname</Form.Label>
+                      <Form.Control type="text" placeholder="Max" {...form.register("firstName")} isInvalid={!!form.formState.errors.firstName} />
+                      <Form.Control.Feedback type="invalid">{form.formState.errors.firstName?.message}</Form.Control.Feedback>
+                    </Form.Group>
+                    <Form.Group className="mb-3" controlId="profileLastName">
+                      <Form.Label>Nachname</Form.Label>
+                      <Form.Control type="text" placeholder="Mustermann" {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} />
+                      <Form.Control.Feedback type="invalid">{form.formState.errors.lastName?.message}</Form.Control.Feedback>
+                    </Form.Group>
+                    <Form.Group className="mb-3" controlId="profileUsername">
+                      <Form.Label>Benutzername</Form.Label>
+                      <Form.Control type="text" placeholder="max_mustermann" {...form.register("username")} isInvalid={!!form.formState.errors.username} />
+                      <Form.Control.Feedback type="invalid">{form.formState.errors.username?.message}</Form.Control.Feedback>
+                    </Form.Group>
+                    <Form.Group className="mb-3" controlId="profileSignature">
+                      <Form.Label>E-Mail Signatur (HTML)</Form.Label>
+                      <Form.Control as="textarea" rows={5} placeholder="<p>Mit freundlichen Grüßen,<br/>Max Mustermann</p>" {...form.register("email_signature")} />
+                    </Form.Group>
+                    <Button type="submit" disabled={updateProfileMutation.isPending}>
+                      {updateProfileMutation.isPending ? <Spinner as="span" animation="border" size="sm" /> : "Änderungen speichern"}
+                    </Button>
+                  </Form>
+                )}
+              </Card.Body>
+            </Card>
+          </div>
+          <div className="col-lg-4">
+            <Card>
+              <Card.Header>
+                <Card.Title>Einstellungen & Aktionen</Card.Title>
+              </Card.Header>
+              <Card.Body className="d-flex flex-column gap-2">
+                <NavLink to="/profile/dashboard-settings" className="btn btn-outline-secondary w-100">
+                  <LayoutDashboard className="me-2" size={16} />
+                  Dashboard anpassen
+                </NavLink>
+                <Button variant="outline-secondary" className="w-100" onClick={() => setIsAddVacationDialogOpen(true)}>
+                  <Plane className="me-2" size={16} />
+                  Urlaub beantragen
+                </Button>
+              </Card.Body>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+      <AddVacationRequestDialog
+        show={isAddVacationDialogOpen}
+        onHide={() => setIsAddVacationDialogOpen(false)}
+      />
+    </>
   );
 };
 

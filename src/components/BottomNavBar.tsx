@@ -4,13 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const BottomNavBar = () => {
   const { hasPermission } = useAuth();
+  const isDriver = hasPermission('driver.dashboard.access');
 
   const navItems = [
-    { href: '/', icon: LayoutDashboard, label: 'Dashboard', permission: null },
-    { href: '/driver/dashboard', icon: Truck, label: 'Fahrer', permission: 'driver.dashboard.access' },
+    { href: isDriver ? '/driver/dashboard' : '/', icon: LayoutDashboard, label: 'Dashboard', permission: null },
+    !isDriver && { href: '/driver/dashboard', icon: Truck, label: 'Fahrer', permission: 'driver.dashboard.access' },
     { href: '/work-time', icon: Clock, label: 'Zeiterfassung', permission: null },
     { href: '/profile', icon: User, label: 'Profil', permission: null },
-  ];
+  ].filter(Boolean) as { href: string; icon: React.ElementType; label: string; permission: string | null; }[];
 
   const activeLinkClass = "text-primary";
   const inactiveLinkClass = "text-muted";
