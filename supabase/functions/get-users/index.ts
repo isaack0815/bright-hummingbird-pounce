@@ -24,7 +24,7 @@ serve(async (_req) => {
     
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, first_name, last_name, username, vacation_days_per_year, commute_km, entry_date, exit_date, works_weekends')
+      .select('id, first_name, last_name, username, vacation_days_per_year, commute_km, entry_date, exit_date, works_weekends, manager_id')
       .in('id', userIds);
     if (profilesError) throw profilesError;
     const profilesMap = new Map(profiles.map(p => [p.id, p]));
@@ -98,6 +98,7 @@ serve(async (_req) => {
         entry_date: profile?.entry_date,
         exit_date: profile?.exit_date,
         works_weekends: profile?.works_weekends,
+        manager_id: profile?.manager_id,
       };
     });
 

@@ -47,6 +47,7 @@ const VacationRequestManagement = lazy(() => import('@/pages/VacationRequestMana
 const VehicleAnalytics = lazy(() => import('@/pages/VehicleAnalytics'));
 const TourBilling = lazy(() => import('@/pages/TourBilling'));
 const Dispatch = lazy(() => import('@/pages/Dispatch'));
+const OrganizationChart = lazy(() => import('@/pages/OrganizationChart'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -84,6 +85,7 @@ const AppRoutes = () => {
             <Route path="/vehicle-analytics" element={<ProtectedRoute requiredPermission="vehicles.manage"><VehicleAnalytics /></ProtectedRoute>} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/users/:id/personnel-file" element={<PersonnelFile />} />
+            <Route path="/organization-chart" element={<ProtectedRoute requiredPermission="users.manage"><OrganizationChart /></ProtectedRoute>} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/roles" element={<RoleManagement />} />

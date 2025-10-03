@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, Button, Table, Badge } from 'react-bootstrap';
-import { PlusCircle, Trash2, Edit, FileText, Users } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, FileText, Users, GitBranch } from 'lucide-react';
 import { AddUserDialog } from '@/components/AddUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -80,6 +80,10 @@ const UserManagement = () => {
       <div className="d-flex align-items-center justify-content-between mb-4">
         <h1 className="h2">Nutzerverwaltung</h1>
         <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => navigate('/organization-chart')}>
+                <GitBranch className="me-2" size={16} />
+                Organigramm
+            </Button>
             <Button variant="outline-secondary" onClick={() => navigate('/work-groups')}>
                 <Users className="me-2" size={16} />
                 Arbeitsgruppen verwalten
