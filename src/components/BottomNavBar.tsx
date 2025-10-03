@@ -16,7 +16,7 @@ const BottomNavBar = () => {
   const inactiveLinkClass = "text-muted";
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-light border-top shadow-lg p-2 md:hidden z-50">
+    <nav className="fixed-bottom bg-light border-top shadow-lg p-2 d-md-none">
       <div className="d-flex justify-content-around align-items-center">
         {navItems.map(item => {
           if (item.permission && !hasPermission(item.permission)) {
