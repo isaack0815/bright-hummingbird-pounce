@@ -4,6 +4,7 @@ import * as z from "zod";
 import { Button, Card, Form, Spinner } from "react-bootstrap";
 import { supabase } from "@/lib/supabase";
 import { showSuccess, showError } from "@/utils/toast";
+import { useMutation } from "@tanstack/react-query";
 
 const passwordSchema = z.object({
   newPassword: z.string().min(6, "Das neue Passwort muss mindestens 6 Zeichen lang sein."),
