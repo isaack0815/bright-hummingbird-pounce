@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Container, Spinner, Alert, Button, Card, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Container, Spinner, Alert, Button, Card } from 'react-bootstrap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { DriverTimeClock } from '@/components/driver/DriverTimeClock';
 import { CurrentTour } from '@/components/driver/CurrentTour';
 import { TourSelection } from '@/components/driver/TourSelection';
-import { showError, showSuccess } from '@/utils/toast';
+import { showError } from '@/utils/toast';
 import type { Vehicle } from '@/types/vehicle';
 import { useGeolocation } from '@/hooks/use-geolocation';
-import { ShieldAlert, ArrowLeft, HeartPulse } from 'lucide-react';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 type Stop = {
   id: number;
@@ -76,20 +76,6 @@ const DriverDashboard = () => {
     onError: (err: any) => showError(err.message || "Ein Fehler ist aufgetreten."),
   });
 
-  const reportSickMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('report-sick');
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      showSuccess(data.message);
-    },
-    onError: (err: any) => {
-      showError(err.data?.error || err.message || "Fehler beim Senden der Krankmeldung.");
-    },
-  });
-
   if (isLoading || isLoadingVehicle) {
     return <div className="d-flex justify-content-center align-items-center" style={{ height: '80vh' }}><Spinner /></div>;
   }
@@ -121,19 +107,6 @@ const DriverDashboard = () => {
           isMutating={workTimeMutation.isPending}
           assignedVehicle={assignedVehicle || null}
         />
-        
-        <Card>
-          <Card.Body className="d-flex justify-content-center">
-            <Button 
-              variant="outline-danger" 
-              onClick={() => reportSickMutation.mutate()}
-              disabled={reportSickMutation.isPending}
-            >
-              <HeartPulse className="me-2" />
-              {reportSickMutation.isPending ? 'Wird gesendet...' : 'Krankmeldung'}
-            </Button>
-          </Card.Body>
-        </Card>
 
         {permissionState !== 'granted' && (
           <Alert variant="warning" className="d-flex align-items-center">

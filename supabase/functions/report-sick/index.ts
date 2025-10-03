@@ -25,10 +25,15 @@ serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
+    const { start_date, end_date } = await req.json();
+    if (!start_date || !end_date) {
+      return new Response(JSON.stringify({ error: 'Start- und Enddatum sind erforderlich.' }), { status: 400 });
+    }
+
     // 1. Always create a record in the sick_reports table
     const { error: sickReportError } = await supabaseAdmin
       .from('sick_reports')
-      .insert({ user_id: user.id, report_date: new Date().toISOString().split('T')[0] });
+      .insert({ user_id: user.id, start_date, end_date });
 
     if (sickReportError) throw sickReportError;
 
@@ -57,7 +62,9 @@ serve(async (req) => {
       }
 
       // 3b. Send the sick report chat message
-      const sickMessage = `Automatische Nachricht: ${profile.first_name || ''} ${profile.last_name || ''} meldet sich für heute krank.`;
+      const formattedStartDate = new Date(start_date).toLocaleDateString('de-DE');
+      const formattedEndDate = new Date(end_date).toLocaleDateString('de-DE');
+      const sickMessage = `Automatische Nachricht: ${profile.first_name || ''} ${profile.last_name || ''} meldet sich von ${formattedStartDate} bis ${formattedEndDate} krank.`;
       const { error: messageError } = await supabaseAdmin
         .from('chat_messages')
         .insert({
@@ -69,7 +76,7 @@ serve(async (req) => {
 
       // 3c. Create a todo for the manager
       const todoSubject = "Neue Krankmeldung, bitte bearbeiten";
-      const todoDescription = `Krankmeldung von ${profile.first_name || ''} ${profile.last_name || ''} für den ${new Date().toLocaleDateString('de-DE')}.`;
+      const todoDescription = `Krankmeldung von ${profile.first_name || ''} ${profile.last_name || ''} für den Zeitraum ${formattedStartDate} bis ${formattedEndDate}.`;
       const { error: todoError } = await supabaseAdmin.from('todos').insert({
         created_by: user.id,
         assigned_to: profile.manager_id,
