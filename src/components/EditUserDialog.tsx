@@ -30,7 +30,10 @@ const formSchema = z.object({
   username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
   roleIds: z.array(z.coerce.number()).optional(),
   workGroupIds: z.array(z.coerce.number()).optional(),
-  managerId: z.string().uuid().nullable().optional(),
+  managerId: z.preprocess(
+    (val) => (val === "" ? null : val),
+    z.string().uuid().nullable().optional()
+  ),
 });
 
 type EditUserDialogProps = {
