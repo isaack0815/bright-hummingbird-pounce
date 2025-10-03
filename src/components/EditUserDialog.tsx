@@ -21,6 +21,7 @@ type User = {
   username?: string | null;
   roles: Role[];
   work_groups: { id: number; name: string }[];
+  manager_id?: string | null;
 };
 
 const formSchema = z.object({
@@ -29,10 +30,12 @@ const formSchema = z.object({
   username: z.string().min(3, { message: "Benutzername muss mindestens 3 Zeichen lang sein." }).regex(/^[a-zA-Z0-9_]+$/, { message: "Nur Buchstaben, Zahlen und Unterstriche erlaubt." }),
   roleIds: z.array(z.coerce.number()).optional(),
   workGroupIds: z.array(z.coerce.number()).optional(),
+  managerId: z.string().uuid().nullable().optional(),
 });
 
 type EditUserDialogProps = {
   user: User | null;
+  users: User[];
   show: boolean;
   onHide: () => void;
 };
@@ -44,43 +47,12 @@ const fetchRoles = async (): Promise<Role[]> => {
 };
 
 const fetchWorkGroups = async (): Promise<WorkGroup[]> => {
-  const { data: groupsData, error: groupsError } = await supabase
-    .from('work_groups')
-    .select(`id, name, description, user_work_groups(user_id)`)
-    .order('name');
-
-  if (groupsError) throw new Error(groupsError.message);
-  if (!groupsData) return [];
-
-  const allUserIds = [...new Set(groupsData.flatMap(g => g.user_work_groups.map((m: any) => m.user_id)))];
-
-  if (allUserIds.length === 0) {
-    return groupsData.map(group => {
-      const { user_work_groups, ...restOfGroup } = group;
-      return { ...restOfGroup, members: [] };
-    });
-  }
-
-  const { data: profiles, error: profilesError } = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name')
-    .in('id', allUserIds);
-
-  if (profilesError) throw new Error(profilesError.message);
-  if (!profiles) return [];
-
-  const profilesMap = new Map(profiles.map(p => [p.id, p]));
-
-  const groupsWithMembers = groupsData.map(group => {
-    const members = group.user_work_groups.map((m: any) => profilesMap.get(m.user_id)).filter(Boolean);
-    const { user_work_groups, ...restOfGroup } = group;
-    return { ...restOfGroup, members };
-  });
-
-  return groupsWithMembers;
+  const { data, error } = await supabase.functions.invoke('get-work-groups');
+  if (error) throw new Error(error.message);
+  return data.groups;
 };
 
-export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
+export function EditUserDialog({ user, users, show, onHide }: EditUserDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   
@@ -108,6 +80,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
         username: user.username || "",
         roleIds: user.roles.map(role => role.id),
         workGroupIds: user.work_groups.map(group => group.id),
+        managerId: user.manager_id || null,
       });
     }
   }, [user, form, show]);
@@ -138,6 +111,8 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
 
   if (!user) return null;
 
+  const potentialManagers = users.filter(u => u.id !== user.id);
+
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
@@ -150,6 +125,19 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
             <Col md={6}><Form.Group><Form.Label>Nachname</Form.Label><Form.Control {...form.register("lastName")} isInvalid={!!form.formState.errors.lastName} /></Form.Group></Col>
             <Col md={6}><Form.Group><Form.Label>Benutzername</Form.Label><Form.Control {...form.register("username")} isInvalid={!!form.formState.errors.username} /></Form.Group></Col>
             <Col md={6}><Form.Group><Form.Label>Email</Form.Label><Form.Control type="email" value={user.email} disabled /></Form.Group></Col>
+            <Col md={12}>
+              <Form.Group>
+                <Form.Label>Vorgesetzter</Form.Label>
+                <Form.Select {...form.register("managerId")}>
+                  <option value="">- Kein Vorgesetzter -</option>
+                  {potentialManagers.map(manager => (
+                    <option key={manager.id} value={manager.id}>
+                      {manager.first_name} {manager.last_name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
           </Row>
           <hr />
           <Row>
@@ -158,7 +146,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
               {isLoadingRoles ? <p>Gruppen werden geladen...</p> : (
                 <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {allRoles?.map((role) => (
-                    <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} defaultChecked={user.roles.some(userRole => userRole.id === role.id)} />
+                    <Form.Check type="checkbox" id={`role-${role.id}`} key={role.id} label={role.name} {...form.register("roleIds")} value={role.id} />
                   ))}
                 </div>
               )}
@@ -168,7 +156,7 @@ export function EditUserDialog({ user, show, onHide }: EditUserDialogProps) {
               {isLoadingWorkGroups ? <p>Arbeitsgruppen werden geladen...</p> : (
                 <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {allWorkGroups?.map((group) => (
-                    <Form.Check type="checkbox" id={`work-group-${group.id}`} key={group.id} label={group.name} {...form.register("workGroupIds")} value={group.id} defaultChecked={user.work_groups.some(userGroup => userGroup.id === group.id)} />
+                    <Form.Check type="checkbox" id={`work-group-${group.id}`} key={group.id} label={group.name} {...form.register("workGroupIds")} value={group.id} />
                   ))}
                 </div>
               )}

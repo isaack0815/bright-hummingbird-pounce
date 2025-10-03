@@ -34,7 +34,7 @@ serve(async (req) => {
     )
 
     const body = await req.json()
-    const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate, workGroupIds, entryDate, exitDate, works_weekends } = body;
+    const { userId, firstName, lastName, username, roleIds, vacationDays, commuteKm, hoursPerWeek, birthDate, workGroupIds, entryDate, exitDate, works_weekends, managerId } = body;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required' }), {
@@ -61,6 +61,7 @@ serve(async (req) => {
         entry_date: entryDate || null,
         exit_date: exitDate || null,
         works_weekends: works_weekends,
+        manager_id: managerId || null,
       })
 
     if (hoursPerWeek !== null && hoursPerWeek !== undefined) {

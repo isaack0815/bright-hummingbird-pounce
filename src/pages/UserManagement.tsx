@@ -20,6 +20,7 @@ type User = {
   roles: { id: number; name: string }[];
   work_groups: { id: number; name: string }[];
   entry_date?: string | null;
+  manager_id?: string | null;
 };
 
 const fetchUsers = async (): Promise<User[]> => {
@@ -174,6 +175,7 @@ const UserManagement = () => {
       {selectedUser && (
         <EditUserDialog
           user={selectedUser}
+          users={users || []}
           show={isEditUserDialogOpen}
           onHide={() => setIsEditUserDialogOpen(false)}
         />
