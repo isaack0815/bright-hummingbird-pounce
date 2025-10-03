@@ -1,13 +1,29 @@
-import { useEffect } from 'react';
-import { Container, Spinner, Alert } from 'react-bootstrap';
+import { useState, useEffect } from 'react';
+import { Container, Spinner, Alert, Button } from 'react-bootstrap';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { DriverTimeClock } from '@/components/driver/DriverTimeClock';
 import { CurrentTour } from '@/components/driver/CurrentTour';
+import { TourSelection } from '@/components/driver/TourSelection';
 import { showError } from '@/utils/toast';
 import type { Vehicle } from '@/types/vehicle';
 import { useGeolocation } from '@/hooks/use-geolocation';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
+
+type Stop = {
+  id: number;
+  name: string;
+  address: string;
+  assignment_id: number;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+type Tour = {
+  id: number;
+  name: string;
+  stops: Stop[];
+};
 
 const fetchDashboardData = async () => {
   const { data, error } = await supabase.functions.invoke('get-driver-dashboard-data');
@@ -32,16 +48,13 @@ const fetchAssignedVehicle = async (): Promise<Vehicle | null> => {
 }
 
 const DriverDashboard = () => {
+  const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const queryClient = useQueryClient();
   const { permissionState, getCurrentPosition } = useGeolocation();
 
   useEffect(() => {
-    // This will trigger the browser's permission prompt if the state is 'prompt'
     if (permissionState === 'prompt') {
-      getCurrentPosition().catch(() => {
-        // User likely denied the prompt, the state will update automatically.
-        // No need to show an error here as the UI will reflect the 'denied' state.
-      });
+      getCurrentPosition().catch(() => {});
     }
   }, [permissionState, getCurrentPosition]);
 
@@ -75,7 +88,16 @@ const DriverDashboard = () => {
 
   return (
     <Container>
-      <h1 className="h2 mb-4">Fahrer-Dashboard</h1>
+      <div className="d-flex align-items-center gap-3 mb-4">
+        {selectedTour && (
+          <Button variant="outline-secondary" size="sm" className="p-2 lh-1" onClick={() => setSelectedTour(null)}>
+            <ArrowLeft size={16} />
+          </Button>
+        )}
+        <h1 className="h2 mb-0">
+          {selectedTour ? `Tour: ${selectedTour.name}` : 'Fahrer-Dashboard'}
+        </h1>
+      </div>
       <div className="d-flex flex-column gap-4">
         <DriverTimeClock
           status={data.workSession}
@@ -104,11 +126,18 @@ const DriverDashboard = () => {
           </Alert>
         )}
 
-        <CurrentTour 
-          tours={data.tours || []} 
-          isGpsGranted={isGpsGranted}
-          getCurrentPosition={getCurrentPosition}
-        />
+        {selectedTour ? (
+          <CurrentTour 
+            tours={[selectedTour]}
+            isGpsGranted={isGpsGranted}
+            getCurrentPosition={getCurrentPosition}
+          />
+        ) : (
+          <TourSelection 
+            tours={data.tours || []}
+            onSelectTour={setSelectedTour}
+          />
+        )}
       </div>
     </Container>
   );
