@@ -1,24 +1,35 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { Card, Button, Spinner, Form, Tabs, Tab, ListGroup, Row, Col, Badge } from 'react-bootstrap';
+import { Card, Button, Spinner, Table, Alert, Row, Col, Badge } from 'react-bootstrap';
 import { PlusCircle, Check, X } from 'lucide-react';
 import { AddVacationRequestDialog } from '@/components/vacation/AddVacationRequestDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { showError, showSuccess } from '@/utils/toast';
-import { format, parseISO } from 'date-fns';
+import { eachDayOfInterval, isWeekend, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import type { VacationRequest, UserWithVacationDetails } from '@/types/vacation';
-import { MonthlyVacationTable } from '@/components/vacation/MonthlyVacationTable';
-import { VacationSummaryTable } from '@/components/vacation/VacationSummaryTable';
+import type { VacationRequest } from '@/types/vacation';
+
+const fetchMyRequests = async (userId: string): Promise<VacationRequest[]> => {
+  const { data, error } = await supabase
+    .from('vacation_requests')
+    .select('*')
+    .eq('user_id', userId)
+    .order('start_date', { ascending: false });
+  if (error) throw error;
+  return data;
+};
 
 const fetchAllRequests = async (): Promise<VacationRequest[]> => {
-  const { data: requests, error } = await supabase
+  const { data, error } = await supabase
     .from('vacation_requests_with_profiles')
-    .select('*');
+    .select('*')
+    .order('created_at', { ascending: false });
   
   if (error) throw error;
 
+  // The view returns profile fields at the top level, we need to nest them for consistency
   const formattedRequests = requests?.map(req => {
     const { first_name, last_name, ...rest } = req;
     return {
@@ -33,50 +44,38 @@ const fetchAllRequests = async (): Promise<VacationRequest[]> => {
   return formattedRequests as VacationRequest[];
 };
 
-const fetchUsers = async (): Promise<UserWithVacationDetails[]> => {
-  const { data, error } = await supabase.functions.invoke('get-users');
-  if (error) throw new Error(error.message);
-  return data.users;
+const fetchMyProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('vacation_days_per_year, works_weekends')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return data;
 };
 
 const VacationRequestManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [year, setYear] = useState(new Date().getFullYear());
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission('vacations.manage');
-  const currentMonthIndex = new Date().getMonth();
 
-  const { data: requests, isLoading: isLoadingRequests, error } = useQuery<VacationRequest[]>({
+  const { data: myRequests, isLoading: isLoadingMyRequests } = useQuery<VacationRequest[]>({
+    queryKey: ['myVacationRequests', user?.id],
+    queryFn: () => fetchMyRequests(user!.id),
+    enabled: !!user,
+  });
+
+  const { data: allRequests, isLoading: isLoadingAllRequests } = useQuery<VacationRequest[]>({
     queryKey: ['allVacationRequests'],
     queryFn: fetchAllRequests,
+    enabled: canManage,
   });
 
-  const { data: users, isLoading: isLoadingUsers } = useQuery<UserWithVacationDetails[]>({
-    queryKey: ['usersWithVacationDetails'],
-    queryFn: fetchUsers,
-  });
-
-  const manageRequestMutation = useMutation({
-    mutationFn: async ({ action, payload }: { action: string, payload: any }) => {
-      const { error } = await supabase.functions.invoke('action', {
-        body: { action, payload },
-      });
-      if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      if (variables.action === 'create-vacation-request') {
-        showSuccess(`Eintrag erstellt.`);
-      } else if (variables.action === 'update-vacation-request') {
-        showSuccess("Urlaub erfolgreich aktualisiert!");
-      } else if (variables.action === 'toggle-vacation-status') {
-        showSuccess("Status geändert.");
-      } else {
-        showSuccess(`Aktion erfolgreich ausgeführt.`);
-      }
-      queryClient.invalidateQueries({ queryKey: ['allVacationRequests'] });
-    },
-    onError: (err: any) => showError(err.message || "Fehler bei der Aktion."),
+  const { data: myProfile, isLoading: isLoadingProfile } = useQuery({
+    queryKey: ['myVacationProfile', user?.id],
+    queryFn: () => fetchMyProfile(user!.id),
+    enabled: !!user,
   });
 
   const updateStatusMutation = useMutation({
@@ -94,130 +93,97 @@ const VacationRequestManagement = () => {
     onError: (err: any) => showError(err.message || "Fehler beim Aktualisieren."),
   });
 
-  const handleCellClick = (userId: string, date: Date) => {
-    if (!canManage) {
-      showError("Nur Manager können direkt Einträge erstellen.");
-      return;
+  const { takenDays, remainingDays } = useMemo(() => {
+    if (!myRequests || !myProfile) return { takenDays: 0, remainingDays: 0 };
+    
+    const approvedRequests = myRequests.filter(r => r.status === 'approved');
+    let totalDays = 0;
+
+    for (const req of approvedRequests) {
+      const days = eachDayOfInterval({ start: parseISO(req.start_date), end: parseISO(req.end_date) });
+      const vacationDays = myProfile.works_weekends ? days.length : days.filter(day => !isWeekend(day)).length;
+      totalDays += vacationDays;
     }
-    manageRequestMutation.mutate({
-      action: 'create-vacation-request',
-      payload: { userId, date: format(date, 'yyyy-MM-dd') },
-    });
-  };
-
-  const handleDeleteRequest = (requestId: number) => {
-    manageRequestMutation.mutate({
-      action: 'delete-vacation-request',
-      payload: { requestId },
-    });
-  };
-
-  const handleUpdateRequest = (requestId: number, startDate: string, endDate: string) => {
-    manageRequestMutation.mutate({
-      action: 'update-vacation-request',
-      payload: { requestId, startDate, endDate, notes: '' },
-    });
-  };
-
-  const handleToggleStatus = (requestId: number) => {
-    if (!canManage) {
-      showError("Nur Manager können den Status ändern.");
-      return;
-    }
-    manageRequestMutation.mutate({
-      action: 'toggle-vacation-status',
-      payload: { requestId },
-    });
-  };
+    
+    const entitlement = myProfile.vacation_days_per_year || 0;
+    return { takenDays: totalDays, remainingDays: entitlement - totalDays };
+  }, [myRequests, myProfile]);
 
   const pendingRequests = useMemo(() => {
-    return requests?.filter(r => r.status === 'pending') || [];
-  }, [requests]);
+    return allRequests?.filter(r => r.status === 'pending') || [];
+  }, [allRequests]);
 
-  const yearOptions = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
-  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => new Date(year, i, 1)), [year]);
-
-  const isLoading = isLoadingRequests || isLoadingUsers;
+  const isLoading = isLoadingMyRequests || isLoadingAllRequests || isLoadingProfile;
 
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h2">Urlaubsplanung</h1>
-        <div className="d-flex align-items-center gap-3">
-          <Form.Select value={year} onChange={e => setYear(Number(e.target.value))} style={{width: '120px'}}>
-            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-          </Form.Select>
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <PlusCircle size={16} className="me-2" />
-            Urlaub beantragen
-          </Button>
-        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)}>
+          <PlusCircle size={16} className="me-2" />
+          Urlaub beantragen
+        </Button>
       </div>
       
-      {isLoading && <div className="text-center p-5"><Spinner /></div>}
-      {error && <p className="text-danger">Fehler: {error.message}</p>}
-      
-      {requests && users && (
-        <Tabs defaultActiveKey={currentMonthIndex} id="month-tabs" className="mb-3">
-          {months.map((month, index) => (
-            <Tab eventKey={index} title={format(month, 'MMMM', { locale: de })} key={index}>
-              <Card>
-                <Card.Body className="p-0">
-                  <MonthlyVacationTable 
-                    year={year} 
-                    month={index} 
-                    requests={requests} 
-                    users={users}
-                    onCellClick={handleCellClick}
-                    onDeleteRequest={handleDeleteRequest}
-                    onUpdateRequest={handleUpdateRequest}
-                    onToggleStatus={handleToggleStatus}
-                  />
-                </Card.Body>
-              </Card>
-            </Tab>
-          ))}
-        </Tabs>
-      )}
+      <Row className="g-4 mb-4">
+        <Col><Card body className="text-center"><h5>{myProfile?.vacation_days_per_year || 0}</h5><span className="text-muted">Tage Anspruch</span></Card></Col>
+        <Col><Card body className="text-center"><h5>{takenDays}</h5><span className="text-muted">Tage Genommen</span></Card></Col>
+        <Col><Card body className="text-center"><h5 className={remainingDays < 0 ? 'text-danger' : ''}>{remainingDays}</h5><span className="text-muted">Tage Übrig</span></Card></Col>
+      </Row>
 
-      {canManage && pendingRequests.length > 0 && (
-        <Card className="mt-4">
+      {canManage && (
+        <Card className="mb-4">
           <Card.Header><Card.Title>Offene Anträge</Card.Title></Card.Header>
-          <ListGroup variant="flush">
-            {pendingRequests.map(req => (
-              <ListGroup.Item key={req.id}>
-                <Row className="align-items-center">
-                  <Col>
-                    <strong>{req.profiles?.first_name} {req.profiles?.last_name}</strong><br/>
-                    <span className="text-muted">{format(parseISO(req.start_date), 'dd.MM.yy')} - {format(parseISO(req.end_date), 'dd.MM.yy')}</span>
-                  </Col>
-                  <Col md="auto">
-                    <Button variant="link" size="sm" className="text-success p-1" onClick={() => updateStatusMutation.mutate({ id: req.id, status: 'approved' })}><Check /></Button>
-                    <Button variant="link" size="sm" className="text-danger p-1" onClick={() => updateStatusMutation.mutate({ id: req.id, status: 'rejected' })}><X /></Button>
-                  </Col>
-                </Row>
-              </ListGroup.Item>
-            ))}
-          </ListGroup>
+          {isLoading ? <Card.Body><Spinner size="sm" /></Card.Body> : pendingRequests.length > 0 ? (
+            <Table responsive hover>
+              <thead><tr><th>Mitarbeiter</th><th>Zeitraum</th><th>Notizen</th><th className="text-end">Aktionen</th></tr></thead>
+              <tbody>
+                {pendingRequests.map(req => (
+                  <tr key={req.id}>
+                    <td>{req.profiles?.first_name} {req.profiles?.last_name}</td>
+                    <td>{format(parseISO(req.start_date), 'dd.MM.yy')} - {format(parseISO(req.end_date), 'dd.MM.yy')}</td>
+                    <td>{req.notes}</td>
+                    <td className="text-end">
+                      <Button variant="link" size="sm" className="text-success p-1" onClick={() => updateStatusMutation.mutate({ id: req.id, status: 'approved' })}><Check /></Button>
+                      <Button variant="link" size="sm" className="text-danger p-1" onClick={() => updateStatusMutation.mutate({ id: req.id, status: 'rejected' })}><X /></Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          ) : <Card.Body><p className="text-muted">Keine offenen Anträge vorhanden.</p></Card.Body>}
         </Card>
       )}
 
-      <Card className="mt-4">
-        <Card.Header><Card.Title>Jahresübersicht {year}</Card.Title></Card.Header>
+      <Card>
+        <Card.Header><Card.Title>Meine Anträge</Card.Title></Card.Header>
         <Card.Body>
-          <VacationSummaryTable 
-            users={users || []}
-            requests={requests || []}
-            year={year}
-            isLoading={isLoading}
-          />
+          {isLoading ? <Spinner /> : myRequests && myRequests.length > 0 ? (
+            <Table responsive striped>
+              <thead><tr><th>Von</th><th>Bis</th><th>Status</th><th>Notizen</th></tr></thead>
+              <tbody>
+                {myRequests.map(req => (
+                  <tr key={req.id}>
+                    <td>{format(parseISO(req.start_date), 'PPP', { locale: de })}</td>
+                    <td>{format(parseISO(req.end_date), 'PPP', { locale: de })}</td>
+                    <td>
+                      <Badge bg={req.status === 'approved' ? 'success' : req.status === 'pending' ? 'warning' : 'danger'}>
+                        {req.status}
+                      </Badge>
+                    </td>
+                    <td>{req.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          ) : <Alert variant="info">Sie haben noch keine Urlaubsanträge gestellt.</Alert>}
         </Card.Body>
       </Card>
 
       <AddVacationRequestDialog 
         show={isAddDialogOpen} 
         onHide={() => setIsAddDialogOpen(false)} 
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['allVacationRequests'] })}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['myVacationRequests', user?.id] })}
       />
     </>
   );
